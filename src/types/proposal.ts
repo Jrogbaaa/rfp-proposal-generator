@@ -47,7 +47,6 @@ export interface ProposalState {
   content: ProblemsAndBenefits;
   expanded: ExpandedContent;
   generated: GeneratedContent;
-  pandadocLink: string | null;
   isLoading: boolean;
   error: string | null;
 }

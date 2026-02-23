@@ -5,24 +5,15 @@ import BriefEditor from './components/BriefEditor'
 import PdfUploader from './components/PdfUploader'
 import DocumentPreview from './components/DocumentPreview'
 import SlidePreview from './components/SlidePreview'
-import GenerateButton from './components/GenerateButton'
 import GoogleSlidesButton from './components/GoogleSlidesButton'
 import { useBriefParser } from './hooks/useBriefParser'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import DevTools from './components/DevTools'
-import { safeRequest, logError } from './utils/errorHandler'
-import { createProposal } from './utils/pandadoc'
-import { generateProposalContent } from './utils/llmService'
-import type { ProposalData, ExpandedContent } from './types/proposal'
 
 type InputMode = 'paste' | 'pdf'
 
 export default function App() {
   const [briefText, setBriefText] = useState('')
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generationStatus, setGenerationStatus] = useState<string>('')
-  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
-  const [generateError, setGenerateError] = useState<string | null>(null)
   const [inputMode, setInputMode] = useState<InputMode>('paste')
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isProcessingPdf, setIsProcessingPdf] = useState(false)
@@ -38,115 +29,9 @@ export default function App() {
     }
   }, [])
 
-  // Build complete ProposalData from parsed partial data and LLM-generated expansions
-  const buildProposalData = (llmContent?: ExpandedContent): ProposalData | null => {
-    if (!parsedData) return null
-
-    const today = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-
-    return {
-      client: {
-        firstName: parsedData.client?.firstName || 'Client',
-        lastName: parsedData.client?.lastName || '',
-        email: parsedData.client?.email || 'client@example.com',
-        company: parsedData.client?.company || 'Company',
-      },
-      project: {
-        title: parsedData.project?.title || 'Proposal',
-        duration: parsedData.project?.duration || '3 months',
-        totalValue: parsedData.project?.totalValue || '$0',
-        platformCosts: parsedData.project?.platformCosts || '$0',
-        monthOneInvestment: parsedData.project?.monthOneInvestment || '$0',
-        monthTwoInvestment: parsedData.project?.monthTwoInvestment || '$0',
-        monthThreeInvestment: parsedData.project?.monthThreeInvestment || '$0',
-      },
-      content: parsedData.content || {
-        problems: ['', '', '', ''],
-        benefits: ['', '', '', ''],
-      },
-      expanded: llmContent || {
-        problemExpansions: parsedData.content?.problems || ['', '', '', ''],
-        benefitExpansions: parsedData.content?.benefits || ['', '', '', ''],
-      },
-      generated: {
-        slideFooter: `${parsedData.client?.company || 'Company'} | Confidential`,
-        contractFooterSlug: `proposal-${Date.now()}`,
-        createdDate: today,
-      },
-    }
-  }
-
-  const handleGenerate = async () => {
-    if (!briefText.trim()) return
-
-    if (!parsedData) {
-      logError('Could not parse brief data', 'validation', { briefText }, 'App')
-      setGenerateError('Please enter valid brief information')
-      return
-    }
-
-    setIsGenerating(true)
-    setGenerateError(null)
-    setGenerationStatus('Generating personalized content...')
-
-    // Step 1: Call LLM to generate personalized content
-    const { data: llmContent, error: llmError } = await safeRequest(
-      async () => {
-        return await generateProposalContent(briefText, parsedData)
-      },
-      { endpoint: 'openai', component: 'LLMService' }
-    )
-
-    if (llmError) {
-      console.error('[Terminal] LLM generation failed:', llmError.message)
-      setGenerateError(`Content generation failed: ${llmError.message}`)
-      setIsGenerating(false)
-      setGenerationStatus('')
-      return
-    }
-
-    // Step 2: Build proposal data with LLM-generated content
-    const proposalData = buildProposalData(llmContent || undefined)
-    if (!proposalData) {
-      logError('Could not build proposal data from input', 'validation', { briefText }, 'App')
-      setGenerateError('Please enter valid brief information')
-      setIsGenerating(false)
-      setGenerationStatus('')
-      return
-    }
-
-    setGenerationStatus('Creating document in PandaDoc...')
-
-    // Step 3: Create document in PandaDoc
-    const { data, error } = await safeRequest(
-      async () => {
-        const result = await createProposal(proposalData)
-        return result.internalLink
-      },
-      { endpoint: '/api/pandadoc', component: 'GenerateButton' }
-    )
-
-    if (error) {
-      console.error('[Terminal] Generation failed:', error.message)
-      setGenerateError(error.message)
-      setIsGenerating(false)
-      setGenerationStatus('')
-      return
-    }
-
-    setGeneratedUrl(data)
-    setIsGenerating(false)
-    setGenerationStatus('')
-  }
-
   const handleClear = () => {
     setBriefText('')
     setUploadedFile(null)
-    setGeneratedUrl(null)
   }
 
   const handleFileUpload = (file: File) => {
@@ -393,23 +278,7 @@ export default function App() {
                     isEmpty={!briefText.trim()}
                   />
 
-                  <div className="pt-5 mt-5 border-t border-cream-400 space-y-4">
-                    <GenerateButton
-                      onClick={handleGenerate}
-                      isLoading={isGenerating}
-                      disabled={!briefText.trim()}
-                      generatedUrl={generatedUrl}
-                      statusMessage={generationStatus}
-                    />
-
-                    {/* Divider with "or" */}
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 h-px bg-cream-300" />
-                      <span className="text-xs font-medium text-navy-400 uppercase tracking-wider">or</span>
-                      <div className="flex-1 h-px bg-cream-300" />
-                    </div>
-
-                    {/* Google Slides — direct API integration */}
+                  <div className="pt-5 mt-5 border-t border-cream-400">
                     <GoogleSlidesButton
                       data={parsedData}
                       briefText={briefText}
@@ -422,50 +291,6 @@ export default function App() {
           </div>
         </motion.section>
       </main>
-
-      {/* Toast notifications */}
-      <AnimatePresence>
-        {generatedUrl && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 bg-navy-800 text-cream-100 px-6 py-4 rounded-xl shadow-elevated flex items-center gap-3 z-50"
-          >
-            <svg className="w-5 h-5 text-gold-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 11.08V12a10 10 0 11-5.93-9.14" strokeLinecap="round" />
-              <polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="font-medium">Document generated successfully!</span>
-          </motion.div>
-        )}
-
-        {/* Error toast */}
-        {generateError && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 bg-red-600 text-white px-6 py-4 rounded-xl shadow-elevated flex items-center gap-3 z-50 max-w-md"
-          >
-            <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <div className="flex-1">
-              <span className="font-medium block">Generation failed</span>
-              <span className="text-sm text-red-100">{generateError}</span>
-            </div>
-            <button
-              onClick={() => setGenerateError(null)}
-              className="text-red-200 hover:text-white"
-            >
-              ✕
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* DevTools Panel - only renders in dev mode */}
       <DevTools />

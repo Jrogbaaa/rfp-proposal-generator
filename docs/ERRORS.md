@@ -146,8 +146,8 @@ npm install -D @types/<package-name>
 - Misconfigured Vite proxy
 
 **Solutions:**
-- Use the `/api/pandadoc` proxy endpoint
-- Check `vite.config.ts` proxy settings
+- Use server-side proxy for APIs that don't support CORS
+- Check `vite.config.ts` proxy settings if applicable
 
 ---
 
@@ -160,7 +160,7 @@ npm install -D @types/<package-name>
 - Network connectivity
 
 **Solutions:**
-1. Check `.env` has valid `VITE_PANDADOC_API_KEY`
+1. Check `.env` has valid API keys (`VITE_OPENAI_API_KEY`, `VITE_GOOGLE_CLIENT_ID`)
 2. Verify network connection
 3. Check API status at provider's status page
 
@@ -234,34 +234,6 @@ npm install -D @types/<package-name>
 
 ---
 
-### PandaDoc API Errors
-
-#### Validation Error: Data merge disabled
-**Error:** `PandaDoc API error: 400 - {"type":"validation_error","detail":{"pricing_tables":["Data merge is disabled..."]}}`
-
-**Causes:**
-- Using pricing_tables with data_merge without a template that has it enabled
-- Sending content_placeholders as empty array
-
-**Solutions:**
-- Use HTML content approach instead of templates for demo mode
-- Remove pricing_tables and content_placeholders from payload
-- Or create a PandaDoc template with data merge enabled
-
----
-
-#### Validation Error: content_placeholders empty
-**Error:** `content_placeholders: ["This list may not be empty."]`
-
-**Causes:**
-- Sending `content_placeholders: []` in the API request
-
-**Solutions:**
-- Remove content_placeholders from payload entirely
-- Or use HTML content approach: `content: { html: "<div>...</div>" }`
-
----
-
 ### Framer Motion Errors
 
 #### useContext is null
@@ -284,7 +256,6 @@ npm install -D @types/<package-name>
 
 | Date | Error | File | Solution | Status |
 |------|-------|------|----------|--------|
-| 2026-01-19 | PandaDoc 400 validation error | pandadoc.ts | Switched to HTML content API | Fixed |
 | 2026-01-19 | useContext null (framer-motion) | App.tsx | Restart dev server / clear .vite cache | Workaround |
 | 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Add credits to OpenAI account | Fixed |
 

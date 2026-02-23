@@ -35,7 +35,7 @@ export default function Header({ isConnected }: HeaderProps) {
               w-1.5 h-1.5 rounded-full
               ${isConnected ? 'bg-gold-500' : 'bg-red-500'}
             `} />
-            {isConnected ? 'PandaDoc Connected' : 'Disconnected'}
+            {isConnected ? 'Google Slides Ready' : 'Disconnected'}
           </div>
 
           {/* Template Button */}

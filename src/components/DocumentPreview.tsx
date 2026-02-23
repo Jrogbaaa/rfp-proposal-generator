@@ -161,7 +161,7 @@ export default function DocumentPreview({ data, isEmpty }: DocumentPreviewProps)
                 {/* Footer */}
                 <div className="mt-12 pt-6 border-t border-cream-300">
                   <p className="text-xs text-navy-400 text-center">
-                    Generated with PandaDoc • {today}
+                    Proposal Preview • {today}
                   </p>
                 </div>
               </div>

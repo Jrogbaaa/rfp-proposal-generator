@@ -71,7 +71,7 @@ export default function Layout({ children, currentStep, onStepClick }: LayoutPro
       <footer className="bg-white border-t border-cream-300 py-4">
         <div className="max-w-5xl mx-auto px-6">
           <p className="text-sm text-navy-400 text-center">
-            Powered by PandaDoc API
+            Powered by Google Slides API
           </p>
         </div>
       </footer>

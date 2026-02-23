@@ -63,7 +63,7 @@ When developing locally and encountering errors:
 import { logError, safeRequest, debugState } from './utils/errorHandler';
 
 // Log errors with context
-logError(error, 'api', { endpoint: '/api/pandadoc' }, 'GenerateButton');
+logError(error, 'api', { endpoint: '/api/slides' }, 'GoogleSlidesButton');
 
 // Wrap async requests safely
 const { data, error } = await safeRequest(() => fetch('/api/...'));

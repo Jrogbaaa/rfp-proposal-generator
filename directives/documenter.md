@@ -57,7 +57,7 @@ When to update:
 ### CHANGELOG Entry
 ```markdown
 ### Fixed
-- Resolved API timeout issue in PandaDoc document generation - `src/utils/pandadoc.ts`
+- Resolved API timeout issue in Google Slides presentation generation - `src/utils/googleSlides.ts`
 ```
 
 ### COMPONENTS.md Entry

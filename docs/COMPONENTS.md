@@ -18,10 +18,9 @@ Auto-generated documentation for all React components in the Paramount applicati
 | ContentEditor | `src/components/ContentEditor.tsx` | Edit expanded content |
 | DocumentPreview | `src/components/DocumentPreview.tsx` | Real-time proposal preview |
 | ProposalReview | `src/components/ProposalReview.tsx` | Final review before generation |
-| GenerateButton | `src/components/GenerateButton.tsx` | Triggers PandaDoc generation (supports `statusMessage` prop for progress) |
-| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Creates Google Slides presentations via API (replaces GammaPromptGenerator) |
+| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Creates Google Slides presentations via API (sole generation path) |
 | ProgressStepper | `src/components/ProgressStepper.tsx` | Workflow step indicator |
-| SuccessScreen | `src/components/SuccessScreen.tsx` | Post-generation success view |
+| ~~SuccessScreen~~ | _removed_ | Was PandaDoc success view (deleted) |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
 | DevTools | `src/components/DevTools.tsx` | Floating dev panel for error viewing (dev only) |
 
@@ -125,7 +124,6 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 | Utility | Location | Purpose |
 |---------|----------|---------|
-| pandadoc | `src/utils/pandadoc.ts` | PandaDoc API integration |
 | contentExpander | `src/utils/contentExpander.ts` | Expands brief content into full sections |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
@@ -134,5 +132,5 @@ Auto-generated documentation for all React components in the Paramount applicati
 ---
 
 ## Last Updated
-- Date: (Auto-updated by Documenter)
-- Changes: Initial documentation structure
+- Date: 2026-02-23
+- Changes: Removed PandaDoc components (GenerateButton, SuccessScreen, pandadoc.ts); Google Slides is now sole generation path

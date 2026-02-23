@@ -45,18 +45,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BriefEditor.tsx** - Updated placeholder example with Starbucks demo brief including all pricing fields
 - Updated App.tsx to include ErrorBoundary wrapper and DevTools panel
 - Updated main.tsx with global error capturing
-- handleGenerate now calls REAL PandaDoc API via `createProposal()` instead of mock URL
-- Added `buildProposalData()` helper to construct complete ProposalData from parsed input
-- Added error toast UI to display API errors in browser
-- **App.tsx** - Added LLM call in `handleGenerate()` flow: Parse brief → Call OpenAI → Build proposal → Send to PandaDoc
-- **App.tsx** - Added status messages for generation progress ("Generating personalized content..." → "Creating document in PandaDoc...")
-- **GenerateButton.tsx** - Added `statusMessage` prop to display generation progress to user
+- **App.tsx** - Simplified to single generation path (Google Slides only); removed PandaDoc flow, "or" divider, and PandaDoc toasts
 
 ### Fixed
 - **vite-env.d.ts** — Removed invalid `declare global` wrapper; ambient `.d.ts` files augment `Window` directly. Resolved 5× TS2339 TypeScript errors on `window.google`.
 - **vite.config.ts** — Added `port: 5173, strictPort: true` to prevent OAuth `redirect_uri_mismatch` errors caused by the dev server silently bumping to a different port when 5173 is occupied.
 
 ### Removed
+- **PandaDoc integration fully removed** — `src/utils/pandadoc.ts`, `src/components/GenerateButton.tsx`, `src/components/SuccessScreen.tsx` deleted; PandaDoc imports, state, `handleGenerate`, `buildProposalData`, proxy config, and env vars all stripped; Google Slides is now the sole presentation output
 - **GammaPromptGenerator** removed from `App.tsx` (component file retained but no longer rendered; replaced by `GoogleSlidesButton`)
 
 ---

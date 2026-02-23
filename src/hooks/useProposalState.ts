@@ -14,7 +14,6 @@ import {
   generateContractSlug,
   generateCreatedDate,
 } from '../utils/contentExpander';
-import { createProposal } from '../utils/pandadoc';
 
 const INITIAL_STATE: ProposalState = {
   step: 0,
@@ -47,7 +46,6 @@ const INITIAL_STATE: ProposalState = {
     contractFooterSlug: '',
     createdDate: '',
   },
-  pandadocLink: null,
   isLoading: false,
   error: null,
 };
@@ -123,33 +121,6 @@ export function useProposalState() {
     });
   }, []);
 
-  const submitProposal = useCallback(async () => {
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    try {
-      const result = await createProposal({
-        client: state.client,
-        project: state.project,
-        content: state.content,
-        expanded: state.expanded,
-        generated: state.generated,
-      });
-
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        pandadocLink: result.internalLink,
-        step: prev.step + 1,
-      }));
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Failed to create proposal',
-      }));
-    }
-  }, [state.client, state.project, state.content, state.expanded, state.generated]);
-
   const reset = useCallback(() => {
     setState(INITIAL_STATE);
   }, []);
@@ -185,7 +156,6 @@ export function useProposalState() {
     nextStep,
     prevStep,
     generateExpandedContent,
-    submitProposal,
     reset,
     setError,
   };
