@@ -3,6 +3,7 @@ export interface ClientInfo {
   lastName: string;
   email: string;
   company: string;
+  companyDomain?: string;
 }
 
 export interface ProjectInfo {

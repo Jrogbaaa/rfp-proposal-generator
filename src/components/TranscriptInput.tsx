@@ -233,6 +233,15 @@ They want to implement automated lead scoring, clean up their CRM, and build rea
                   placeholder="Company name"
                 />
               </div>
+              <div className="form-field">
+                <label>Company Domain <span className="text-gray-400 text-sm font-normal">(optional)</span></label>
+                <input
+                  type="text"
+                  value={client.companyDomain ?? ''}
+                  onChange={(e) => onClientChange({ companyDomain: e.target.value })}
+                  placeholder="company.com"
+                />
+              </div>
             </div>
           </div>
 

@@ -82,13 +82,16 @@ Auto-generated documentation for all React components in the Paramount applicati
 ### googleSlides.ts
 **Location:** `src/utils/googleSlides.ts`
 
-**Purpose:** Creates Google Slides presentations via REST API using a two-phase approach.
+**Purpose:** Creates Google Slides presentations via REST API using a three-phase approach with Paramount branding.
 
 **Exports:**
 - `createGoogleSlidesPresentation(data: ProposalData, accessToken: string): Promise<CreateSlidesResult>`
 
 **Phase 1:** `POST /v1/presentations` — create empty presentation
 **Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all 10 slides in one atomic request
+**Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught)
+
+**Brand:** Paramount navy (`#0D1F40`) + orange (`#F27321`), Montserrat headings, Inter body text. Logos auto-fetched via Clearbit Logo API.
 
 **Returns:** `{ presentationId, presentationUrl, title }`
 
@@ -133,4 +136,4 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 ## Last Updated
 - Date: 2026-02-23
-- Changes: Removed PandaDoc components (GenerateButton, SuccessScreen, pandadoc.ts); Google Slides is now sole generation path
+- Changes: Paramount branding applied to Google Slides export (navy+orange palette, Montserrat/Inter fonts, auto-fetched logos via Clearbit, text autofit); `companyDomain` field added to ClientInfo and intake forms

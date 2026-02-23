@@ -23,6 +23,7 @@ const INITIAL_STATE: ProposalState = {
     lastName: '',
     email: '',
     company: '',
+    companyDomain: '',
   },
   project: {
     title: '',

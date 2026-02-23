@@ -34,6 +34,7 @@ function buildProposalData(parsedData: Partial<ProposalData>, llmContent?: Expan
       lastName: parsedData.client?.lastName || '',
       email: parsedData.client?.email || 'client@example.com',
       company: parsedData.client?.company || 'Company',
+      companyDomain: parsedData.client?.companyDomain || '',
     },
     project: {
       title: parsedData.project?.title || 'Proposal',

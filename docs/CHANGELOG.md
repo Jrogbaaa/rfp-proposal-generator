@@ -9,6 +9,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **E2E testing with Playwright** — 15 tests covering app shell, input mode toggle, brief editor, document preview, Google Slides button, and PDF uploader
+  - `e2e/app.spec.ts` — test suite
+  - `playwright.config.ts` — Playwright configuration (Chromium, Vite preview server)
+  - `npm test`, `npm run test:ui`, `npm run test:headed` scripts
+- **GitHub Actions CI** — `.github/workflows/e2e.yml` runs E2E tests on every push and PR to main
+  - Uploads Playwright HTML report and failure traces as artifacts
+
+### Fixed
+- **App.tsx** — Removed stale `setGeneratedUrl(null)` call in `handleFileUpload` that caused a build failure
+- **Paramount branding for Google Slides export**
+  - Brand palette switched from navy/gold/cream to Paramount navy (`#0D1F40`) + orange (`#F27321`)
+  - Fonts updated: headings use Montserrat (Bold), body uses Inter (replaces Playfair Display + DM Sans)
+  - Agency name changed from "Look After You" to "Paramount" on cover and closing slides
+- **Auto-fetched brand logos** on cover and closing slides via Clearbit Logo API
+  - Paramount logo on cover (top-right) and closing (centered)
+  - Client logo on cover (bottom-right), fetched by `companyDomain`
+  - Logo insertion is best-effort — failures don't break the presentation
+- **`companyDomain` field** added to `ClientInfo` type and both intake forms (StructuredForm, TranscriptInput)
+- **Text autofit** (`TEXT_AUTOFIT`) applied to every text box across all slides — text auto-shrinks to fit containers
+
+### Fixed
+- **Slide text overlap** — `problemDeepDive` headline box enlarged (700K → 1M EMU), font reduced (30pt → 24pt), body pushed down (y 1.5M → 1.65M EMU); same fix applied to `problemsCombined` two-column layout
+
+### Added (prior)
 - **Google Slides API integration** — replaces manual Gamma.app workflow
   - `src/utils/googleAuth.ts` — OAuth 2.0 token management via Google Identity Services (GIS)
   - `src/utils/googleSlides.ts` — Google Slides REST API client using two-phase batchUpdate approach

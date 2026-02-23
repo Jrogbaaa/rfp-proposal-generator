@@ -150,6 +150,16 @@ export default function StructuredForm({
               />
               {errors.company && <p className="error-message">{errors.company}</p>}
             </div>
+
+            <div className="form-field">
+              <label>Company Domain <span className="text-gray-400 text-sm font-normal">(optional — for logo)</span></label>
+              <input
+                type="text"
+                value={client.companyDomain ?? ''}
+                onChange={(e) => onClientChange({ companyDomain: e.target.value })}
+                placeholder="acmecorp.com"
+              />
+            </div>
           </div>
 
           <div className="mt-8 flex justify-end">

@@ -37,7 +37,6 @@ export default function App() {
   const handleFileUpload = (file: File) => {
     setUploadedFile(file)
     setBriefText('')
-    setGeneratedUrl(null)
     setIsProcessingPdf(true)
     setProcessingStage(0)
 

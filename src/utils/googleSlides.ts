@@ -17,12 +17,12 @@ const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 const W = 9144000  // slide width
 const H = 5143500  // slide height
 
-// Brand palette (RGB 0–1 floats)
-const NAVY  = { red: 0.098, green: 0.122, blue: 0.212 }  // #1a1f36
-const GOLD  = { red: 0.788, green: 0.635, blue: 0.153 }  // #c9a227
-const CREAM = { red: 0.996, green: 0.988, blue: 0.969 }  // #fefdfb
-const WHITE = { red: 1, green: 1, blue: 1 }
-const GRAY  = { red: 0.45, green: 0.48, blue: 0.54 }
+// Paramount brand palette (RGB 0–1 floats)
+const NAVY   = { red: 0.051, green: 0.122, blue: 0.251 }  // #0D1F40
+const ORANGE = { red: 0.949, green: 0.451, blue: 0.129 }  // #F27321
+const WHITE  = { red: 1, green: 1, blue: 1 }
+const LTGRAY = { red: 0.96, green: 0.96, blue: 0.97 }     // #F5F5F7
+const GRAY   = { red: 0.45, green: 0.48, blue: 0.54 }
 
 export interface CreateSlidesResult {
   presentationId: string
@@ -93,7 +93,7 @@ function styleText(id: string, opts: TextStyleOpts) {
     updateTextStyle: {
       objectId: id,
       style: {
-        fontFamily: opts.fontFamily ?? 'DM Sans',
+        fontFamily: opts.fontFamily ?? 'Inter',
         fontSize: { magnitude: opts.fontSize ?? 18, unit: 'PT' },
         foregroundColor: { opaqueColor: { rgbColor: opts.color ?? NAVY } },
         bold: opts.bold ?? false,
@@ -111,6 +111,40 @@ function paragraphAlign(id: string, alignment: 'START' | 'CENTER' | 'END' = 'STA
       style: { alignment },
       textRange: { type: 'ALL' },
       fields: 'alignment',
+    },
+  }
+}
+
+function autofit(id: string) {
+  return {
+    updateShapeProperties: {
+      objectId: id,
+      shapeProperties: { autofit: { autofitType: 'TEXT_AUTOFIT' } },
+      fields: 'autofit',
+    },
+  }
+}
+
+function createImageReq(
+  id: string, slideId: string, url: string,
+  x: number, y: number, w: number, h: number,
+) {
+  return {
+    createImage: {
+      objectId: id,
+      url,
+      elementProperties: {
+        pageObjectId: slideId,
+        size: {
+          width: { magnitude: w, unit: 'EMU' },
+          height: { magnitude: h, unit: 'EMU' },
+        },
+        transform: {
+          scaleX: 1, scaleY: 1,
+          translateX: x, translateY: y,
+          unit: 'EMU',
+        },
+      },
     },
   }
 }
@@ -168,25 +202,23 @@ function titleSlide(slideId: string, data: ProposalData): object[] {
 
   return [
     bgFill(slideId, NAVY),
-    // Gold accent bar top
-    ...createRect(barId, slideId, 0, 0, W, 60000, GOLD),
-    // Thin cream bar at bottom
-    ...createRect(bar2Id, slideId, 0, H - 80000, W, 80000, { red: 0.102, green: 0.133, blue: 0.231 }),
+    ...createRect(barId, slideId, 0, 0, W, 60000, ORANGE),
+    ...createRect(bar2Id, slideId, 0, H - 80000, W, 80000, { red: 0.035, green: 0.09, blue: 0.2 }),
 
-    // Agency label
     createTextBox(subId, slideId, MARGIN_X, 300000, FULL_W, 220000),
-    insertText(subId, 'Look After You'),
-    styleText(subId, { color: GOLD, fontSize: 13, fontFamily: 'DM Sans', bold: true }),
+    insertText(subId, 'Paramount'),
+    styleText(subId, { color: ORANGE, fontSize: 13, fontFamily: 'Inter', bold: true }),
+    autofit(subId),
 
-    // Main title
     createTextBox(titleId, slideId, MARGIN_X, 550000, FULL_W, 1500000),
     insertText(titleId, data.project.title),
-    styleText(titleId, { color: CREAM, fontSize: 48, fontFamily: 'Playfair Display' }),
+    styleText(titleId, { color: WHITE, fontSize: 48, fontFamily: 'Montserrat', bold: true }),
+    autofit(titleId),
 
-    // Company + date
     createTextBox(dateId, slideId, MARGIN_X, 2200000, FULL_W, 400000),
     insertText(dateId, `Prepared for ${data.client.company}  ·  ${data.generated.createdDate}`),
-    styleText(dateId, { color: GRAY, fontSize: 14, fontFamily: 'DM Sans' }),
+    styleText(dateId, { color: GRAY, fontSize: 14, fontFamily: 'Inter' }),
+    autofit(dateId),
   ]
 }
 
@@ -198,16 +230,18 @@ function challengeSlide(slideId: string, data: ProposalData): object[] {
   const problems = data.content.problems.filter(p => p.trim())
 
   return [
-    bgFill(slideId, CREAM),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, GOLD),
+    bgFill(slideId, WHITE),
+    ...createRect(barId, slideId, 0, H - 50000, W, 50000, ORANGE),
 
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'The Challenge'),
-    styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Playfair Display', bold: false }),
+    styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    autofit(headId),
 
     createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
     insertText(bodyId, problems.join('\n')),
-    styleText(bodyId, { color: NAVY, fontSize: 20, fontFamily: 'DM Sans' }),
+    styleText(bodyId, { color: NAVY, fontSize: 20, fontFamily: 'Inter' }),
+    autofit(bodyId),
     {
       createParagraphBullets: {
         objectId: bodyId,
@@ -232,27 +266,31 @@ function problemDeepDive(
   const barId   = `${slideId}_bar`
   const accentId = `${slideId}_accent`
 
+  const xOff = accent ? 80000 : 0
   const reqs: object[] = [
     bgFill(slideId, WHITE),
     ...createRect(barId, slideId, 0, H - 50000, W, 50000, NAVY),
   ]
 
   if (accent) {
-    reqs.push(...createRect(accentId, slideId, 0, 0, 20000, H, GOLD))
+    reqs.push(...createRect(accentId, slideId, 0, 0, 20000, H, ORANGE))
   }
 
   reqs.push(
-    createTextBox(labelId, slideId, MARGIN_X + (accent ? 80000 : 0), MARGIN_TOP, FULL_W, 180000),
+    createTextBox(labelId, slideId, MARGIN_X + xOff, 300000, FULL_W, 180000),
     insertText(labelId, label),
-    styleText(labelId, { color: GOLD, fontSize: 11, fontFamily: 'DM Sans', bold: true }),
+    styleText(labelId, { color: ORANGE, fontSize: 11, fontFamily: 'Inter', bold: true }),
+    autofit(labelId),
 
-    createTextBox(headId, slideId, MARGIN_X + (accent ? 80000 : 0), 650000, FULL_W - (accent ? 80000 : 0), 700000),
+    createTextBox(headId, slideId, MARGIN_X + xOff, 520000, FULL_W - xOff, 1000000),
     insertText(headId, headline),
-    styleText(headId, { color: NAVY, fontSize: 30, fontFamily: 'Playfair Display' }),
+    styleText(headId, { color: NAVY, fontSize: 24, fontFamily: 'Montserrat', bold: true }),
+    autofit(headId),
 
-    createTextBox(bodyId, slideId, MARGIN_X + (accent ? 80000 : 0), 1500000, FULL_W - (accent ? 80000 : 0), 3200000),
+    createTextBox(bodyId, slideId, MARGIN_X + xOff, 1650000, FULL_W - xOff, 3100000),
     insertText(bodyId, body),
-    styleText(bodyId, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 18, fontFamily: 'DM Sans' }),
+    styleText(bodyId, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 16, fontFamily: 'Inter' }),
+    autofit(bodyId),
   )
 
   return reqs
@@ -272,29 +310,32 @@ function problemsCombined(slideId: string, data: ProposalData): object[] {
   const e3 = data.expanded.problemExpansions[2] || ''
   const e4 = data.expanded.problemExpansions[3] || ''
 
+  const colW = W / 2 - MARGIN_X - 80000
+
   return [
     bgFill(slideId, WHITE),
     ...createRect(barId, slideId, 0, H - 50000, W, 50000, NAVY),
-    // Vertical divider
     ...createRect(divId, slideId, W / 2 - 15000, MARGIN_TOP, 30000, H - MARGIN_TOP - 50000, { red: 0.9, green: 0.91, blue: 0.93 }),
 
-    // Left column
-    createTextBox(head1Id, slideId, MARGIN_X, MARGIN_TOP, W / 2 - MARGIN_X - 80000, 500000),
+    createTextBox(head1Id, slideId, MARGIN_X, MARGIN_TOP, colW, 700000),
     insertText(head1Id, p3),
-    styleText(head1Id, { color: NAVY, fontSize: 22, fontFamily: 'Playfair Display' }),
+    styleText(head1Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true }),
+    autofit(head1Id),
 
-    createTextBox(body1Id, slideId, MARGIN_X, 1000000, W / 2 - MARGIN_X - 80000, 3600000),
+    createTextBox(body1Id, slideId, MARGIN_X, 1200000, colW, 3400000),
     insertText(body1Id, e3),
-    styleText(body1Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 16, fontFamily: 'DM Sans' }),
+    styleText(body1Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' }),
+    autofit(body1Id),
 
-    // Right column
-    createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP, W / 2 - MARGIN_X - 80000, 500000),
+    createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP, colW, 700000),
     insertText(head2Id, p4),
-    styleText(head2Id, { color: NAVY, fontSize: 22, fontFamily: 'Playfair Display' }),
+    styleText(head2Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true }),
+    autofit(head2Id),
 
-    createTextBox(body2Id, slideId, W / 2 + 80000, 1000000, W / 2 - MARGIN_X - 80000, 3600000),
+    createTextBox(body2Id, slideId, W / 2 + 80000, 1200000, colW, 3400000),
     insertText(body2Id, e4),
-    styleText(body2Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 16, fontFamily: 'DM Sans' }),
+    styleText(body2Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' }),
+    autofit(body2Id),
   ]
 }
 
@@ -307,15 +348,17 @@ function solutionSlide(slideId: string, data: ProposalData): object[] {
 
   return [
     bgFill(slideId, NAVY),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, GOLD),
+    ...createRect(barId, slideId, 0, H - 50000, W, 50000, ORANGE),
 
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'The Solution'),
-    styleText(headId, { color: GOLD, fontSize: 36, fontFamily: 'Playfair Display' }),
+    styleText(headId, { color: ORANGE, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    autofit(headId),
 
     createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
     insertText(bodyId, benefits.join('\n')),
-    styleText(bodyId, { color: CREAM, fontSize: 20, fontFamily: 'DM Sans' }),
+    styleText(bodyId, { color: WHITE, fontSize: 20, fontFamily: 'Inter' }),
+    autofit(bodyId),
     {
       createParagraphBullets: {
         objectId: bodyId,
@@ -337,32 +380,38 @@ function investmentSlide(slideId: string, data: ProposalData): object[] {
   const barId    = `${slideId}_bar`
 
   return [
-    bgFill(slideId, CREAM),
+    bgFill(slideId, LTGRAY),
     ...createRect(barId, slideId, 0, H - 50000, W, 50000, NAVY),
 
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'Investment & Timeline'),
-    styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Playfair Display' }),
+    styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    autofit(headId),
 
     createTextBox(totalId, slideId, MARGIN_X, 1050000, FULL_W / 2, 400000),
     insertText(totalId, `Total Investment: ${data.project.totalValue}`),
-    styleText(totalId, { color: GOLD, fontSize: 24, fontFamily: 'DM Sans', bold: true }),
+    styleText(totalId, { color: ORANGE, fontSize: 24, fontFamily: 'Inter', bold: true }),
+    autofit(totalId),
 
     createTextBox(timeId, slideId, MARGIN_X, 1550000, FULL_W / 2, 300000),
     insertText(timeId, `Timeline: ${data.project.duration}`),
-    styleText(timeId, { color: NAVY, fontSize: 18, fontFamily: 'DM Sans' }),
+    styleText(timeId, { color: NAVY, fontSize: 18, fontFamily: 'Inter' }),
+    autofit(timeId),
 
     createTextBox(m1Id, slideId, MARGIN_X, 2100000, FULL_W, 300000),
     insertText(m1Id, `Month 1: ${data.project.monthOneInvestment}`),
-    styleText(m1Id, { color: NAVY, fontSize: 16, fontFamily: 'DM Sans' }),
+    styleText(m1Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
+    autofit(m1Id),
 
     createTextBox(m2Id, slideId, MARGIN_X, 2500000, FULL_W, 300000),
     insertText(m2Id, `Month 2: ${data.project.monthTwoInvestment}`),
-    styleText(m2Id, { color: NAVY, fontSize: 16, fontFamily: 'DM Sans' }),
+    styleText(m2Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
+    autofit(m2Id),
 
     createTextBox(m3Id, slideId, MARGIN_X, 2900000, FULL_W, 300000),
     insertText(m3Id, `Month 3: ${data.project.monthThreeInvestment}`),
-    styleText(m3Id, { color: NAVY, fontSize: 16, fontFamily: 'DM Sans' }),
+    styleText(m3Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
+    autofit(m3Id),
   ]
 }
 
@@ -375,23 +424,74 @@ function closingSlide(slideId: string, data: ProposalData): object[] {
 
   return [
     bgFill(slideId, NAVY),
-    ...createRect(barId, slideId, 0, H - 80000, W, 80000, { red: 0.102, green: 0.133, blue: 0.231 }),
+    ...createRect(barId, slideId, 0, H - 80000, W, 80000, { red: 0.035, green: 0.09, blue: 0.2 }),
 
     createTextBox(headId, slideId, MARGIN_X, 1400000, FULL_W, 800000),
     insertText(headId, `Let's build this together, ${data.client.firstName}.`),
-    styleText(headId, { color: GOLD, fontSize: 40, fontFamily: 'Playfair Display' }),
+    styleText(headId, { color: ORANGE, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
+    autofit(headId),
     paragraphAlign(headId, 'CENTER'),
 
     createTextBox(subId, slideId, MARGIN_X, 2400000, FULL_W, 400000),
-    insertText(subId, 'Look After You  ·  lookafteryou.agency'),
-    styleText(subId, { color: CREAM, fontSize: 16, fontFamily: 'DM Sans' }),
+    insertText(subId, 'Paramount'),
+    styleText(subId, { color: WHITE, fontSize: 16, fontFamily: 'Inter' }),
+    autofit(subId),
     paragraphAlign(subId, 'CENTER'),
 
     createTextBox(footerId, slideId, MARGIN_X, H - 200000, FULL_W, 150000),
     insertText(footerId, data.generated.slideFooter),
-    styleText(footerId, { color: GRAY, fontSize: 11, fontFamily: 'DM Sans' }),
+    styleText(footerId, { color: GRAY, fontSize: 11, fontFamily: 'Inter' }),
+    autofit(footerId),
     paragraphAlign(footerId, 'CENTER'),
   ]
+}
+
+// ---------------------------------------------------------------------------
+// Logo helpers
+// ---------------------------------------------------------------------------
+
+const PARAMOUNT_DOMAIN = 'paramount.com'
+const LOGO_API = 'https://logo.clearbit.com'
+
+function getClientDomain(data: ProposalData): string | null {
+  if (data.client.companyDomain) return data.client.companyDomain
+  const guess = data.client.company.toLowerCase().replace(/[^a-z0-9]/g, '') + '.com'
+  return guess || null
+}
+
+function logoRequests(coverSlideId: string, closeSlideId: string, data: ProposalData): object[] {
+  const reqs: object[] = []
+  const LOGO_H = 457200   // ~0.5"
+  const LOGO_W = 1371600  // ~1.5" (rectangular aspect)
+
+  reqs.push(
+    createImageReq(
+      `${coverSlideId}_plogo`, coverSlideId,
+      `${LOGO_API}/${PARAMOUNT_DOMAIN}`,
+      W - MARGIN_X - LOGO_W, 200000, LOGO_W, LOGO_H,
+    ),
+  )
+
+  const clientDomain = getClientDomain(data)
+  if (clientDomain) {
+    reqs.push(
+      createImageReq(
+        `${coverSlideId}_clogo`, coverSlideId,
+        `${LOGO_API}/${clientDomain}`,
+        W - MARGIN_X - LOGO_W, H - 80000 - LOGO_H - 100000, LOGO_W, LOGO_H,
+      ),
+    )
+  }
+
+  reqs.push(
+    createImageReq(
+      `${closeSlideId}_plogo`, closeSlideId,
+      `${LOGO_API}/${PARAMOUNT_DOMAIN}`,
+      W / 2 - LOGO_W / 2, 600000, LOGO_W, LOGO_H,
+    ),
+  )
+
+  return reqs
 }
 
 // ---------------------------------------------------------------------------
@@ -421,11 +521,9 @@ export async function createGoogleSlidesPresentation(
 
   const presentation = await createResp.json()
   const presentationId: string = presentation.presentationId
-  // The default blank slide created automatically
   const defaultSlideId: string = presentation.slides?.[0]?.objectId
 
   // Phase 2: Build all slides via batchUpdate
-  // Each slide gets a stable ID so object IDs within it can reference it
   const slideIds = [
     's01_cover', 's02_challenge', 's03_prob1', 's04_prob2',
     's05_prob34', 's06_solution', 's07_ben1', 's08_ben23',
@@ -437,12 +535,10 @@ export async function createGoogleSlidesPresentation(
 
   const slideRequests: object[] = []
 
-  // Delete the default blank slide first
   if (defaultSlideId) {
     slideRequests.push({ deleteObject: { objectId: defaultSlideId } })
   }
 
-  // Create all 10 slides (blank first, then populate)
   for (let i = 0; i < slideIds.length; i++) {
     slideRequests.push({
       createSlide: {
@@ -453,7 +549,6 @@ export async function createGoogleSlidesPresentation(
     })
   }
 
-  // Populate each slide
   const populationRequests: object[] = [
     ...titleSlide(slideIds[0], p),
     ...challengeSlide(slideIds[1], p),
@@ -476,6 +571,20 @@ export async function createGoogleSlidesPresentation(
   if (!batchResp.ok) {
     const err = await batchResp.json().catch(() => ({}))
     throw new Error(`Failed to build slides: ${err?.error?.message || batchResp.statusText}`)
+  }
+
+  // Phase 3: Insert logos (separate request so failures don't break the deck)
+  try {
+    const logoReqs = logoRequests(slideIds[0], slideIds[9], p)
+    if (logoReqs.length > 0) {
+      await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ requests: logoReqs }),
+      })
+    }
+  } catch {
+    // Logo insertion is best-effort — don't throw
   }
 
   return {
