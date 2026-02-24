@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- **Switched LLM from OpenAI GPT-4o to Google Gemini 2.5 Flash** — `src/utils/llmService.ts` now calls the Gemini REST API instead of OpenAI; uses `responseMimeType: "application/json"` for native JSON output; env var changed from `VITE_OPENAI_API_KEY` to `VITE_GEMINI_API_KEY`; `src/vite-env.d.ts` updated accordingly
+- **Removed TEXT_AUTOFIT from Google Slides** — Google Slides API no longer supports `autofitType: 'TEXT_AUTOFIT'`; removed the `autofit()` helper and all 23 call sites in `src/utils/googleSlides.ts` to fix `400 Autofit types other than NONE are not supported` error
+
 ### Added
 - **E2E testing with Playwright** — 15 tests covering app shell, input mode toggle, brief editor, document preview, Google Slides button, and PDF uploader
   - `e2e/app.spec.ts` — test suite
@@ -17,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Uploads Playwright HTML report and failure traces as artifacts
 
 ### Fixed
+- **Google Slides `updateShapeProperties` autofit field mask** — Changed `fields: 'autofit'` to `fields: 'autofit.autofitType'` in `googleSlides.ts` to avoid including read-only subfields (`fontScale`, `lineSpacingReduction`) that caused `400 Invalid field mask: * includes read-only fields` on batchUpdate request #19
 - **App.tsx** — Removed stale `setGeneratedUrl(null)` call in `handleFileUpload` that caused a build failure
 - **Paramount branding for Google Slides export**
   - Brand palette switched from navy/gold/cream to Paramount navy (`#0D1F40`) + orange (`#F27321`)
@@ -54,8 +59,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Copy-to-clipboard functionality for easy transfer to gamma.app
   - Expandable UI with preview of generated prompt
   - Added alongside GenerateButton with "or" divider in App.tsx
-- **LLM Service** - `src/utils/llmService.ts` - OpenAI GPT-4o integration for personalized proposal content generation
-- `VITE_OPENAI_API_KEY` environment variable for OpenAI API authentication
+- **LLM Service** - `src/utils/llmService.ts` - personalized proposal content generation (originally OpenAI GPT-4o, now Gemini 2.0 Flash)
+- `VITE_GEMINI_API_KEY` environment variable for Gemini API authentication (previously `VITE_OPENAI_API_KEY`)
 
 ### Changed
 - **App.tsx** — Replaced `GammaPromptGenerator` with `GoogleSlidesButton` (direct API integration replaces manual copy-paste Gamma workflow); added `briefText` prop forwarding

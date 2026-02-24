@@ -115,15 +115,6 @@ function paragraphAlign(id: string, alignment: 'START' | 'CENTER' | 'END' = 'STA
   }
 }
 
-function autofit(id: string) {
-  return {
-    updateShapeProperties: {
-      objectId: id,
-      shapeProperties: { autofit: { autofitType: 'TEXT_AUTOFIT' } },
-      fields: 'autofit',
-    },
-  }
-}
 
 function createImageReq(
   id: string, slideId: string, url: string,
@@ -208,17 +199,14 @@ function titleSlide(slideId: string, data: ProposalData): object[] {
     createTextBox(subId, slideId, MARGIN_X, 300000, FULL_W, 220000),
     insertText(subId, 'Paramount'),
     styleText(subId, { color: ORANGE, fontSize: 13, fontFamily: 'Inter', bold: true }),
-    autofit(subId),
 
     createTextBox(titleId, slideId, MARGIN_X, 550000, FULL_W, 1500000),
     insertText(titleId, data.project.title),
     styleText(titleId, { color: WHITE, fontSize: 48, fontFamily: 'Montserrat', bold: true }),
-    autofit(titleId),
 
     createTextBox(dateId, slideId, MARGIN_X, 2200000, FULL_W, 400000),
     insertText(dateId, `Prepared for ${data.client.company}  ·  ${data.generated.createdDate}`),
     styleText(dateId, { color: GRAY, fontSize: 14, fontFamily: 'Inter' }),
-    autofit(dateId),
   ]
 }
 
@@ -236,12 +224,10 @@ function challengeSlide(slideId: string, data: ProposalData): object[] {
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'The Challenge'),
     styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
-    autofit(headId),
 
     createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
     insertText(bodyId, problems.join('\n')),
     styleText(bodyId, { color: NAVY, fontSize: 20, fontFamily: 'Inter' }),
-    autofit(bodyId),
     {
       createParagraphBullets: {
         objectId: bodyId,
@@ -280,17 +266,14 @@ function problemDeepDive(
     createTextBox(labelId, slideId, MARGIN_X + xOff, 300000, FULL_W, 180000),
     insertText(labelId, label),
     styleText(labelId, { color: ORANGE, fontSize: 11, fontFamily: 'Inter', bold: true }),
-    autofit(labelId),
 
     createTextBox(headId, slideId, MARGIN_X + xOff, 520000, FULL_W - xOff, 1000000),
     insertText(headId, headline),
     styleText(headId, { color: NAVY, fontSize: 24, fontFamily: 'Montserrat', bold: true }),
-    autofit(headId),
 
     createTextBox(bodyId, slideId, MARGIN_X + xOff, 1650000, FULL_W - xOff, 3100000),
     insertText(bodyId, body),
     styleText(bodyId, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 16, fontFamily: 'Inter' }),
-    autofit(bodyId),
   )
 
   return reqs
@@ -320,22 +303,18 @@ function problemsCombined(slideId: string, data: ProposalData): object[] {
     createTextBox(head1Id, slideId, MARGIN_X, MARGIN_TOP, colW, 700000),
     insertText(head1Id, p3),
     styleText(head1Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true }),
-    autofit(head1Id),
 
     createTextBox(body1Id, slideId, MARGIN_X, 1200000, colW, 3400000),
     insertText(body1Id, e3),
     styleText(body1Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' }),
-    autofit(body1Id),
 
     createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP, colW, 700000),
     insertText(head2Id, p4),
     styleText(head2Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true }),
-    autofit(head2Id),
 
     createTextBox(body2Id, slideId, W / 2 + 80000, 1200000, colW, 3400000),
     insertText(body2Id, e4),
     styleText(body2Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' }),
-    autofit(body2Id),
   ]
 }
 
@@ -353,12 +332,10 @@ function solutionSlide(slideId: string, data: ProposalData): object[] {
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'The Solution'),
     styleText(headId, { color: ORANGE, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
-    autofit(headId),
 
     createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
     insertText(bodyId, benefits.join('\n')),
     styleText(bodyId, { color: WHITE, fontSize: 20, fontFamily: 'Inter' }),
-    autofit(bodyId),
     {
       createParagraphBullets: {
         objectId: bodyId,
@@ -386,32 +363,26 @@ function investmentSlide(slideId: string, data: ProposalData): object[] {
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'Investment & Timeline'),
     styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
-    autofit(headId),
 
     createTextBox(totalId, slideId, MARGIN_X, 1050000, FULL_W / 2, 400000),
     insertText(totalId, `Total Investment: ${data.project.totalValue}`),
     styleText(totalId, { color: ORANGE, fontSize: 24, fontFamily: 'Inter', bold: true }),
-    autofit(totalId),
 
     createTextBox(timeId, slideId, MARGIN_X, 1550000, FULL_W / 2, 300000),
     insertText(timeId, `Timeline: ${data.project.duration}`),
     styleText(timeId, { color: NAVY, fontSize: 18, fontFamily: 'Inter' }),
-    autofit(timeId),
 
     createTextBox(m1Id, slideId, MARGIN_X, 2100000, FULL_W, 300000),
     insertText(m1Id, `Month 1: ${data.project.monthOneInvestment}`),
     styleText(m1Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
-    autofit(m1Id),
 
     createTextBox(m2Id, slideId, MARGIN_X, 2500000, FULL_W, 300000),
     insertText(m2Id, `Month 2: ${data.project.monthTwoInvestment}`),
     styleText(m2Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
-    autofit(m2Id),
 
     createTextBox(m3Id, slideId, MARGIN_X, 2900000, FULL_W, 300000),
     insertText(m3Id, `Month 3: ${data.project.monthThreeInvestment}`),
     styleText(m3Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
-    autofit(m3Id),
   ]
 }
 
@@ -429,19 +400,16 @@ function closingSlide(slideId: string, data: ProposalData): object[] {
     createTextBox(headId, slideId, MARGIN_X, 1400000, FULL_W, 800000),
     insertText(headId, `Let's build this together, ${data.client.firstName}.`),
     styleText(headId, { color: ORANGE, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
-    autofit(headId),
     paragraphAlign(headId, 'CENTER'),
 
     createTextBox(subId, slideId, MARGIN_X, 2400000, FULL_W, 400000),
     insertText(subId, 'Paramount'),
     styleText(subId, { color: WHITE, fontSize: 16, fontFamily: 'Inter' }),
-    autofit(subId),
     paragraphAlign(subId, 'CENTER'),
 
     createTextBox(footerId, slideId, MARGIN_X, H - 200000, FULL_W, 150000),
     insertText(footerId, data.generated.slideFooter),
     styleText(footerId, { color: GRAY, fontSize: 11, fontFamily: 'Inter' }),
-    autofit(footerId),
     paragraphAlign(footerId, 'CENTER'),
   ]
 }

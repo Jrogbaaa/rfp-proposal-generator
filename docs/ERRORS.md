@@ -86,6 +86,17 @@ declare global { interface Window { google?: { ... } } }
 
 ---
 
+### "Autofit types other than NONE are not supported" (updateShapeProperties)
+**Error:** `Invalid requests[N].updateShapeProperties: Autofit types other than NONE are not supported`
+
+**Cause:** Google Slides API deprecated `TEXT_AUTOFIT` as an autofit type. Any `updateShapeProperties` request that sets `autofitType: 'TEXT_AUTOFIT'` is now rejected with a 400.
+
+**Solution:** Remove all autofit requests entirely. Text boxes should be sized generously at creation time instead of relying on auto-shrink.
+
+**Fix applied:** Removed the `autofit()` helper function and all 23 call sites from `src/utils/googleSlides.ts`.
+
+---
+
 ### VITE_GOOGLE_CLIENT_ID not configured
 **Cause:** The `.env` file is missing `VITE_GOOGLE_CLIENT_ID`.
 **Solution:** Add to `.env`:
@@ -160,7 +171,7 @@ npm install -D @types/<package-name>
 - Network connectivity
 
 **Solutions:**
-1. Check `.env` has valid API keys (`VITE_OPENAI_API_KEY`, `VITE_GOOGLE_CLIENT_ID`)
+1. Check `.env` has valid API keys (`VITE_GEMINI_API_KEY`, `VITE_GOOGLE_CLIENT_ID`)
 2. Verify network connection
 3. Check API status at provider's status page
 
@@ -199,38 +210,47 @@ npm install -D @types/<package-name>
 
 ---
 
-### OpenAI API Errors
+### Gemini API Errors
 
-#### 429 - Insufficient Quota
-**Error:** `You exceeded your current quota, please check your plan and billing details`
+#### 429 - Resource Exhausted
+**Error:** `Gemini API error: 429` or `RESOURCE_EXHAUSTED`
 
 **Causes:**
-- OpenAI account has run out of credits
-- Hit maximum monthly spending limit
-- Prepaid credits have been consumed
+- Exceeded per-minute request quota for Gemini API
+- Free tier daily limit reached
 
 **Solutions:**
-1. Check billing at https://platform.openai.com/account/billing
-2. Add payment method or purchase more credits
-3. Check usage at https://platform.openai.com/usage
-4. Consider increasing monthly spending limit in account settings
-
-**Note:** This is different from rate limiting (too many requests). Quota errors require adding funds to your OpenAI account.
+1. Check quota at https://aistudio.google.com/apikey
+2. Wait a minute and retry (per-minute quota resets quickly)
+3. Upgrade to a paid plan for higher limits
+4. Consider switching model from `gemini-2.0-flash` to a lower-cost variant
 
 ---
 
-#### 429 - Rate Limit Reached
-**Error:** `Rate limit reached for requests`
+#### 400 - Invalid API Key
+**Error:** `Gemini API error: 400` with `API_KEY_INVALID`
 
 **Causes:**
-- Sending too many requests per minute
-- Concurrent API calls exceeding tier limits
+- `VITE_GEMINI_API_KEY` is missing or incorrect
+- API key was revoked or regenerated
 
 **Solutions:**
-1. Implement exponential backoff retry logic
-2. Add delays between requests
-3. Check your rate limit tier at https://platform.openai.com/account/limits
-4. Consider upgrading API tier for higher limits
+1. Generate a new key at https://aistudio.google.com/apikey
+2. Add it to `.env`: `VITE_GEMINI_API_KEY=your-key-here`
+3. Restart the dev server after changing `.env`
+
+---
+
+#### 403 - Permission Denied
+**Error:** `Gemini API error: 403`
+
+**Causes:**
+- Gemini API not enabled for the Google Cloud project associated with the key
+- API key restricted to specific APIs that don't include Generative Language
+
+**Solutions:**
+1. Go to https://console.cloud.google.com/apis/library and enable "Generative Language API"
+2. Check API key restrictions in the Cloud Console
 
 ---
 
@@ -257,7 +277,7 @@ npm install -D @types/<package-name>
 | Date | Error | File | Solution | Status |
 |------|-------|------|----------|--------|
 | 2026-01-19 | useContext null (framer-motion) | App.tsx | Restart dev server / clear .vite cache | Workaround |
-| 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Add credits to OpenAI account | Fixed |
+| 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Migrated to Gemini — no longer applicable | Obsolete |
 
 ---
 

@@ -1,6 +1,8 @@
 import type { ProposalData, ExpandedContent } from '../types/proposal';
 
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 interface LLMResponse {
   problemExpansions: [string, string, string, string];
@@ -30,8 +32,8 @@ export async function generateProposalContent(
   briefText: string,
   parsedData: Partial<ProposalData>
 ): Promise<ExpandedContent> {
-  if (!OPENAI_API_KEY) {
-    throw new Error('VITE_OPENAI_API_KEY environment variable is not set');
+  if (!GEMINI_API_KEY) {
+    throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
   }
 
   const problems = parsedData.content?.problems || ['', '', '', ''];
@@ -61,50 +63,45 @@ Parsed information:
 
 Generate personalized expansions for each problem and benefit that reference specific details from this brief. Make the content feel tailored to ${clientCompany}, not generic.`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
+      systemInstruction: {
+        parts: [{ text: SYSTEM_PROMPT }],
+      },
+      contents: [
+        { role: 'user', parts: [{ text: userPrompt }] },
       ],
-      temperature: 0.7,
-      max_tokens: 2000,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2000,
+        responseMimeType: 'application/json',
+      },
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('[LLM Service] API Error:', errorText);
-    throw new Error(`OpenAI API error: ${response.status}`);
+    console.error('[LLM Service] Gemini API Error:', errorText);
+    throw new Error(`Gemini API error: ${response.status}`);
   }
 
   const result = await response.json();
-  const content = result.choices?.[0]?.message?.content;
+  const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
   if (!content) {
-    throw new Error('No content returned from OpenAI');
+    throw new Error('No content returned from Gemini');
   }
 
   let parsed: LLMResponse;
   try {
-    // Handle potential markdown code blocks
-    const cleanedContent = content
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
-    parsed = JSON.parse(cleanedContent);
-  } catch (e) {
+    parsed = JSON.parse(content);
+  } catch {
     console.error('[LLM Service] Failed to parse response:', content);
     throw new Error('Failed to parse LLM response as JSON');
   }
 
-  // Validate the response structure
   if (!Array.isArray(parsed.problemExpansions) || parsed.problemExpansions.length !== 4) {
     throw new Error('Invalid problemExpansions in LLM response');
   }
