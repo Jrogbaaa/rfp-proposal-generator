@@ -91,7 +91,11 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all 10 slides in one atomic request
 **Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught)
 
-**Brand:** Paramount navy (`#0D1F40`) + orange (`#F27321`), Montserrat headings, Inter body text. Logos auto-fetched via Clearbit Logo API.
+**Brand:** Paramount navy (`#0D1F40`) + orange (`#F27321`), Montserrat headings, Inter body text. Logos auto-fetched via Google Favicon API (`google.com/s2/favicons?sz=128`).
+
+**Cover slide layout:** Split-panel design — left 65% content zone, right 35% branded panel (`NAVY_LIGHTER`). Panel contains client label, client logo, orange divider rule, "PARAMOUNT" label, and Paramount logo — all vertically centered. Labels/divider drawn in Phase 2; logo images inserted in Phase 3 using shared layout constants (`LOGO_X`, `COVER_CLOGO_Y`, `COVER_PLOGO_Y`).
+
+**Closing slide layout:** Navy background, two thin orange horizontal rules bracket the CTA text, Paramount logo centered above the rules (Phase 3).
 
 **Returns:** `{ presentationId, presentationUrl, title }`
 
@@ -130,10 +134,10 @@ Auto-generated documentation for all React components in the Paramount applicati
 | contentExpander | `src/utils/contentExpander.ts` | Expands brief content into full sections |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | OpenAI GPT-4o integration for generating personalized problem/benefit expansions |
+| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash integration for generating personalized problem/benefit expansions |
 
 ---
 
 ## Last Updated
-- Date: 2026-02-23
-- Changes: Paramount branding applied to Google Slides export (navy+orange palette, Montserrat/Inter fonts, auto-fetched logos via Clearbit, text autofit); `companyDomain` field added to ClientInfo and intake forms
+- Date: 2026-02-25
+- Changes: Cover slide redesigned with split-panel layout (right branded panel replaces decorative ellipse); logos moved into panel with labels and divider; closing slide ellipse replaced with orange bracket rules; `llmService` updated to Gemini 2.5 Flash

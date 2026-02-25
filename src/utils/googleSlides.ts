@@ -174,6 +174,42 @@ function createRect(id: string, slideId: string, x: number, y: number, w: number
   ]
 }
 
+const NAVY_LIGHTER = { red: 0.07, green: 0.16, blue: 0.32 }
+
+function createEllipse(id: string, slideId: string, x: number, y: number, w: number, h: number, color: RgbColor): object[] {
+  return [
+    {
+      createShape: {
+        objectId: id,
+        shapeType: 'ELLIPSE',
+        elementProperties: {
+          pageObjectId: slideId,
+          size: {
+            width: { magnitude: w, unit: 'EMU' },
+            height: { magnitude: h, unit: 'EMU' },
+          },
+          transform: {
+            scaleX: 1, scaleY: 1,
+            translateX: x, translateY: y,
+            unit: 'EMU',
+          },
+        },
+      },
+    },
+    {
+      updateShapeProperties: {
+        objectId: id,
+        shapeProperties: {
+          shapeBackgroundFill: {
+            solidFill: { color: { rgbColor: color } },
+          },
+        },
+        fields: 'shapeBackgroundFill',
+      },
+    },
+  ]
+}
+
 // ---------------------------------------------------------------------------
 // Slide builders — each returns an array of batchUpdate requests
 // ---------------------------------------------------------------------------
@@ -183,49 +219,111 @@ const MARGIN_X = 457200      // ~0.5"
 const MARGIN_TOP = 400000
 const FULL_W = W - MARGIN_X * 2
 
+// Cover slide layout: content zone (left ~65%) + branded right panel (right ~35%)
+const PANEL_X        = 5943600             // right brand panel starts at ~65% of slide
+const PANEL_W        = W - PANEL_X         // = 3,200,400 (~3.5" wide)
+const CONTENT_W      = 5400000             // text column width (leaves ~100k gap before accent line)
+
+// Panel logo layout — shared between titleSlide() (Phase 2 divider/labels) and logoRequests() (Phase 3 images)
+// All values vertically center the two-logo block within the available panel height.
+const LOGO_SIZE      = 914400              // ~1" square
+const LOGO_X         = PANEL_X + Math.round(PANEL_W / 2) - Math.round(LOGO_SIZE / 2)  // 7,086,600
+const COVER_CLABEL_Y = 1286350             // client company label (e.g. "STARBUCKS")
+const COVER_CLOGO_Y  = 1526350             // client logo image
+const COVER_DIV_Y    = 2590750             // thin orange rule between logos
+const COVER_PLABEL_Y = 2682750             // "PARAMOUNT" label
+const COVER_PLOGO_Y  = 2922750             // Paramount logo image
+
 /** Slide 1: Title / Cover */
 function titleSlide(slideId: string, data: ProposalData): object[] {
-  const titleId = `${slideId}_title`
-  const subId   = `${slideId}_sub`
-  const dateId  = `${slideId}_date`
-  const barId   = `${slideId}_bar`
-  const bar2Id  = `${slideId}_bar2`
+  const panelId       = `${slideId}_panel`
+  const vlineId       = `${slideId}_vline`
+  const clientLblId   = `${slideId}_clbl`
+  const panelDivId    = `${slideId}_pdiv`
+  const partnerLblId  = `${slideId}_plbl`
+  const eyebrowId     = `${slideId}_eyebrow`
+  const heroId        = `${slideId}_hero`
+  const titleId       = `${slideId}_title`
+  const ruleId        = `${slideId}_rule`
+  const dateId        = `${slideId}_date`
+  const barId         = `${slideId}_bar`
+  const bar2Id        = `${slideId}_bar2`
+
+  const labelW = PANEL_W - 300000  // label text width inside the panel (150k padding each side)
+  const labelX = PANEL_X + 150000  // label text x (centered in panel via paragraphAlign)
 
   return [
     bgFill(slideId, NAVY),
-    ...createRect(barId, slideId, 0, 0, W, 60000, ORANGE),
-    ...createRect(bar2Id, slideId, 0, H - 80000, W, 80000, { red: 0.035, green: 0.09, blue: 0.2 }),
 
-    createTextBox(subId, slideId, MARGIN_X, 300000, FULL_W, 220000),
-    insertText(subId, 'Paramount'),
-    styleText(subId, { color: ORANGE, fontSize: 13, fontFamily: 'Inter', bold: true }),
+    // Structural bars (full width, drawn first — panel will cover them in right zone)
+    ...createRect(barId,  slideId, 0, 0,          W, 60000,  ORANGE),
+    ...createRect(bar2Id, slideId, 0, H - 80000,  W, 80000,  { red: 0.035, green: 0.09, blue: 0.2 }),
 
-    createTextBox(titleId, slideId, MARGIN_X, 550000, FULL_W, 1500000),
+    // Right brand panel covers the bars in its zone — clean uniform panel background
+    ...createRect(panelId, slideId, PANEL_X, 0, PANEL_W, H, NAVY_LIGHTER),
+    // Thin orange vertical accent line at the split
+    ...createRect(vlineId, slideId, PANEL_X, 0, 12000, H, ORANGE),
+
+    // Panel: client company label (above client logo placeholder)
+    createTextBox(clientLblId, slideId, labelX, COVER_CLABEL_Y, labelW, 180000),
+    insertText(clientLblId, data.client.company.toUpperCase()),
+    styleText(clientLblId, { color: GRAY, fontSize: 10, fontFamily: 'Inter', bold: true }),
+    paragraphAlign(clientLblId, 'CENTER'),
+
+    // Panel: thin orange horizontal rule between the two logos
+    ...createRect(panelDivId, slideId, PANEL_X + 300000, COVER_DIV_Y, PANEL_W - 600000, 12000, ORANGE),
+
+    // Panel: "PARAMOUNT" label (above Paramount logo placeholder)
+    createTextBox(partnerLblId, slideId, labelX, COVER_PLABEL_Y, labelW, 180000),
+    insertText(partnerLblId, 'PARAMOUNT'),
+    styleText(partnerLblId, { color: ORANGE, fontSize: 10, fontFamily: 'Inter', bold: true }),
+    paragraphAlign(partnerLblId, 'CENTER'),
+
+    // Left content zone — constrained to CONTENT_W so text stays clear of the panel
+    createTextBox(eyebrowId, slideId, MARGIN_X, 180000, CONTENT_W, 200000),
+    insertText(eyebrowId, 'PARAMOUNT'),
+    styleText(eyebrowId, { color: ORANGE, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    // Hero brand line — 52pt, wraps cleanly to 2 lines inside the content zone
+    createTextBox(heroId, slideId, MARGIN_X, 600000, CONTENT_W, 1700000),
+    insertText(heroId, `${data.client.company} \u00d7 Paramount`),
+    styleText(heroId, { color: WHITE, fontSize: 52, fontFamily: 'Montserrat', bold: true }),
+
+    // Project title (supporting, smaller)
+    createTextBox(titleId, slideId, MARGIN_X, 2400000, CONTENT_W, 500000),
     insertText(titleId, data.project.title),
-    styleText(titleId, { color: WHITE, fontSize: 48, fontFamily: 'Montserrat', bold: true }),
+    styleText(titleId, { color: GRAY, fontSize: 22, fontFamily: 'Inter' }),
 
-    createTextBox(dateId, slideId, MARGIN_X, 2200000, FULL_W, 400000),
-    insertText(dateId, `Prepared for ${data.client.company}  ·  ${data.generated.createdDate}`),
+    // Thin orange divider rule
+    ...createRect(ruleId, slideId, MARGIN_X, 2960000, CONTENT_W, 18000, ORANGE),
+
+    // Date line
+    createTextBox(dateId, slideId, MARGIN_X, 3040000, CONTENT_W, 280000),
+    insertText(dateId, `Prepared for ${data.client.company}  \u00b7  ${data.generated.createdDate}`),
     styleText(dateId, { color: GRAY, fontSize: 14, fontFamily: 'Inter' }),
   ]
 }
 
 /** Slide 2: The Challenge — bullet list of problems */
 function challengeSlide(slideId: string, data: ProposalData): object[] {
-  const headId = `${slideId}_head`
-  const bodyId = `${slideId}_body`
-  const barId  = `${slideId}_bar`
+  const headId   = `${slideId}_head`
+  const bodyId   = `${slideId}_body`
+  const barId    = `${slideId}_bar`
+  const accentId = `${slideId}_accent`
   const problems = data.content.problems.filter(p => p.trim())
 
   return [
     bgFill(slideId, WHITE),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, ORANGE),
+    ...createRect(barId,    slideId, 0, H - 50000, W, 50000, ORANGE),
+    // Thin left accent bar echoing the problem deep-dive slides
+    ...createRect(accentId, slideId, 0, 0, 12000, H, ORANGE),
 
-    createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
+    createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 600000),
     insertText(headId, 'The Challenge'),
     styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
 
-    createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
+    // Shifted right to clear the left accent bar, with extra top spacing
+    createTextBox(bodyId, slideId, MARGIN_X + 80000, 1100000, FULL_W - 80000, 3500000),
     insertText(bodyId, problems.join('\n')),
     styleText(bodyId, { color: NAVY, fontSize: 20, fontFamily: 'Inter' }),
     {
@@ -260,20 +358,22 @@ function problemDeepDive(
 
   if (accent) {
     reqs.push(...createRect(accentId, slideId, 0, 0, 20000, H, ORANGE))
+  } else {
+    // Hairline orange top bar on benefit slides (mirrors cover/challenge visual language)
+    reqs.push(...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 8000, ORANGE))
   }
 
   reqs.push(
     createTextBox(labelId, slideId, MARGIN_X + xOff, 300000, FULL_W, 180000),
-    insertText(labelId, label),
-    styleText(labelId, { color: ORANGE, fontSize: 11, fontFamily: 'Inter', bold: true }),
+    ...(label ? [insertText(labelId, label), styleText(labelId, { color: ORANGE, fontSize: 11, fontFamily: 'Inter', bold: true })] : []),
 
-    createTextBox(headId, slideId, MARGIN_X + xOff, 520000, FULL_W - xOff, 1000000),
-    insertText(headId, headline),
-    styleText(headId, { color: NAVY, fontSize: 24, fontFamily: 'Montserrat', bold: true }),
+    // Taller headline box so multi-line headlines don't crowd the body
+    createTextBox(headId, slideId, MARGIN_X + xOff, 520000, FULL_W - xOff, 1100000),
+    ...(headline ? [insertText(headId, headline), styleText(headId, { color: NAVY, fontSize: 24, fontFamily: 'Montserrat', bold: true })] : []),
 
-    createTextBox(bodyId, slideId, MARGIN_X + xOff, 1650000, FULL_W - xOff, 3100000),
-    insertText(bodyId, body),
-    styleText(bodyId, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 16, fontFamily: 'Inter' }),
+    // Body pushed down to give headline breathing room
+    createTextBox(bodyId, slideId, MARGIN_X + xOff, 1750000, FULL_W - xOff, 3000000),
+    ...(body ? [insertText(bodyId, body), styleText(bodyId, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 16, fontFamily: 'Inter' })] : []),
   )
 
   return reqs
@@ -301,32 +401,31 @@ function problemsCombined(slideId: string, data: ProposalData): object[] {
     ...createRect(divId, slideId, W / 2 - 15000, MARGIN_TOP, 30000, H - MARGIN_TOP - 50000, { red: 0.9, green: 0.91, blue: 0.93 }),
 
     createTextBox(head1Id, slideId, MARGIN_X, MARGIN_TOP, colW, 700000),
-    insertText(head1Id, p3),
-    styleText(head1Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true }),
+    ...(p3 ? [insertText(head1Id, p3), styleText(head1Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
-    createTextBox(body1Id, slideId, MARGIN_X, 1200000, colW, 3400000),
-    insertText(body1Id, e3),
-    styleText(body1Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' }),
+    createTextBox(body1Id, slideId, MARGIN_X, 1300000, colW, 3300000),
+    ...(e3 ? [insertText(body1Id, e3), styleText(body1Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' })] : []),
 
     createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP, colW, 700000),
-    insertText(head2Id, p4),
-    styleText(head2Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true }),
+    ...(p4 ? [insertText(head2Id, p4), styleText(head2Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
-    createTextBox(body2Id, slideId, W / 2 + 80000, 1200000, colW, 3400000),
-    insertText(body2Id, e4),
-    styleText(body2Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' }),
+    createTextBox(body2Id, slideId, W / 2 + 80000, 1300000, colW, 3300000),
+    ...(e4 ? [insertText(body2Id, e4), styleText(body2Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' })] : []),
   ]
 }
 
 /** Slide 6: The Solution — bullet list of benefits */
 function solutionSlide(slideId: string, data: ProposalData): object[] {
-  const headId = `${slideId}_head`
-  const bodyId = `${slideId}_body`
-  const barId  = `${slideId}_bar`
+  const headId    = `${slideId}_head`
+  const bodyId    = `${slideId}_body`
+  const barId     = `${slideId}_bar`
+  const ellipseId = `${slideId}_ellipse`
   const benefits = data.content.benefits.filter(b => b.trim())
 
   return [
     bgFill(slideId, NAVY),
+    // Decorative ellipse bleeds off top-right corner for visual depth
+    ...createEllipse(ellipseId, slideId, W - 1800000, -300000, 2400000, 2400000, NAVY_LIGHTER),
     ...createRect(barId, slideId, 0, H - 50000, W, 50000, ORANGE),
 
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
@@ -389,23 +488,23 @@ function investmentSlide(slideId: string, data: ProposalData): object[] {
 /** Slide 10: Close / CTA */
 function closingSlide(slideId: string, data: ProposalData): object[] {
   const headId   = `${slideId}_head`
-  const subId    = `${slideId}_sub`
   const footerId = `${slideId}_footer`
   const barId    = `${slideId}_bar`
+  const rule1Id  = `${slideId}_rule1`
+  const rule2Id  = `${slideId}_rule2`
 
   return [
     bgFill(slideId, NAVY),
     ...createRect(barId, slideId, 0, H - 80000, W, 80000, { red: 0.035, green: 0.09, blue: 0.2 }),
 
+    // Thin orange rules bracket the CTA text (logo sits above them, inserted in Phase 3)
+    ...createRect(rule1Id, slideId, MARGIN_X, 1280000, FULL_W, 6000, ORANGE),
+    ...createRect(rule2Id, slideId, MARGIN_X, 2300000, FULL_W, 6000, ORANGE),
+
     createTextBox(headId, slideId, MARGIN_X, 1400000, FULL_W, 800000),
     insertText(headId, `Let's build this together, ${data.client.firstName}.`),
     styleText(headId, { color: ORANGE, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
     paragraphAlign(headId, 'CENTER'),
-
-    createTextBox(subId, slideId, MARGIN_X, 2400000, FULL_W, 400000),
-    insertText(subId, 'Paramount'),
-    styleText(subId, { color: WHITE, fontSize: 16, fontFamily: 'Inter' }),
-    paragraphAlign(subId, 'CENTER'),
 
     createTextBox(footerId, slideId, MARGIN_X, H - 200000, FULL_W, 150000),
     insertText(footerId, data.generated.slideFooter),
@@ -419,7 +518,14 @@ function closingSlide(slideId: string, data: ProposalData): object[] {
 // ---------------------------------------------------------------------------
 
 const PARAMOUNT_DOMAIN = 'paramount.com'
-const LOGO_API = 'https://logo.clearbit.com'
+// Google's favicon service returns direct PNG (no redirect) — reliable with Google Slides API.
+// ClearBit's free logo API was deprecated after HubSpot acquisition and now returns 302
+// redirects which the Google Slides createImage endpoint does not follow, resulting in blank images.
+const FAVICON_API = 'https://www.google.com/s2/favicons'
+
+function logoUrl(domain: string): string {
+  return `${FAVICON_API}?domain=${domain}&sz=128`
+}
 
 function getClientDomain(data: ProposalData): string | null {
   if (data.client.companyDomain) return data.client.companyDomain
@@ -429,33 +535,38 @@ function getClientDomain(data: ProposalData): string | null {
 
 function logoRequests(coverSlideId: string, closeSlideId: string, data: ProposalData): object[] {
   const reqs: object[] = []
-  const LOGO_H = 457200   // ~0.5"
-  const LOGO_W = 1371600  // ~1.5" (rectangular aspect)
-
-  reqs.push(
-    createImageReq(
-      `${coverSlideId}_plogo`, coverSlideId,
-      `${LOGO_API}/${PARAMOUNT_DOMAIN}`,
-      W - MARGIN_X - LOGO_W, 200000, LOGO_W, LOGO_H,
-    ),
-  )
+  // LOGO_SIZE and LOGO_X are module-level constants derived from the panel layout,
+  // keeping Phase 3 images pixel-perfect with Phase 2 labels and divider.
 
   const clientDomain = getClientDomain(data)
+
   if (clientDomain) {
+    // Client logo — aligned to the label drawn above it in Phase 2
     reqs.push(
       createImageReq(
         `${coverSlideId}_clogo`, coverSlideId,
-        `${LOGO_API}/${clientDomain}`,
-        W - MARGIN_X - LOGO_W, H - 80000 - LOGO_H - 100000, LOGO_W, LOGO_H,
+        logoUrl(clientDomain),
+        LOGO_X, COVER_CLOGO_Y, LOGO_SIZE, LOGO_SIZE,
       ),
     )
   }
 
+  // Paramount logo — aligned to its label and divider drawn in Phase 2
+  reqs.push(
+    createImageReq(
+      `${coverSlideId}_plogo`, coverSlideId,
+      logoUrl(PARAMOUNT_DOMAIN),
+      LOGO_X, COVER_PLOGO_Y, LOGO_SIZE, LOGO_SIZE,
+    ),
+  )
+
+  // Paramount logo on closing slide (centered, above the bracketing rules)
+  const closeLogoSize = 686000
   reqs.push(
     createImageReq(
       `${closeSlideId}_plogo`, closeSlideId,
-      `${LOGO_API}/${PARAMOUNT_DOMAIN}`,
-      W / 2 - LOGO_W / 2, 600000, LOGO_W, LOGO_H,
+      logoUrl(PARAMOUNT_DOMAIN),
+      Math.round(W / 2 - closeLogoSize / 2), 800000, closeLogoSize, closeLogoSize,
     ),
   )
 
@@ -545,14 +656,19 @@ export async function createGoogleSlidesPresentation(
   try {
     const logoReqs = logoRequests(slideIds[0], slideIds[9], p)
     if (logoReqs.length > 0) {
-      await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
+      const logoResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ requests: logoReqs }),
       })
+      if (!logoResp.ok) {
+        const logoErr = await logoResp.json().catch(() => ({}))
+        console.warn('[Slides] Logo insertion failed:', logoErr?.error?.message || logoResp.statusText)
+      }
     }
-  } catch {
-    // Logo insertion is best-effort — don't throw
+  } catch (e) {
+    // Logo insertion is best-effort — don't throw, but log so it's diagnosable
+    console.warn('[Slides] Logo insertion error:', e)
   }
 
   return {

@@ -9,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
+- **Cover slide redesigned: right-panel split layout** — `src/utils/googleSlides.ts`
+  - Removed decorative `ELLIPSE` blobs from cover and closing slides
+  - Cover slide split into left content zone (65%) and branded right panel (35%, `NAVY_LIGHTER`)
+  - Thin orange vertical accent line divides the two zones
+  - Client and Paramount logos now live inside the right panel: stacked vertically, centered, with labels (`STARBUCKS` / `PARAMOUNT`) and an orange horizontal rule between them — drawn in Phase 2 as structural elements, logos inserted in Phase 3
+  - All text content constrained to `CONTENT_W` (left 65%) so it never bleeds into the panel
+  - Closing slide: ellipse removed; two thin orange horizontal rules now bracket the CTA text
+  - New module-level layout constants: `PANEL_X`, `PANEL_W`, `CONTENT_W`, `LOGO_SIZE`, `LOGO_X`, `COVER_CLABEL_Y`, `COVER_CLOGO_Y`, `COVER_DIV_Y`, `COVER_PLABEL_Y`, `COVER_PLOGO_Y` — keeps Phase 2 labels/divider and Phase 3 images pixel-aligned
 - **Switched LLM from OpenAI GPT-4o to Google Gemini 2.5 Flash** — `src/utils/llmService.ts` now calls the Gemini REST API instead of OpenAI; uses `responseMimeType: "application/json"` for native JSON output; env var changed from `VITE_OPENAI_API_KEY` to `VITE_GEMINI_API_KEY`; `src/vite-env.d.ts` updated accordingly
 - **Removed TEXT_AUTOFIT from Google Slides** — Google Slides API no longer supports `autofitType: 'TEXT_AUTOFIT'`; removed the `autofit()` helper and all 23 call sites in `src/utils/googleSlides.ts` to fix `400 Autofit types other than NONE are not supported` error
 

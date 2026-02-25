@@ -86,6 +86,24 @@ declare global { interface Window { google?: { ... } } }
 
 ---
 
+### Logo images are blank/white rectangles in generated slides
+
+**Symptom:** Logo placeholder rectangles appear on the slide but are white/blank — no actual logo image is visible.
+
+**Cause:** The original `logo.clearbit.com` free API was deprecated after HubSpot's 2023 acquisition. It now returns HTTP 302 redirects instead of serving image bytes directly. The Google Slides `createImage` API does **not** follow redirects — it receives the empty 302 response and renders a blank image shape.
+
+**Solution:** Switch logo URL source to a service that returns direct image bytes. Google's own favicon service is the most reliable option since the Slides API makes server-side requests from Google's infrastructure:
+```
+https://www.google.com/s2/favicons?domain=starbucks.com&sz=128
+```
+Returns a direct 128×128 PNG — no redirect, no auth required.
+
+**Fix applied:** Replaced `LOGO_API = 'https://logo.clearbit.com'` with `FAVICON_API = 'https://www.google.com/s2/favicons'` and added `logoUrl(domain)` helper. Also changed logo shape from rectangular (1.5" × 0.5") to square (0.75" × 0.75") to match the square favicon aspect ratio. Error logging added to Phase 3 so future failures are visible in the browser console.
+
+**Note:** If a company's Google favicon is a generic/low-quality icon, add `Company Domain: company.com` to the brief — this sets `data.client.companyDomain` which is used directly, allowing you to specify a domain with a better favicon.
+
+---
+
 ### "Autofit types other than NONE are not supported" (updateShapeProperties)
 **Error:** `Invalid requests[N].updateShapeProperties: Autofit types other than NONE are not supported`
 
