@@ -52,11 +52,11 @@ export interface ProposalState {
   error: string | null;
 }
 
-export type Step = 'input' | 'expand' | 'review' | 'success';
+export type Step = 'draft' | 'iterate' | 'design' | 'share';
 
 export const STEPS: { id: Step; label: string; number: number }[] = [
-  { id: 'input', label: 'Client Info', number: 1 },
-  { id: 'expand', label: 'Content', number: 2 },
-  { id: 'review', label: 'Review', number: 3 },
-  { id: 'success', label: 'Complete', number: 4 },
+  { id: 'draft', label: 'Draft', number: 1 },
+  { id: 'iterate', label: 'Iteration', number: 2 },
+  { id: 'design', label: 'Design', number: 3 },
+  { id: 'share', label: 'Share', number: 4 },
 ];

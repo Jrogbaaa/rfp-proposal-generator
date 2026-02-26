@@ -290,12 +290,45 @@ npm install -D @types/<package-name>
 
 ---
 
+### PDF Analysis Returns Empty Brief
+**Error:** PDF uploaded but parsed fields (company, project, etc.) remain empty after extraction.
+
+**Causes:**
+- The PDF is a scanned image (not text-based) — Gemini may return empty fields
+- The PDF is password-protected
+- The brief text is in an unusual format that doesn't match expected key:value or list patterns
+
+**Solutions:**
+1. Ensure the PDF has selectable text (not a scanned image). If scanned, use OCR software first.
+2. Try the "Paste Text" tab instead — copy text from the PDF manually.
+3. If Gemini extracts garbled text, try adding a `Client:` / `Problems:` / `Benefits:` header structure.
+
+---
+
+### `TS2322: Type '"input"' is not assignable to type 'Step'`
+**Error:** TypeScript errors in `useProposalState.ts` referencing old step names after migration.
+
+**Cause:** The `Step` type was updated from `'input' | 'expand' | 'review' | 'success'` to `'draft' | 'iterate' | 'design' | 'share'` in `src/types/proposal.ts`. Any file using the old step IDs will fail.
+
+**Solution:** Update `useProposalState.ts` (and any other files) to map to the new step names:
+```
+case 0: return 'draft'  // was 'input'
+case 1: return 'iterate' // was 'expand'
+case 2: return 'design'  // was 'review'
+case 3: return 'share'   // was 'success'
+```
+
+**Fix applied:** `src/hooks/useProposalState.ts` updated.
+
+---
+
 ## Error Log
 
 | Date | Error | File | Solution | Status |
 |------|-------|------|----------|--------|
 | 2026-01-19 | useContext null (framer-motion) | App.tsx | Restart dev server / clear .vite cache | Workaround |
 | 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Migrated to Gemini — no longer applicable | Obsolete |
+| 2026-02-26 | TS2322 Step type mismatch after migration | useProposalState.ts | Updated step IDs to draft/iterate/design/share | Fixed |
 
 ---
 

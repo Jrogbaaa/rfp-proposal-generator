@@ -10,6 +10,8 @@ interface GoogleSlidesButtonProps {
   data: Partial<ProposalData> | null
   briefText: string
   isEmpty: boolean
+  preGeneratedContent?: ExpandedContent | null
+  onSuccess?: (url: string) => void
 }
 
 type Stage = 'idle' | 'authenticating' | 'generating' | 'creating' | 'done' | 'error'
@@ -61,7 +63,7 @@ function buildProposalData(parsedData: Partial<ProposalData>, llmContent?: Expan
   }
 }
 
-export default function GoogleSlidesButton({ data, briefText, isEmpty }: GoogleSlidesButtonProps) {
+export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, onSuccess }: GoogleSlidesButtonProps) {
   const [stage, setStage] = useState<Stage>('idle')
   const [progressStep, setProgressStep] = useState(0)
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
@@ -82,9 +84,9 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty }: GoogleS
       const token = await getValidToken()
       setProgressStep(1)
 
-      // Step 2: Generate LLM content
+      // Step 2: Generate LLM content (skip if already pre-generated via chatbot)
       setStage('generating')
-      const llmContent = await generateProposalContent(briefText, data)
+      const llmContent = preGeneratedContent ?? await generateProposalContent(briefText, data)
       setProgressStep(2)
 
       // Step 3: Build full proposal data
@@ -98,6 +100,7 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty }: GoogleS
 
       setSlidesUrl(result.presentationUrl)
       setStage('done')
+      onSuccess?.(result.presentationUrl)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       logError(message, 'api', { component: 'GoogleSlidesButton' }, 'GoogleSlidesButton')

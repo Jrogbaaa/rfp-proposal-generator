@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-02-26]
+
+### Added
+- **Gemini multimodal PDF analysis** — `src/utils/llmService.ts`; new `analyzeBriefPdf(file: File): Promise<string>` function uses Gemini's `inline_data` multimodal API to send the entire PDF as base64-encoded data; Gemini Vision reads every page (text, images, logos, brand colors) and returns structured brief text covering client info, project details, problems, benefits, and brand visual notes; new `fileToBase64()` helper handles the File → base64 conversion
+- **4-step app flow: Draft → Iteration → Design → Share** — `src/App.tsx` fully restructured; `ProgressStepper.tsx` now wired in with a fixed step-nav bar below the header
+- **Real PDF extraction via Gemini Vision** — `src/components/PdfUploader.tsx` now calls `analyzeBriefPdf()` directly instead of a fake processing animation; three real loading stages: "Uploading to Gemini" → "Extracting structure & content" → "Building brief from PDF"; extracted text feeds into `useBriefParser` automatically via `onTextExtracted` callback prop; shows actual error messages on failure instead of silent failure
+- **`ChatInterface` component** — `src/components/ChatInterface.tsx` (new file); Step 2 chatbot for multi-turn AI content iteration; users request tone/language/focus changes; Gemini refines `problemExpansions` + `benefitExpansions` inline with conversation history; suggested prompt chips pre-populate common requests; fires `onExpansionsUpdated` callback
+- **`iterateProposalContent()` LLM function** — `src/utils/llmService.ts`; accepts brief, parsed data, current expansions, instruction, and conversation history; returns `{reply, updatedExpansions?}`; also exports new `ChatMessage` interface for multi-turn history
+- **Live slide preview with real data (Step 3)** — `src/components/SlidePreview.tsx` updated; `data?: Partial<ProposalData>` prop added; `buildSlidesFromData()` generates 10 slide cards from real proposal content; falls back to T-Mobile static demo when no real data is present
+- **Outlook mailto share (Step 4)** — share step renders `mailto:` link pre-filled with client email, subject `RFP: {project}`, and body containing Google Slides URL; no API integration required
+- **`onSuccess` callback on `GoogleSlidesButton`** — triggers step advance to Share on successful slide creation; `preGeneratedContent` prop skips LLM re-call when chatbot already generated expansions
+
+### Changed
+- **`PdfUploader` replaces fake animation with real Gemini Vision extraction** — `src/components/PdfUploader.tsx`; previously showed a fake progress animation that never read the file; now calls `analyzeBriefPdf()` and surfaces real loading stages and error messages; `onTextExtracted` callback prop added
+- **`SlidePreview` accepts real proposal data** — `src/components/SlidePreview.tsx`; updated to accept `data?: Partial<ProposalData>` prop; previously rendered only static content
+- **`GoogleSlidesButton` extended with new props** — `src/components/GoogleSlidesButton.tsx`; added `preGeneratedContent` (skips redundant LLM call when ChatInterface already ran) and `onSuccess` callback (advances to Share step on completion)
+- **`Step` type updated** — `src/types/proposal.ts`; `Step` union type changed from previous values to `'draft' | 'iterate' | 'design' | 'share'`; `STEPS` array updated accordingly
+- **`useProposalState` hook updated** — `src/hooks/useProposalState.ts`; minor updates to align with new step types and multi-step flow
+
+---
+
 ## [Unreleased]
 
 ### Changed

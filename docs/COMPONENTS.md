@@ -8,19 +8,15 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| App | `src/App.tsx` | Main application wrapper and state orchestration |
+| App | `src/App.tsx` | 4-step flow orchestrator: Draft → Iteration → Design → Share |
 | Header | `src/components/Header.tsx` | Application header with branding |
-| Layout | `src/components/Layout.tsx` | Page layout wrapper |
-| BriefEditor | `src/components/BriefEditor.tsx` | Free-form brief text input |
-| InputModeSelector | `src/components/InputModeSelector.tsx` | Toggle between input modes |
-| TranscriptInput | `src/components/TranscriptInput.tsx` | Transcript/paste input handler |
-| StructuredForm | `src/components/StructuredForm.tsx` | Structured data entry form |
-| ContentEditor | `src/components/ContentEditor.tsx` | Edit expanded content |
-| DocumentPreview | `src/components/DocumentPreview.tsx` | Real-time proposal preview |
-| ProposalReview | `src/components/ProposalReview.tsx` | Final review before generation |
-| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Creates Google Slides presentations via API (sole generation path) |
-| ProgressStepper | `src/components/ProgressStepper.tsx` | Workflow step indicator |
-| ~~SuccessScreen~~ | _removed_ | Was PandaDoc success view (deleted) |
+| BriefEditor | `src/components/BriefEditor.tsx` | Free-form brief text input (Step 1 paste mode) |
+| PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for real Gemini extraction; fires `onTextExtracted` |
+| ChatInterface | `src/components/ChatInterface.tsx` | **(new)** Step 2 chatbot — multi-turn Gemini conversation for refining proposal content; fires `onExpansionsUpdated` |
+| SlidePreview | `src/components/SlidePreview.tsx` | Step 3 preview — renders 10 slide cards from real `ProposalData`; falls back to static T-Mobile demo |
+| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Step 3 export — auth → LLM → Slides; accepts `preGeneratedContent` + `onSuccess` callback |
+| ProgressStepper | `src/components/ProgressStepper.tsx` | 4-step stepper (Draft/Iteration/Design/Share); completed steps are clickable |
+| DocumentPreview | `src/components/DocumentPreview.tsx` | Live brief preview (tabs: Preview / Structure / Settings) |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
 | DevTools | `src/components/DevTools.tsx` | Floating dev panel for error viewing (dev only) |
 
@@ -34,7 +30,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 **State Management:** Uses `useProposalState` hook for centralized state.
 
 **Workflow Steps:**
-1. Input → 2. Expand → 3. Review → 4. Success
+1. Draft (brief input via paste or PDF upload) → 2. Iteration (AI chat to refine content) → 3. Design (slide preview + Google Slides export) → 4. Share (mailto link with Slides URL)
 
 ---
 
@@ -45,14 +41,16 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `data: Partial<ProposalData> | null` — Parsed brief data
 - `briefText: string` — Raw brief text (passed to LLM for content generation)
 - `isEmpty: boolean` — Disables button when no brief is entered
+- `preGeneratedContent` — Pre-generated expansions from `ChatInterface`; skips the LLM call inside this component when already iterated in Step 2
+- `onSuccess` — Callback fired after successful slide creation; used by `App.tsx` to advance to the Share step
 
 **State machine:** `idle → authenticating → generating → creating → done | error`
 
 **Flow:**
 1. User clicks button → `getValidToken()` triggers Google OAuth popup
-2. LLM generates personalized problem/benefit expansions via OpenAI
+2. LLM generates personalized problem/benefit expansions via Gemini (skipped if `preGeneratedContent` provided)
 3. `createGoogleSlidesPresentation()` creates presentation via Google Slides REST API
-4. "Open in Google Slides" link appears pointing to the created presentation
+4. "Open in Google Slides" link appears; `onSuccess` callback fires to advance to Step 4
 
 **10-slide structure:** Title, Challenge (problems list), Problem Deep Dives ×3, Solution (benefits list), Benefit Deep Dives ×2, Investment & Timeline, Closing CTA
 

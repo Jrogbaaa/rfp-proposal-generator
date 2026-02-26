@@ -133,15 +133,15 @@ export function useProposalState() {
   const getCurrentStep = (): Step => {
     switch (state.step) {
       case 0:
-        return 'input';
+        return 'draft';
       case 1:
-        return 'expand';
+        return 'iterate';
       case 2:
-        return 'review';
+        return 'design';
       case 3:
-        return 'success';
+        return 'share';
       default:
-        return 'input';
+        return 'draft';
     }
   };
 
