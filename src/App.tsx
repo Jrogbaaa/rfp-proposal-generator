@@ -1,16 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './components/Header'
 import BriefEditor from './components/BriefEditor'
 import PdfUploader from './components/PdfUploader'
 import SlidePreview from './components/SlidePreview'
-import GoogleSlidesButton from './components/GoogleSlidesButton'
 import ChatInterface from './components/ChatInterface'
+import DesignChatInterface from './components/DesignChatInterface'
+import GoogleSlidesButton from './components/GoogleSlidesButton'
 import ProgressStepper from './components/ProgressStepper'
 import { useBriefParser } from './hooks/useBriefParser'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import DevTools from './components/DevTools'
-import type { Step, ExpandedContent } from './types/proposal'
+import type { Step, ExpandedContent, DesignConfig } from './types/proposal'
+import { DEFAULT_DESIGN_CONFIG } from './types/proposal'
+import { generateProposalContent } from './utils/llmService'
+import { getAuthState } from './utils/googleAuth'
 
 type InputMode = 'pdf' | 'paste'
 
@@ -26,6 +30,22 @@ export default function App() {
 
   // AI-refined expansions from chatbot
   const [expansions, setExpansions] = useState<ExpandedContent | null>(null)
+
+  // Design config
+  const [designConfig, setDesignConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
+  const [sidebarTab, setSidebarTab] = useState<'content' | 'design'>('content')
+
+  // Loading / error states
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isSlideUpdating, setIsSlideUpdating] = useState(false)
+  const [generationError, setGenerationError] = useState<string | null>(null)
+
+  // Google auth state — poll periodically so badge updates after OAuth
+  const [isGoogleConnected, setIsGoogleConnected] = useState(() => getAuthState().isSignedIn)
+  useEffect(() => {
+    const id = setInterval(() => setIsGoogleConnected(getAuthState().isSignedIn), 3000)
+    return () => clearInterval(id)
+  }, [])
 
   const parsedData = useBriefParser(briefText)
   const hasContent = briefText.trim().length > 0
@@ -55,20 +75,66 @@ export default function App() {
     setUploadedFile(null)
     setExpansions(null)
     setSlidesUrl(null)
+    setIsGenerating(false)
+    setIsSlideUpdating(false)
     setCurrentStep('draft')
   }
 
-  const handleStepClick = (stepIndex: number) => {
-    const steps: Step[] = ['draft', 'iterate', 'design', 'share']
-    setCurrentStep(steps[stepIndex])
+  const STEP_ORDER: Step[] = ['draft', 'iterate', 'share']
+  const currentStepIndex = STEP_ORDER.indexOf(currentStep)
+
+  const handleStepClick = useCallback((stepIndex: number) => {
+    if (stepIndex >= currentStepIndex) return
+    setCurrentStep(STEP_ORDER[stepIndex])
+  }, [currentStepIndex])
+
+  const handleContinueToIteration = async () => {
+    setCurrentStep('iterate')
+    setGenerationError(null)
+    if (!expansions) {
+      setIsGenerating(true)
+      try {
+        const result = await generateProposalContent(briefText, parsedData || {})
+        setExpansions(result)
+      } catch (err) {
+        console.error('[App] Failed to generate proposal content:', err)
+        setGenerationError(err instanceof Error ? err.message : 'Failed to generate content. Please try again.')
+      } finally {
+        setIsGenerating(false)
+      }
+    }
   }
 
-  const slideOutline = buildSlideOutline(parsedData)
+  const handleRetryGeneration = async () => {
+    setGenerationError(null)
+    setIsGenerating(true)
+    try {
+      const result = await generateProposalContent(briefText, parsedData || {})
+      setExpansions(result)
+    } catch (err) {
+      console.error('[App] Retry failed:', err)
+      setGenerationError(err instanceof Error ? err.message : 'Failed to generate content. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleSlideEdit = (slideNumber: number, bulletIndex: number, newText: string) => {
+    if (!expansions) return
+    const probs = [...expansions.problemExpansions] as [string, string, string, string]
+    const bens = [...expansions.benefitExpansions] as [string, string, string, string]
+    if (slideNumber === 3 && bulletIndex === 0) probs[0] = newText
+    else if (slideNumber === 4 && bulletIndex === 0) probs[1] = newText
+    else if (slideNumber === 7 && bulletIndex === 0) bens[0] = newText
+    else if (slideNumber === 8 && bulletIndex === 0) bens[1] = newText
+    else return
+    setExpansions({ problemExpansions: probs, benefitExpansions: bens })
+  }
 
   return (
     <ErrorBoundary componentName="App">
       <div className="min-h-screen flex flex-col bg-cream-100">
-        <Header isConnected={true} />
+        <Header isConnected={isGoogleConnected} onNew={handleReset} />
 
         {/* Step nav bar — fixed below the header */}
         <div className="fixed top-16 left-0 right-0 z-30 bg-cream-50 border-b border-cream-300 shadow-sm">
@@ -232,10 +298,10 @@ export default function App() {
                           </div>
 
                           <button
-                            onClick={() => setCurrentStep('iterate')}
+                            onClick={handleContinueToIteration}
                             className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-navy-800 text-cream-100 font-semibold text-base hover:bg-navy-700 transition-colors shadow-md"
                           >
-                            Continue to Iteration
+                            Continue to Refine
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M5 12h14M12 5l7 7-7 7" />
                             </svg>
@@ -258,7 +324,7 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* ── STEP 2: ITERATION ─────────────────────────────────────── */}
+            {/* ── STEP 2: REFINE ────────────────────────────────────────── */}
             {currentStep === 'iterate' && (
               <motion.div
                 key="iterate"
@@ -266,164 +332,170 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -16 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="grid grid-cols-1 lg:grid-cols-3 min-h-[calc(100vh-8.5rem)]"
+                className="grid grid-cols-1 lg:grid-cols-[1fr_420px] min-h-[calc(100vh-8.5rem)]"
               >
-                {/* Left: Slide outline */}
-                <section className="bg-navy-800 flex flex-col border-r border-white/10 min-h-[40vh] lg:min-h-0">
-                  <div className="p-6 lg:p-8 flex flex-col h-full">
-                    <div className="mb-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-1">
-                        Step 2 · Iteration
-                      </p>
-                      <h2 className="font-display text-xl text-cream-100">Slide Outline</h2>
-                      <p className="text-xs text-navy-400 mt-1">10-slide structure from your brief</p>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto space-y-1.5">
-                      {slideOutline.map((slide) => (
-                        <div
-                          key={slide.num}
-                          className="flex items-start gap-3 py-2.5 px-3 rounded-lg bg-white/[0.04] border border-white/[0.05]"
-                        >
-                          <span className="w-5 h-5 rounded-full bg-gold-500/20 text-gold-400 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
-                            {slide.num}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-cream-200">{slide.title}</p>
-                            {slide.detail && (
-                              <p className="text-[11px] text-navy-400 mt-0.5 truncate">{slide.detail}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {expansions && (
-                      <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                        <svg className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <span className="text-xs font-medium text-emerald-400">Content updated by AI</span>
-                      </div>
-                    )}
-                  </div>
-                </section>
-
-                {/* Right: Chat (2 cols) */}
-                <section className="lg:col-span-2 bg-cream-50 flex flex-col min-h-[60vh] lg:min-h-0">
+                {/* Left: Full slide preview */}
+                <section className="bg-cream-50 flex flex-col border-r border-cream-300 min-h-[60vh] lg:min-h-0">
                   <div className="flex flex-col h-full p-6 lg:p-8">
-                    <div className="mb-5 flex items-start justify-between gap-4">
+                    <div className="mb-5 flex items-start justify-between">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-1">
-                          Refine with AI
+                          Step 2 · Refine
                         </p>
-                        <h2 className="font-display text-xl text-navy-800">Ask for changes</h2>
-                        <p className="text-sm text-navy-500 mt-1">
-                          Request tone, language, or focus changes — the content will update instantly.
+                        <h2 className="font-display text-xl text-navy-800">Slide Preview</h2>
+                        <p className="text-xs text-navy-400 mt-1">
+                          {generationError
+                            ? 'Generation failed — retry or go back'
+                            : isGenerating
+                            ? 'Generating your slides with AI…'
+                            : isSlideUpdating
+                            ? 'Rewriting slides…'
+                            : expansions
+                            ? 'Click any paragraph to edit it directly'
+                            : '10-slide deck · ready to preview'}
                         </p>
                       </div>
-                      <button
-                        onClick={() => setCurrentStep('design')}
-                        className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-navy-800 text-cream-100 text-sm font-semibold hover:bg-navy-700 transition-colors"
-                      >
-                        Design
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M5 12h14M12 5l7 7-7 7" />
-                        </svg>
-                      </button>
                     </div>
 
-                    <div className="flex-1 min-h-0">
-                      <ChatInterface
-                        briefText={briefText}
-                        parsedData={parsedData || {}}
-                        currentExpansions={expansions}
-                        onExpansionsUpdated={setExpansions}
-                      />
-                    </div>
-                  </div>
-                </section>
-              </motion.div>
-            )}
-
-            {/* ── STEP 3: DESIGN ────────────────────────────────────────── */}
-            {currentStep === 'design' && (
-              <motion.div
-                key="design"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -16 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-8.5rem)]"
-              >
-                {/* Left: Slide preview with real data */}
-                <section className="bg-cream-50 flex flex-col border-r border-cream-300 min-h-[50vh] lg:min-h-0">
-                  <div className="flex flex-col h-full p-6 lg:p-8">
-                    <div className="mb-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-1">
-                        Step 3 · Design
-                      </p>
-                      <h2 className="font-display text-xl text-navy-800">Slide Preview</h2>
-                      <p className="text-xs text-navy-400 mt-1">10-slide deck · ready to export</p>
-                    </div>
-                    <div className="flex-1 min-h-0">
-                      <SlidePreview
-                        data={
-                          expansions
-                            ? { ...parsedData, expanded: expansions }
-                            : parsedData
-                        }
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                {/* Right: Export panel */}
-                <section className="bg-navy-800 flex flex-col min-h-[50vh] lg:min-h-0">
-                  <div className="flex flex-col h-full p-6 lg:p-10">
-                    <div className="mb-8">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-1">
-                        Export
-                      </p>
-                      <h2 className="font-display text-2xl text-cream-100 tracking-tight">
-                        Ready to create your deck?
-                      </h2>
-                      <p className="text-sm text-navy-400 mt-2">
-                        We'll generate all 10 slides in Google Slides with your branding.
-                      </p>
-                    </div>
-
-                    {parsedData && (
-                      <div className="flex flex-wrap gap-2 mb-8">
-                        {parsedData.client?.company && <Chip label={parsedData.client.company} />}
-                        {parsedData.project?.title && <Chip label={parsedData.project.title} />}
-                        {parsedData.project?.duration && <Chip label={parsedData.project.duration} />}
-                        {parsedData.project?.totalValue && <Chip label={parsedData.project.totalValue} />}
-                        {expansions && <Chip label="AI-refined content" highlight />}
+                    {isGenerating ? (
+                      <div className="flex-1 overflow-auto space-y-4 pr-1">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className="preview-paper rounded-lg overflow-hidden animate-pulse">
+                            <div className="flex items-center gap-3 px-6 pt-5 pb-3">
+                              <div className="w-7 h-7 rounded-full bg-cream-300" />
+                              <div className="h-3 bg-cream-300 rounded w-16" />
+                            </div>
+                            <div className="px-6 pb-6 space-y-3">
+                              <div className="h-5 bg-cream-300 rounded w-3/4" />
+                              <div className="h-4 bg-cream-200 rounded w-full" />
+                              <div className="h-4 bg-cream-200 rounded w-5/6" />
+                              <div className="h-4 bg-cream-200 rounded w-4/5" />
+                            </div>
+                            <div className="h-1 bg-cream-300" />
+                          </div>
+                        ))}
+                        <p className="text-center text-sm text-navy-400 py-4 animate-pulse">
+                          Gemini is writing your proposal…
+                        </p>
+                      </div>
+                    ) : generationError ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+                        <div className="rounded-xl border-2 border-red-200 bg-red-50 p-6 max-w-md w-full space-y-4">
+                          <div className="flex items-start gap-3 text-left">
+                            <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                            <div>
+                              <p className="text-sm font-semibold text-red-800">Content generation failed</p>
+                              <p className="text-xs text-red-600 mt-1">{generationError}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleRetryGeneration}
+                              className="flex-1 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"
+                            >
+                              Retry
+                            </button>
+                            <button
+                              onClick={() => setCurrentStep('draft')}
+                              className="flex-1 px-4 py-2.5 rounded-lg border border-red-200 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
+                            >
+                              Back to Draft
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-h-0">
+                        <SlidePreview
+                          data={expansions ? { ...parsedData, expanded: expansions } : parsedData}
+                          designConfig={designConfig}
+                          isUpdating={isSlideUpdating}
+                          onSlideEdit={expansions ? handleSlideEdit : undefined}
+                        />
                       </div>
                     )}
+                  </div>
+                </section>
 
-                    <div className="mt-auto space-y-2">
-                      <GoogleSlidesButton
-                        data={parsedData}
-                        briefText={briefText}
-                        isEmpty={!hasContent}
-                        preGeneratedContent={expansions}
-                        onSuccess={handleSlidesSuccess}
-                      />
+                {/* Right: Content/Design Chat + Export */}
+                <section className="bg-navy-800 flex flex-col min-h-[50vh] lg:min-h-0">
+                  <div className="flex flex-col h-full p-6 lg:p-8">
+                    {/* Tab toggle */}
+                    <div className="flex gap-1 mb-4 p-1 bg-white/[0.04] rounded-lg">
                       <button
-                        onClick={() => setCurrentStep('iterate')}
-                        className="w-full text-sm text-navy-400 hover:text-cream-300 transition-colors py-2"
+                        onClick={() => setSidebarTab('content')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          sidebarTab === 'content'
+                            ? 'bg-white/[0.1] text-cream-100 shadow-sm'
+                            : 'text-navy-400 hover:text-cream-300'
+                        }`}
                       >
-                        ← Back to Iteration
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        Content
+                      </button>
+                      <button
+                        onClick={() => setSidebarTab('design')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          sidebarTab === 'design'
+                            ? 'bg-white/[0.1] text-cream-100 shadow-sm'
+                            : 'text-navy-400 hover:text-cream-300'
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Design
                       </button>
                     </div>
+
+                    <div className="flex-1 min-h-0 bg-cream-50 rounded-xl p-4 overflow-hidden">
+                      {sidebarTab === 'content' ? (
+                        <ChatInterface
+                          briefText={briefText}
+                          parsedData={parsedData || {}}
+                          currentExpansions={expansions}
+                          onExpansionsUpdated={setExpansions}
+                          onLoadingChange={setIsSlideUpdating}
+                        />
+                      ) : (
+                        <DesignChatInterface
+                          currentDesignConfig={designConfig}
+                          onDesignConfigUpdated={setDesignConfig}
+                          parsedData={parsedData}
+                          briefText={briefText}
+                          expansions={expansions}
+                          onSlidesSuccess={handleSlidesSuccess}
+                        />
+                      )}
+                    </div>
+
+                    {/* Export to Google Slides (only on content tab — design tab has its own) */}
+                    {sidebarTab === 'content' && (
+                      <div className="mt-4 pt-4 border-t border-white/10">
+                        <GoogleSlidesButton
+                          data={parsedData}
+                          briefText={briefText}
+                          isEmpty={!briefText.trim()}
+                          preGeneratedContent={expansions}
+                          designConfig={designConfig}
+                          onSuccess={handleSlidesSuccess}
+                        />
+                      </div>
+                    )}
                   </div>
                 </section>
               </motion.div>
             )}
 
-            {/* ── STEP 4: SHARE ─────────────────────────────────────────── */}
+            {/* ── STEP 3: EXPORT & SHARE ────────────────────────────────── */}
             {currentStep === 'share' && (
               <motion.div
                 key="share"
@@ -476,7 +548,7 @@ export default function App() {
 
                     {slidesUrl && (
                       <a
-                        href={`mailto:${parsedData?.client?.email || ''}?subject=${encodeURIComponent(`RFP: ${parsedData?.project?.title || 'Proposal'}`)}&body=${encodeURIComponent(`Hi ${parsedData?.client?.firstName || 'there'},\n\nPlease find your proposal presentation here:\n${slidesUrl}\n\nLet me know if you have any questions.\n\nBest regards`)}`}
+                        href={`mailto:?subject=${encodeURIComponent(`RFP: ${parsedData?.project?.title || 'Proposal'}`)}&body=${encodeURIComponent(`Hey team,\n\nHere's the first draft for ${parsedData?.client?.company || 'the proposal'}:\n${slidesUrl}\n\nLet me know what you think.`)}`}
                         className="flex items-center justify-center gap-3 w-full px-6 py-4 rounded-xl border-2 border-navy-200 bg-white text-navy-800 font-semibold text-base hover:border-navy-300 hover:shadow-sm transition-all"
                       >
                         <svg className="w-5 h-5 text-navy-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -519,38 +591,3 @@ function ParsedField({ label, value }: { label: string; value?: string }) {
   )
 }
 
-function Chip({ label, highlight }: { label: string; highlight?: boolean }) {
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-      highlight
-        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-        : 'bg-white/10 text-navy-300 border border-white/10'
-    }`}>
-      {label}
-    </span>
-  )
-}
-
-// ─── Slide outline builder ────────────────────────────────────────────────────
-
-type ParsedDataType = ReturnType<typeof useBriefParser>
-
-function buildSlideOutline(parsedData: ParsedDataType | null) {
-  const company = parsedData?.client?.company || 'Client'
-  const project = parsedData?.project?.title || 'Proposal'
-  const problems = parsedData?.content?.problems || ['', '', '', '']
-  const benefits = parsedData?.content?.benefits || ['', '', '', '']
-
-  return [
-    { num: 1, title: 'Cover', detail: `${project} · ${company}` },
-    { num: 2, title: 'Challenge Overview', detail: problems.filter(Boolean).join(' · ') || 'Key challenges' },
-    { num: 3, title: 'Problem Deep-Dive', detail: problems[0] || 'Problem 1' },
-    { num: 4, title: 'Problem Deep-Dive', detail: problems[1] || 'Problem 2' },
-    { num: 5, title: 'Problems 3 & 4', detail: [problems[2], problems[3]].filter(Boolean).join(' · ') || 'Additional challenges' },
-    { num: 6, title: 'Solution Overview', detail: benefits.filter(Boolean).join(' · ') || 'Key benefits' },
-    { num: 7, title: 'Benefit Deep-Dive', detail: benefits[0] || 'Benefit 1' },
-    { num: 8, title: 'Benefit Deep-Dive', detail: benefits[1] || 'Benefit 2' },
-    { num: 9, title: 'Investment & Timeline', detail: `${parsedData?.project?.totalValue || 'TBD'} · ${parsedData?.project?.duration || 'TBD'}` },
-    { num: 10, title: 'Closing CTA', detail: `Let's build this together, ${company}` },
-  ]
-}

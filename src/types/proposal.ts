@@ -52,11 +52,20 @@ export interface ProposalState {
   error: string | null;
 }
 
-export type Step = 'draft' | 'iterate' | 'design' | 'share';
+export type Step = 'draft' | 'iterate' | 'share';
 
 export const STEPS: { id: Step; label: string; number: number }[] = [
   { id: 'draft', label: 'Draft', number: 1 },
-  { id: 'iterate', label: 'Iteration', number: 2 },
-  { id: 'design', label: 'Design', number: 3 },
-  { id: 'share', label: 'Share', number: 4 },
+  { id: 'iterate', label: 'Refine', number: 2 },
+  { id: 'share', label: 'Export', number: 3 },
 ];
+
+export type ColorTheme = 'navy-gold' | 'slate-blue' | 'forest-green';
+
+export interface DesignConfig {
+  colorTheme: ColorTheme;
+}
+
+export const DEFAULT_DESIGN_CONFIG: DesignConfig = {
+  colorTheme: 'navy-gold',
+};

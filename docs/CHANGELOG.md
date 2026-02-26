@@ -6,7 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2026-02-26]
+## [2026-02-26] — Workflow Audit
+
+### Added
+- **Design theme picker in Refine step** — `src/App.tsx`; Content/Design tab toggle in the right sidebar lets users switch between content refinement chat and design theme chat; `DesignChatInterface` now integrated and functional
+- **Error state + retry for AI generation** — `src/App.tsx`; if Gemini content generation fails, shows error panel with retry and back-to-draft buttons instead of infinite skeleton
+- **`slideBuilder.ts` utility** — `src/utils/slideBuilder.ts`; `buildSlidesFromData()` extracted from `SlidePreview.tsx` to fix HMR Fast Refresh warnings
+- **Real Google auth state** — `src/App.tsx`; Header `isConnected` badge now reflects actual OAuth state via `getAuthState()` polling
+
+### Changed
+- **Removed T-Mobile demo deck as fallback** — `src/components/SlidePreview.tsx`; no longer imports `TMOBILE_PARAMOUNT_SLIDES`; shows clean empty state when no brief data exists
+- **Cleaned export fallback defaults** — `src/components/GoogleSlidesButton.tsx`; `buildProposalData()` now uses empty strings instead of `'Client'`, `'Company'`, `'$0'`, `'client@example.com'` so missing fields are omitted from exported decks
+- **Cleaned preview fallback text** — `src/utils/slideBuilder.ts`; replaced `'Digital Transformation'`, `'TBD'`, `'Problem 1'` etc. with `'—'` or conditional omission
+- **Replaced Starbucks placeholder** — `src/components/BriefEditor.tsx`; textarea placeholder now shows generic format guide instead of branded Starbucks example
+- **Header wired up** — `src/App.tsx`; `onNew={handleReset}` connected; non-functional Templates/History buttons removed
+- **Step navigation guarded** — `src/App.tsx`; `handleStepClick` now prevents forward jumps to incomplete steps
+- **Chat history capped** — `src/utils/llmService.ts`; `iterateProposalContent` and `iterateDesign` now send only the last 10 messages to Gemini
+- **Step flow collapsed to 3** — `src/types/proposal.ts`; steps are now Draft/Refine/Export (removed standalone Design step)
+
+### Removed
+- 9 orphaned legacy files: `DocumentPreview.tsx`, `ContentEditor.tsx`, `StructuredForm.tsx`, `TranscriptInput.tsx`, `InputModeSelector.tsx`, `Layout.tsx`, `GammaPromptGenerator.tsx`, `ProposalReview.tsx`, `useProposalState.ts`
+- Non-functional Templates and History header buttons
+
+---
+
+## [2026-02-26] — Previous
 
 ### Added
 - **Gemini multimodal PDF analysis** — `src/utils/llmService.ts`; new `analyzeBriefPdf(file: File): Promise<string>` function uses Gemini's `inline_data` multimodal API to send the entire PDF as base64-encoded data; Gemini Vision reads every page (text, images, logos, brand colors) and returns structured brief text covering client info, project details, problems, benefits, and brand visual notes; new `fileToBase64()` helper handles the File → base64 conversion

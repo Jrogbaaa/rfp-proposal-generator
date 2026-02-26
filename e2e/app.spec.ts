@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 const SAMPLE_BRIEF = `Project: Digital Customer Experience Transformation
 Client: Sarah Martinez, sarah.martinez@starbucks.com, Starbucks
@@ -8,154 +8,430 @@ Budget: $175,000
 Problems:
 - Mobile app engagement has dropped 23% since last quarter
 - Customer loyalty program data is siloed across multiple systems
+- Customer service resolution time averages 4.2 days
+- Checkout abandonment rate is 47% on mobile
 
 Benefits:
 - Real-time unified customer view across all touchpoints
-- 15-20% lift in mobile app engagement within 90 days`
+- 15-20% lift in mobile app engagement within 90 days
+- Reduce customer service resolution time by 60%
+- Increase mobile checkout completion by 30%`
+
+// ─── Mock helpers ─────────────────────────────────────────────────────────────
+
+function geminiContentBody() {
+  return JSON.stringify({
+    candidates: [{
+      content: {
+        parts: [{
+          text: JSON.stringify({
+            problemExpansions: [
+              'Mobile engagement has declined sharply, directly impacting revenue and customer lifetime value.',
+              'Siloed data systems prevent Starbucks from delivering the personalised experience customers expect.',
+              'Slow resolution times are eroding brand trust and driving customer churn at scale.',
+              'Mobile checkout friction is costing significant conversion revenue every quarter.',
+            ],
+            benefitExpansions: [
+              'A unified customer view enables hyper-personalised experiences that drive loyalty and repeat purchases.',
+              'A 15-20% engagement lift translates to measurable revenue growth within the first quarter.',
+              'Faster resolution dramatically improves NPS and reduces costly repeat contacts.',
+              'Eliminating checkout friction directly increases completed transactions and revenue per visit.',
+            ],
+          }),
+        }],
+      },
+    }],
+  })
+}
+
+function geminiIterationBody() {
+  return JSON.stringify({
+    candidates: [{
+      content: {
+        parts: [{
+          text: JSON.stringify({
+            reply: "Done! I've tightened the language across all sections — the copy is now more direct and concise.",
+            updatedExpansions: {
+              problemExpansions: [
+                'Declining mobile engagement is hurting revenue and retention.',
+                'Siloed data prevents personalisation at scale.',
+                'Slow resolution times drive churn and increase support costs.',
+                'Mobile checkout friction is losing conversions daily.',
+              ],
+              benefitExpansions: [
+                'Unified customer data unlocks personalisation that drives loyalty.',
+                'A 15-20% engagement lift delivers measurable revenue within 90 days.',
+                'Faster resolution boosts NPS and cuts repeat contacts by half.',
+                'Removing friction increases mobile checkout completion by 30%.',
+              ],
+            },
+          }),
+        }],
+      },
+    }],
+  })
+}
+
+async function mockGeminiApi(page: Page) {
+  let callCount = 0
+  await page.route('**/generativelanguage.googleapis.com/**', (route) => {
+    callCount++
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: callCount === 1 ? geminiContentBody() : geminiIterationBody(),
+    })
+  })
+}
+
+async function mockGoogleOAuth(page: Page) {
+  // Block the GIS library from loading — otherwise it overwrites our window.google mock
+  await page.route('**/accounts.google.com/gsi/**', (route) => {
+    route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
+  })
+
+  // Inject mock window.google before ANY page scripts run
+  await page.addInitScript(function () {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).google = {
+      accounts: {
+        oauth2: {
+          initTokenClient: function (config: { callback: (r: Record<string, unknown>) => void }) {
+            return {
+              requestAccessToken: function () {
+                config.callback({ access_token: 'fake-test-token', expires_in: 3600 })
+              },
+            }
+          },
+          revoke: function () {},
+        },
+      },
+    }
+  })
+}
+
+async function mockGoogleSlidesApi(page: Page) {
+  await page.route('**/slides.googleapis.com/**', (route) => {
+    if (route.request().url().includes(':batchUpdate')) {
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
+    } else {
+      // Create presentation — return a fake presentationId
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ presentationId: 'fake-presentation-id' }),
+      })
+    }
+  })
+  // Block logo fetch requests (fault-tolerant in the app, but we suppress noise)
+  await page.route('**/*favicon*', (route) => {
+    route.fulfill({ status: 200, contentType: 'image/png', body: '' })
+  })
+}
+
+/** Navigate to the Iterate (step 2) with Gemini mocked */
+async function goToIterateStep(page: Page) {
+  await mockGeminiApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Paste Text' }).click()
+  await page.locator('textarea').fill(SAMPLE_BRIEF)
+  await page.getByRole('button', { name: 'Continue to Refine' }).click()
+  await expect(page.getByText('Ask for changes')).toBeVisible()
+}
+
+/** Navigate all the way to the Share (step 3) with all APIs mocked */
+async function goToShareStep(page: Page) {
+  await mockGeminiApi(page)
+  await mockGoogleOAuth(page)   // must come before page.goto
+  await mockGoogleSlidesApi(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Paste Text' }).click()
+  await page.locator('textarea').fill(SAMPLE_BRIEF)
+  await page.getByRole('button', { name: 'Continue to Refine' }).click()
+  await expect(page.getByText('Ask for changes')).toBeVisible()
+  await page.getByLabel('Create Google Slides presentation').click()
+  await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
+}
+
+// ─── App Shell ────────────────────────────────────────────────────────────────
 
 test.describe('App Shell', () => {
-  test('loads with header, input panel, and output panel', async ({ page }) => {
+  test('loads with header and connection badge', async ({ page }) => {
     await page.goto('/')
-
     await expect(page.locator('header')).toBeVisible()
     await expect(page.getByText('Google Slides Ready')).toBeVisible()
-    await expect(page.getByText('Input')).toBeVisible()
-    await expect(page.getByText('Output')).toBeVisible()
   })
 
-  test('header shows connection status and action buttons', async ({ page }) => {
+  test('shows 3-step progress bar (Draft, Refine, Export)', async ({ page }) => {
     await page.goto('/')
+    // Use exact: true to avoid matching "Step 1 · Draft" etc.
+    await expect(page.getByText('Draft', { exact: true })).toBeVisible()
+    await expect(page.getByText('Refine', { exact: true })).toBeVisible()
+    await expect(page.getByText('Export', { exact: true })).toBeVisible()
+  })
 
-    await expect(page.getByText('Google Slides Ready')).toBeVisible()
-    await expect(page.getByText('New')).toBeVisible()
+  test('starts on Step 1 Draft', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByText('Step 1 · Draft')).toBeVisible()
+    // Use heading role to avoid matching the PdfUploader's duplicate text
+    await expect(page.getByRole('heading', { name: 'Upload your brief here' })).toBeVisible()
   })
 })
 
-test.describe('Input Mode Toggle', () => {
-  test('defaults to Paste Brief mode', async ({ page }) => {
-    await page.goto('/')
+// ─── Step 1: Input Modes ──────────────────────────────────────────────────────
 
-    await expect(page.getByText('Paste Your Brief')).toBeVisible()
+test.describe('Step 1 – Input Modes', () => {
+  test('defaults to PDF upload mode', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByText('Drop a PDF — Gemini extracts structure automatically')).toBeVisible()
+  })
+
+  test('switches to Paste Text mode', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
     await expect(page.locator('textarea')).toBeVisible()
+    await expect(page.getByText('Paste your RFP or brief text below')).toBeVisible()
   })
 
-  test('switches to Upload PDF mode', async ({ page }) => {
+  test('switches back to Upload PDF mode', async ({ page }) => {
     await page.goto('/')
-
+    await page.getByRole('button', { name: 'Paste Text' }).click()
     await page.getByRole('button', { name: 'Upload PDF' }).click()
-
-    await expect(page.getByText('Upload Document')).toBeVisible()
-    await expect(page.getByText('Drop your PDF here')).toBeVisible()
-  })
-
-  test('switches back to Paste Brief mode', async ({ page }) => {
-    await page.goto('/')
-
-    await page.getByRole('button', { name: 'Upload PDF' }).click()
-    await expect(page.getByText('Upload Document')).toBeVisible()
-
-    await page.getByRole('button', { name: 'Paste Brief' }).click()
-    await expect(page.getByText('Paste Your Brief')).toBeVisible()
-    await expect(page.locator('textarea')).toBeVisible()
+    await expect(page.getByText('Drop a PDF — Gemini extracts structure automatically')).toBeVisible()
+    await expect(page.locator('textarea')).not.toBeVisible()
   })
 })
 
-test.describe('Brief Editor', () => {
-  test('typing updates character count', async ({ page }) => {
+// ─── Step 1: Brief Parsing ────────────────────────────────────────────────────
+
+test.describe('Step 1 – Brief Parsing', () => {
+  test('right panel shows "Waiting for brief" when empty', async ({ page }) => {
     await page.goto('/')
-
-    const textarea = page.locator('textarea')
-    await textarea.fill('Hello World')
-
-    await expect(page.getByText('11')).toBeVisible()
-    await expect(page.getByText('characters')).toBeVisible()
+    await expect(page.getByText('Waiting for brief')).toBeVisible()
   })
 
-  test('clear button resets the editor', async ({ page }) => {
+  test('"Continue to Refine" button is hidden when brief is empty', async ({ page }) => {
     await page.goto('/')
-
-    const textarea = page.locator('textarea')
-    await textarea.fill('Some text')
-
-    const clearButton = page.getByRole('button', { name: 'Clear' }).first()
-    await clearButton.click()
-
-    await expect(textarea).toHaveValue('')
+    await expect(page.getByRole('button', { name: 'Continue to Refine' })).not.toBeVisible()
   })
 
-  test('shows placeholder text when empty', async ({ page }) => {
+  test('entering brief text switches preview to "Brief parsed"', async ({ page }) => {
     await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await expect(page.getByText('Brief parsed')).toBeVisible()
+  })
 
-    const textarea = page.locator('textarea')
-    await expect(textarea).toHaveAttribute('placeholder', /Paste your proposal brief here/)
+  test('parsed fields (Company, Project, Timeline, Budget) appear in preview', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    // Check the right panel parsed field values
+    const preview = page.locator('section').filter({ hasText: 'Preview' })
+    await expect(preview.getByText('Starbucks', { exact: true })).toBeVisible()
+    await expect(preview.getByText('Digital Customer Experience Transformation')).toBeVisible()
+    await expect(preview.getByText('4 months')).toBeVisible()
+    await expect(preview.getByText('$175,000')).toBeVisible()
+  })
+
+  test('"Continue to Refine" button appears when brief has content', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await expect(page.getByRole('button', { name: 'Continue to Refine' })).toBeVisible()
   })
 })
 
-test.describe('Document Preview', () => {
-  test('shows empty state when no brief is entered', async ({ page }) => {
-    await page.goto('/')
+// ─── Step 2: Slide Preview ────────────────────────────────────────────────────
 
-    await expect(page.getByText('No document yet')).toBeVisible()
-    await expect(page.getByText('Paste your proposal brief on the left')).toBeVisible()
+test.describe('Step 2 – Slide Preview', () => {
+  test('navigates to Refine step with Slide Preview heading', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('Step 2 · Refine')).toBeVisible()
+    await expect(page.getByText('Slide Preview')).toBeVisible()
   })
 
-  test('shows parsed proposal after entering a brief', async ({ page }) => {
-    await page.goto('/')
-
-    await page.locator('textarea').fill(SAMPLE_BRIEF)
-
-    await expect(page.getByText('Digital Customer Experience Transformation')).toBeVisible()
-    await expect(page.getByText('Starbucks')).toBeVisible()
+  test('right sidebar shows "Refine with AI" and "Ask for changes" headings', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('Refine with AI')).toBeVisible()
+    await expect(page.getByText('Ask for changes')).toBeVisible()
   })
 
-  test('preview tabs are clickable', async ({ page }) => {
-    await page.goto('/')
-    await page.locator('textarea').fill(SAMPLE_BRIEF)
-
-    await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Structure' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible()
-
-    await page.getByRole('button', { name: 'Structure' }).click()
-    await page.getByRole('button', { name: 'Preview' }).click()
+  test('export button is visible in the sidebar', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByLabel('Create Google Slides presentation')).toBeVisible()
   })
 })
 
-test.describe('Google Slides Button', () => {
-  test('is disabled when no brief text is entered', async ({ page }) => {
-    await page.goto('/')
+// ─── Step 2: Chat Interface ───────────────────────────────────────────────────
 
-    const button = page.getByRole('button', { name: /Create Google Slides/i })
-    await expect(button).toBeVisible()
-    await expect(button).toBeDisabled()
+test.describe('Step 2 – Chat Interface', () => {
+  test('shows AI greeting message on load', async ({ page }) => {
+    await goToIterateStep(page)
+    // Find the first assistant message bubble
+    const greeting = page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    await expect(greeting).toBeVisible()
   })
 
-  test('becomes enabled after entering brief text', async ({ page }) => {
-    await page.goto('/')
-
-    await page.locator('textarea').fill(SAMPLE_BRIEF)
-
-    const button = page.getByRole('button', { name: /Create Google Slides/i })
-    await expect(button).toBeEnabled()
+  test('greeting references the client company name', async ({ page }) => {
+    await goToIterateStep(page)
+    const greeting = page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    await expect(greeting).toContainText('Starbucks')
   })
 
-  test('shows helper hint when brief is entered', async ({ page }) => {
-    await page.goto('/')
+  test('shows all 6 suggested prompts on first load', async ({ page }) => {
+    await goToIterateStep(page)
+    for (const prompt of [
+      'Make it more concise',
+      'Add stronger ROI focus',
+      'Use a more formal tone',
+      'Make it more persuasive',
+      'Highlight urgency',
+      'Add specific metrics',
+    ]) {
+      await expect(page.getByRole('button', { name: prompt })).toBeVisible()
+    }
+  })
 
-    await page.locator('textarea').fill(SAMPLE_BRIEF)
+  test('chat textarea has correct placeholder text', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(
+      page.locator('textarea[placeholder*="Ask for changes"]')
+    ).toBeVisible()
+  })
 
-    await expect(page.getByText('Creates a 10-slide presentation')).toBeVisible()
+  test('clicking a suggested prompt sends the message', async ({ page }) => {
+    await goToIterateStep(page)
+    await page.getByRole('button', { name: 'Make it more concise' }).click()
+    // User message bubble appears
+    const userBubble = page.locator('[class*="bg-navy-700"]').filter({ hasText: 'Make it more concise' })
+    await expect(userBubble).toBeVisible()
+  })
+
+  test('AI responds after a suggested prompt is sent', async ({ page }) => {
+    await goToIterateStep(page)
+    await page.getByRole('button', { name: 'Make it more concise' }).click()
+    // AI reply from mock — wait for the assistant bubble
+    const replyBubble = page.locator('[class*="rounded-2xl"]').filter({
+      hasText: "I've tightened the language across all sections"
+    }).first()
+    await expect(replyBubble).toBeVisible({ timeout: 10000 })
+  })
+
+  test('typing a custom message and pressing Enter sends it', async ({ page }) => {
+    await goToIterateStep(page)
+    const chatTextarea = page.locator('textarea[placeholder*="Ask for changes"]')
+    await chatTextarea.fill('Focus more on cost savings')
+    await chatTextarea.press('Enter')
+    const userBubble = page.locator('[class*="bg-navy-700"]').filter({ hasText: 'Focus more on cost savings' })
+    await expect(userBubble).toBeVisible()
+    const replyBubble = page.locator('[class*="rounded-2xl"]').filter({
+      hasText: "I've tightened the language across all sections"
+    }).first()
+    await expect(replyBubble).toBeVisible({ timeout: 10000 })
+  })
+
+  test('suggested prompts disappear after first exchange', async ({ page }) => {
+    await goToIterateStep(page)
+    await page.getByRole('button', { name: 'Make it more concise' }).click()
+    // Wait for AI reply
+    await expect(page.locator('[class*="rounded-2xl"]').filter({
+      hasText: "I've tightened the language across all sections"
+    }).first()).toBeVisible({ timeout: 10000 })
+    // Prompts should now be hidden (messages.length > 1)
+    await expect(
+      page.getByRole('button', { name: 'Add stronger ROI focus' })
+    ).not.toBeVisible()
   })
 })
 
-test.describe('PDF Uploader', () => {
-  test('shows drop zone with instructions', async ({ page }) => {
-    await page.goto('/')
+// ─── Step 2: Export Button ────────────────────────────────────────────────────
 
-    await page.getByRole('button', { name: 'Upload PDF' }).click()
+test.describe('Step 2 – Export Button', () => {
+  test('is enabled when brief is present', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByLabel('Create Google Slides presentation')).toBeEnabled()
+  })
 
-    await expect(page.getByText('Drop your PDF here')).toBeVisible()
-    await expect(page.getByText('or click to browse')).toBeVisible()
-    await expect(page.getByText('No file selected')).toBeVisible()
+  test('shows helper hint "Creates a 10-slide presentation"', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(
+      page.getByText('Creates a 10-slide presentation in your Google Drive')
+    ).toBeVisible()
+  })
+})
+
+// ─── Step 3: Share Screen ─────────────────────────────────────────────────────
+
+test.describe('Step 3 – Share Screen', () => {
+  test('shows "Presentation created!" success heading', async ({ page }) => {
+    await goToShareStep(page)
+    await expect(page.getByText('Presentation created!')).toBeVisible()
+  })
+
+  test('shows "Open in Google Slides" link pointing to the fake presentation', async ({ page }) => {
+    await goToShareStep(page)
+    const link = page.getByRole('link', { name: 'Open in Google Slides' })
+    await expect(link).toBeVisible()
+    const href = await link.getAttribute('href')
+    expect(href).toContain('fake-presentation-id')
+  })
+
+  test('shows "Share via Outlook" mailto link', async ({ page }) => {
+    await goToShareStep(page)
+    await expect(page.getByRole('link', { name: 'Share via Outlook' })).toBeVisible()
+  })
+
+  test('email body says "Hey team" not "Hi FirstName" or "Hi there"', async ({ page }) => {
+    await goToShareStep(page)
+    const mailtoHref = await page
+      .getByRole('link', { name: 'Share via Outlook' })
+      .getAttribute('href')
+    expect(mailtoHref).toBeTruthy()
+    const decoded = decodeURIComponent(mailtoHref!)
+    expect(decoded).toContain('Hey team')
+    expect(decoded).not.toMatch(/Hi Sarah/i)
+    expect(decoded).not.toMatch(/Hi there/i)
+  })
+
+  test('email body contains the client company name', async ({ page }) => {
+    await goToShareStep(page)
+    const mailtoHref = await page
+      .getByRole('link', { name: 'Share via Outlook' })
+      .getAttribute('href')
+    const decoded = decodeURIComponent(mailtoHref!)
+    expect(decoded).toContain('Starbucks')
+  })
+
+  test('email body contains the slides URL', async ({ page }) => {
+    await goToShareStep(page)
+    const mailtoHref = await page
+      .getByRole('link', { name: 'Share via Outlook' })
+      .getAttribute('href')
+    const decoded = decodeURIComponent(mailtoHref!)
+    expect(decoded).toContain('fake-presentation-id')
+  })
+
+  test('email To: field is blank (intended for internal team, not the client)', async ({ page }) => {
+    await goToShareStep(page)
+    const mailtoHref = await page
+      .getByRole('link', { name: 'Share via Outlook' })
+      .getAttribute('href')
+    // mailto: with no recipient — href should start with "mailto:?" not "mailto:someone@..."
+    expect(mailtoHref).toMatch(/^mailto:\?/)
+  })
+
+  test('description names the client company', async ({ page }) => {
+    await goToShareStep(page)
+    // The description paragraph on the share screen
+    const desc = page.locator('p').filter({ hasText: 'is live in Google Drive' })
+    await expect(desc).toContainText('Starbucks')
+  })
+
+  test('"Start new proposal" button resets to Draft step', async ({ page }) => {
+    await goToShareStep(page)
+    await page.getByRole('button', { name: 'Start new proposal' }).click()
+    await expect(page.getByRole('heading', { name: 'Upload your brief here' })).toBeVisible()
+    await expect(page.getByText('Step 1 · Draft')).toBeVisible()
   })
 })

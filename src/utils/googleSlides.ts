@@ -8,7 +8,7 @@
  * No Vite proxy needed — Google Slides API supports CORS with OAuth Bearer tokens.
  */
 
-import type { ProposalData } from '../types/proposal'
+import type { ProposalData, DesignConfig } from '../types/proposal'
 
 const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 
@@ -17,9 +17,7 @@ const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 const W = 9144000  // slide width
 const H = 5143500  // slide height
 
-// Paramount brand palette (RGB 0–1 floats)
-const NAVY   = { red: 0.051, green: 0.122, blue: 0.251 }  // #0D1F40
-const ORANGE = { red: 0.949, green: 0.451, blue: 0.129 }  // #F27321
+// Theme-independent palette constants
 const WHITE  = { red: 1, green: 1, blue: 1 }
 const LTGRAY = { red: 0.96, green: 0.96, blue: 0.97 }     // #F5F5F7
 const GRAY   = { red: 0.45, green: 0.48, blue: 0.54 }
@@ -31,10 +29,42 @@ export interface CreateSlidesResult {
 }
 
 // ---------------------------------------------------------------------------
-// Low-level request builders
+// Palette system
 // ---------------------------------------------------------------------------
 
 type RgbColor = { red: number; green: number; blue: number }
+
+interface SlidePalette {
+  primary: RgbColor        // dark background (NAVY equivalent)
+  primaryLighter: RgbColor // lighter variant for panels
+  primaryDarker: RgbColor  // darker variant for footer bars
+  accent: RgbColor         // brand accent (ORANGE equivalent)
+}
+
+const PALETTE_MAP: Record<string, SlidePalette> = {
+  'navy-gold': {
+    primary:        { red: 0.051, green: 0.122, blue: 0.251 },  // #0D1F40
+    primaryLighter: { red: 0.07,  green: 0.16,  blue: 0.32  },
+    primaryDarker:  { red: 0.035, green: 0.09,  blue: 0.2   },
+    accent:         { red: 0.949, green: 0.451, blue: 0.129 },  // #F27321
+  },
+  'slate-blue': {
+    primary:        { red: 0.118, green: 0.227, blue: 0.373 },  // #1E3A5F
+    primaryLighter: { red: 0.16,  green: 0.28,  blue: 0.44  },
+    primaryDarker:  { red: 0.07,  green: 0.15,  blue: 0.27  },
+    accent:         { red: 0.231, green: 0.510, blue: 0.965 },  // #3B82F6
+  },
+  'forest-green': {
+    primary:        { red: 0.102, green: 0.227, blue: 0.165 },  // #1A3A2A
+    primaryLighter: { red: 0.14,  green: 0.28,  blue: 0.21  },
+    primaryDarker:  { red: 0.06,  green: 0.14,  blue: 0.10  },
+    accent:         { red: 0.133, green: 0.773, blue: 0.369 },  // #22C55E
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Low-level request builders
+// ---------------------------------------------------------------------------
 
 function bgFill(slideId: string, color: RgbColor) {
   return {
@@ -95,7 +125,7 @@ function styleText(id: string, opts: TextStyleOpts) {
       style: {
         fontFamily: opts.fontFamily ?? 'Inter',
         fontSize: { magnitude: opts.fontSize ?? 18, unit: 'PT' },
-        foregroundColor: { opaqueColor: { rgbColor: opts.color ?? NAVY } },
+        foregroundColor: { opaqueColor: { rgbColor: opts.color ?? GRAY } },
         bold: opts.bold ?? false,
       },
       textRange: { type: 'ALL' },
@@ -174,8 +204,6 @@ function createRect(id: string, slideId: string, x: number, y: number, w: number
   ]
 }
 
-const NAVY_LIGHTER = { red: 0.07, green: 0.16, blue: 0.32 }
-
 function createEllipse(id: string, slideId: string, x: number, y: number, w: number, h: number, color: RgbColor): object[] {
   return [
     {
@@ -235,7 +263,7 @@ const COVER_PLABEL_Y = 2682750             // "PARAMOUNT" label
 const COVER_PLOGO_Y  = 2922750             // Paramount logo image
 
 /** Slide 1: Title / Cover */
-function titleSlide(slideId: string, data: ProposalData): object[] {
+function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
   const panelId       = `${slideId}_panel`
   const vlineId       = `${slideId}_vline`
   const clientLblId   = `${slideId}_clbl`
@@ -253,16 +281,16 @@ function titleSlide(slideId: string, data: ProposalData): object[] {
   const labelX = PANEL_X + 150000  // label text x (centered in panel via paragraphAlign)
 
   return [
-    bgFill(slideId, NAVY),
+    bgFill(slideId, palette.primary),
 
     // Structural bars (full width, drawn first — panel will cover them in right zone)
-    ...createRect(barId,  slideId, 0, 0,          W, 60000,  ORANGE),
-    ...createRect(bar2Id, slideId, 0, H - 80000,  W, 80000,  { red: 0.035, green: 0.09, blue: 0.2 }),
+    ...createRect(barId,  slideId, 0, 0,          W, 60000,  palette.accent),
+    ...createRect(bar2Id, slideId, 0, H - 80000,  W, 80000,  palette.primaryDarker),
 
     // Right brand panel covers the bars in its zone — clean uniform panel background
-    ...createRect(panelId, slideId, PANEL_X, 0, PANEL_W, H, NAVY_LIGHTER),
-    // Thin orange vertical accent line at the split
-    ...createRect(vlineId, slideId, PANEL_X, 0, 12000, H, ORANGE),
+    ...createRect(panelId, slideId, PANEL_X, 0, PANEL_W, H, palette.primaryLighter),
+    // Thin accent vertical line at the split
+    ...createRect(vlineId, slideId, PANEL_X, 0, 12000, H, palette.accent),
 
     // Panel: client company label (above client logo placeholder)
     createTextBox(clientLblId, slideId, labelX, COVER_CLABEL_Y, labelW, 180000),
@@ -270,19 +298,19 @@ function titleSlide(slideId: string, data: ProposalData): object[] {
     styleText(clientLblId, { color: GRAY, fontSize: 10, fontFamily: 'Inter', bold: true }),
     paragraphAlign(clientLblId, 'CENTER'),
 
-    // Panel: thin orange horizontal rule between the two logos
-    ...createRect(panelDivId, slideId, PANEL_X + 300000, COVER_DIV_Y, PANEL_W - 600000, 12000, ORANGE),
+    // Panel: thin accent horizontal rule between the two logos
+    ...createRect(panelDivId, slideId, PANEL_X + 300000, COVER_DIV_Y, PANEL_W - 600000, 12000, palette.accent),
 
     // Panel: "PARAMOUNT" label (above Paramount logo placeholder)
     createTextBox(partnerLblId, slideId, labelX, COVER_PLABEL_Y, labelW, 180000),
     insertText(partnerLblId, 'PARAMOUNT'),
-    styleText(partnerLblId, { color: ORANGE, fontSize: 10, fontFamily: 'Inter', bold: true }),
+    styleText(partnerLblId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
     paragraphAlign(partnerLblId, 'CENTER'),
 
     // Left content zone — constrained to CONTENT_W so text stays clear of the panel
     createTextBox(eyebrowId, slideId, MARGIN_X, 180000, CONTENT_W, 200000),
     insertText(eyebrowId, 'PARAMOUNT'),
-    styleText(eyebrowId, { color: ORANGE, fontSize: 11, fontFamily: 'Inter', bold: true }),
+    styleText(eyebrowId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
 
     // Hero brand line — 52pt, wraps cleanly to 2 lines inside the content zone
     createTextBox(heroId, slideId, MARGIN_X, 600000, CONTENT_W, 1700000),
@@ -294,8 +322,8 @@ function titleSlide(slideId: string, data: ProposalData): object[] {
     insertText(titleId, data.project.title),
     styleText(titleId, { color: GRAY, fontSize: 22, fontFamily: 'Inter' }),
 
-    // Thin orange divider rule
-    ...createRect(ruleId, slideId, MARGIN_X, 2960000, CONTENT_W, 18000, ORANGE),
+    // Thin accent divider rule
+    ...createRect(ruleId, slideId, MARGIN_X, 2960000, CONTENT_W, 18000, palette.accent),
 
     // Date line
     createTextBox(dateId, slideId, MARGIN_X, 3040000, CONTENT_W, 280000),
@@ -305,7 +333,7 @@ function titleSlide(slideId: string, data: ProposalData): object[] {
 }
 
 /** Slide 2: The Challenge — bullet list of problems */
-function challengeSlide(slideId: string, data: ProposalData): object[] {
+function challengeSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
   const headId   = `${slideId}_head`
   const bodyId   = `${slideId}_body`
   const barId    = `${slideId}_bar`
@@ -314,18 +342,18 @@ function challengeSlide(slideId: string, data: ProposalData): object[] {
 
   return [
     bgFill(slideId, WHITE),
-    ...createRect(barId,    slideId, 0, H - 50000, W, 50000, ORANGE),
+    ...createRect(barId,    slideId, 0, H - 50000, W, 50000, palette.accent),
     // Thin left accent bar echoing the problem deep-dive slides
-    ...createRect(accentId, slideId, 0, 0, 12000, H, ORANGE),
+    ...createRect(accentId, slideId, 0, 0, 12000, H, palette.accent),
 
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 600000),
     insertText(headId, 'The Challenge'),
-    styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    styleText(headId, { color: palette.primary, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
 
     // Shifted right to clear the left accent bar, with extra top spacing
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1100000, FULL_W - 80000, 3500000),
     insertText(bodyId, problems.join('\n')),
-    styleText(bodyId, { color: NAVY, fontSize: 20, fontFamily: 'Inter' }),
+    styleText(bodyId, { color: palette.primary, fontSize: 20, fontFamily: 'Inter' }),
     {
       createParagraphBullets: {
         objectId: bodyId,
@@ -342,6 +370,7 @@ function problemDeepDive(
   label: string,
   headline: string,
   body: string,
+  palette: SlidePalette,
   accent = true
 ): object[] {
   const labelId = `${slideId}_label`
@@ -353,23 +382,23 @@ function problemDeepDive(
   const xOff = accent ? 80000 : 0
   const reqs: object[] = [
     bgFill(slideId, WHITE),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, NAVY),
+    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary),
   ]
 
   if (accent) {
-    reqs.push(...createRect(accentId, slideId, 0, 0, 20000, H, ORANGE))
+    reqs.push(...createRect(accentId, slideId, 0, 0, 20000, H, palette.accent))
   } else {
-    // Hairline orange top bar on benefit slides (mirrors cover/challenge visual language)
-    reqs.push(...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 8000, ORANGE))
+    // Hairline accent top bar on benefit slides
+    reqs.push(...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 8000, palette.accent))
   }
 
   reqs.push(
     createTextBox(labelId, slideId, MARGIN_X + xOff, 300000, FULL_W, 180000),
-    ...(label ? [insertText(labelId, label), styleText(labelId, { color: ORANGE, fontSize: 11, fontFamily: 'Inter', bold: true })] : []),
+    ...(label ? [insertText(labelId, label), styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true })] : []),
 
     // Taller headline box so multi-line headlines don't crowd the body
     createTextBox(headId, slideId, MARGIN_X + xOff, 520000, FULL_W - xOff, 1100000),
-    ...(headline ? [insertText(headId, headline), styleText(headId, { color: NAVY, fontSize: 24, fontFamily: 'Montserrat', bold: true })] : []),
+    ...(headline ? [insertText(headId, headline), styleText(headId, { color: palette.primary, fontSize: 24, fontFamily: 'Montserrat', bold: true })] : []),
 
     // Body pushed down to give headline breathing room
     createTextBox(bodyId, slideId, MARGIN_X + xOff, 1750000, FULL_W - xOff, 3000000),
@@ -380,7 +409,7 @@ function problemDeepDive(
 }
 
 /** Slide 5: Problems 3 & 4 combined */
-function problemsCombined(slideId: string, data: ProposalData): object[] {
+function problemsCombined(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
   const head1Id = `${slideId}_h1`
   const body1Id = `${slideId}_b1`
   const head2Id = `${slideId}_h2`
@@ -397,17 +426,17 @@ function problemsCombined(slideId: string, data: ProposalData): object[] {
 
   return [
     bgFill(slideId, WHITE),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, NAVY),
+    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary),
     ...createRect(divId, slideId, W / 2 - 15000, MARGIN_TOP, 30000, H - MARGIN_TOP - 50000, { red: 0.9, green: 0.91, blue: 0.93 }),
 
     createTextBox(head1Id, slideId, MARGIN_X, MARGIN_TOP, colW, 700000),
-    ...(p3 ? [insertText(head1Id, p3), styleText(head1Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
+    ...(p3 ? [insertText(head1Id, p3), styleText(head1Id, { color: palette.primary, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
     createTextBox(body1Id, slideId, MARGIN_X, 1300000, colW, 3300000),
     ...(e3 ? [insertText(body1Id, e3), styleText(body1Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' })] : []),
 
     createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP, colW, 700000),
-    ...(p4 ? [insertText(head2Id, p4), styleText(head2Id, { color: NAVY, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
+    ...(p4 ? [insertText(head2Id, p4), styleText(head2Id, { color: palette.primary, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
     createTextBox(body2Id, slideId, W / 2 + 80000, 1300000, colW, 3300000),
     ...(e4 ? [insertText(body2Id, e4), styleText(body2Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' })] : []),
@@ -415,7 +444,7 @@ function problemsCombined(slideId: string, data: ProposalData): object[] {
 }
 
 /** Slide 6: The Solution — bullet list of benefits */
-function solutionSlide(slideId: string, data: ProposalData): object[] {
+function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
   const headId    = `${slideId}_head`
   const bodyId    = `${slideId}_body`
   const barId     = `${slideId}_bar`
@@ -423,14 +452,14 @@ function solutionSlide(slideId: string, data: ProposalData): object[] {
   const benefits = data.content.benefits.filter(b => b.trim())
 
   return [
-    bgFill(slideId, NAVY),
+    bgFill(slideId, palette.primary),
     // Decorative ellipse bleeds off top-right corner for visual depth
-    ...createEllipse(ellipseId, slideId, W - 1800000, -300000, 2400000, 2400000, NAVY_LIGHTER),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, ORANGE),
+    ...createEllipse(ellipseId, slideId, W - 1800000, -300000, 2400000, 2400000, palette.primaryLighter),
+    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.accent),
 
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'The Solution'),
-    styleText(headId, { color: ORANGE, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    styleText(headId, { color: palette.accent, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
 
     createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
     insertText(bodyId, benefits.join('\n')),
@@ -446,7 +475,7 @@ function solutionSlide(slideId: string, data: ProposalData): object[] {
 }
 
 /** Slide 9: Investment & Timeline */
-function investmentSlide(slideId: string, data: ProposalData): object[] {
+function investmentSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
   const headId   = `${slideId}_head`
   const totalId  = `${slideId}_total`
   const timeId   = `${slideId}_time`
@@ -457,36 +486,36 @@ function investmentSlide(slideId: string, data: ProposalData): object[] {
 
   return [
     bgFill(slideId, LTGRAY),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, NAVY),
+    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary),
 
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'Investment & Timeline'),
-    styleText(headId, { color: NAVY, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    styleText(headId, { color: palette.primary, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
 
     createTextBox(totalId, slideId, MARGIN_X, 1050000, FULL_W / 2, 400000),
     insertText(totalId, `Total Investment: ${data.project.totalValue}`),
-    styleText(totalId, { color: ORANGE, fontSize: 24, fontFamily: 'Inter', bold: true }),
+    styleText(totalId, { color: palette.accent, fontSize: 24, fontFamily: 'Inter', bold: true }),
 
     createTextBox(timeId, slideId, MARGIN_X, 1550000, FULL_W / 2, 300000),
     insertText(timeId, `Timeline: ${data.project.duration}`),
-    styleText(timeId, { color: NAVY, fontSize: 18, fontFamily: 'Inter' }),
+    styleText(timeId, { color: palette.primary, fontSize: 18, fontFamily: 'Inter' }),
 
     createTextBox(m1Id, slideId, MARGIN_X, 2100000, FULL_W, 300000),
     insertText(m1Id, `Month 1: ${data.project.monthOneInvestment}`),
-    styleText(m1Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
+    styleText(m1Id, { color: palette.primary, fontSize: 16, fontFamily: 'Inter' }),
 
     createTextBox(m2Id, slideId, MARGIN_X, 2500000, FULL_W, 300000),
     insertText(m2Id, `Month 2: ${data.project.monthTwoInvestment}`),
-    styleText(m2Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
+    styleText(m2Id, { color: palette.primary, fontSize: 16, fontFamily: 'Inter' }),
 
     createTextBox(m3Id, slideId, MARGIN_X, 2900000, FULL_W, 300000),
     insertText(m3Id, `Month 3: ${data.project.monthThreeInvestment}`),
-    styleText(m3Id, { color: NAVY, fontSize: 16, fontFamily: 'Inter' }),
+    styleText(m3Id, { color: palette.primary, fontSize: 16, fontFamily: 'Inter' }),
   ]
 }
 
 /** Slide 10: Close / CTA */
-function closingSlide(slideId: string, data: ProposalData): object[] {
+function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
   const headId   = `${slideId}_head`
   const footerId = `${slideId}_footer`
   const barId    = `${slideId}_bar`
@@ -494,16 +523,16 @@ function closingSlide(slideId: string, data: ProposalData): object[] {
   const rule2Id  = `${slideId}_rule2`
 
   return [
-    bgFill(slideId, NAVY),
-    ...createRect(barId, slideId, 0, H - 80000, W, 80000, { red: 0.035, green: 0.09, blue: 0.2 }),
+    bgFill(slideId, palette.primary),
+    ...createRect(barId, slideId, 0, H - 80000, W, 80000, palette.primaryDarker),
 
-    // Thin orange rules bracket the CTA text (logo sits above them, inserted in Phase 3)
-    ...createRect(rule1Id, slideId, MARGIN_X, 1280000, FULL_W, 6000, ORANGE),
-    ...createRect(rule2Id, slideId, MARGIN_X, 2300000, FULL_W, 6000, ORANGE),
+    // Thin accent rules bracket the CTA text (logo sits above them, inserted in Phase 3)
+    ...createRect(rule1Id, slideId, MARGIN_X, 1280000, FULL_W, 6000, palette.accent),
+    ...createRect(rule2Id, slideId, MARGIN_X, 2300000, FULL_W, 6000, palette.accent),
 
     createTextBox(headId, slideId, MARGIN_X, 1400000, FULL_W, 800000),
     insertText(headId, `Let's build this together, ${data.client.firstName}.`),
-    styleText(headId, { color: ORANGE, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
+    styleText(headId, { color: palette.accent, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
     paragraphAlign(headId, 'CENTER'),
 
     createTextBox(footerId, slideId, MARGIN_X, H - 200000, FULL_W, 150000),
@@ -579,8 +608,11 @@ function logoRequests(coverSlideId: string, closeSlideId: string, data: Proposal
 
 export async function createGoogleSlidesPresentation(
   data: ProposalData,
-  accessToken: string
+  accessToken: string,
+  designConfig?: DesignConfig
 ): Promise<CreateSlidesResult> {
+  const palette = PALETTE_MAP[designConfig?.colorTheme ?? 'navy-gold'] ?? PALETTE_MAP['navy-gold']
+
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${accessToken}`,
@@ -629,16 +661,16 @@ export async function createGoogleSlidesPresentation(
   }
 
   const populationRequests: object[] = [
-    ...titleSlide(slideIds[0], p),
-    ...challengeSlide(slideIds[1], p),
-    ...problemDeepDive(slideIds[2], 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || ''),
-    ...problemDeepDive(slideIds[3], 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || ''),
-    ...problemsCombined(slideIds[4], p),
-    ...solutionSlide(slideIds[5], p),
-    ...problemDeepDive(slideIds[6], 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', false),
-    ...problemDeepDive(slideIds[7], 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', false),
-    ...investmentSlide(slideIds[8], p),
-    ...closingSlide(slideIds[9], p),
+    ...titleSlide(slideIds[0], p, palette),
+    ...challengeSlide(slideIds[1], p, palette),
+    ...problemDeepDive(slideIds[2], 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || '', palette),
+    ...problemDeepDive(slideIds[3], 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || '', palette),
+    ...problemsCombined(slideIds[4], p, palette),
+    ...solutionSlide(slideIds[5], p, palette),
+    ...problemDeepDive(slideIds[6], 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', palette, false),
+    ...problemDeepDive(slideIds[7], 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', palette, false),
+    ...investmentSlide(slideIds[8], p, palette),
+    ...closingSlide(slideIds[9], p, palette),
   ]
 
   const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {

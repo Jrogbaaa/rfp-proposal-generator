@@ -1,37 +1,46 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ChatMessage } from '../utils/llmService'
-import type { ProposalData, ExpandedContent } from '../types/proposal'
-import { iterateProposalContent } from '../utils/llmService'
+import type { ProposalData, ExpandedContent, DesignConfig } from '../types/proposal'
+import { iterateDesign } from '../utils/llmService'
+import GoogleSlidesButton from './GoogleSlidesButton'
 
-interface ChatInterfaceProps {
+interface DesignChatInterfaceProps {
+  currentDesignConfig: DesignConfig
+  onDesignConfigUpdated: (config: DesignConfig) => void
+  parsedData: Partial<ProposalData> | null
   briefText: string
-  parsedData: Partial<ProposalData>
-  currentExpansions: ExpandedContent | null
-  onExpansionsUpdated: (expansions: ExpandedContent) => void
-  onLoadingChange?: (loading: boolean) => void
+  expansions: ExpandedContent | null
+  onSlidesSuccess: (url: string) => void
 }
 
-const SUGGESTED_PROMPTS = [
-  'Make it more concise',
-  'Add stronger ROI focus',
-  'Use a more formal tone',
-  'Make it more persuasive',
-  'Highlight urgency',
-  'Add specific metrics',
+const DESIGN_SUGGESTED_PROMPTS = [
+  'Make it more corporate',
+  'Tech-forward palette',
+  'Sustainable / green theme',
+  'Classic professional style',
+  'Modern and clean',
+  'Bold enterprise style',
 ]
 
-export default function ChatInterface({
-  briefText,
+const THEME_LABELS: Record<string, string> = {
+  'navy-gold': 'Navy & Gold',
+  'slate-blue': 'Slate & Blue',
+  'forest-green': 'Forest Green',
+}
+
+export default function DesignChatInterface({
+  currentDesignConfig,
+  onDesignConfigUpdated,
   parsedData,
-  currentExpansions,
-  onExpansionsUpdated,
-  onLoadingChange,
-}: ChatInterfaceProps) {
+  briefText,
+  expansions,
+  onSlidesSuccess,
+}: DesignChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      text: `Hi! I've reviewed the brief for **${parsedData.client?.company || 'your client'}**. You can ask me to refine the tone, adjust the language, tighten the copy, or shift the focus — I'll update the content and you can regenerate the slides anytime.`,
+      text: `Hi! I can help you choose the right visual style for this deck. The current theme is **${THEME_LABELS[currentDesignConfig.colorTheme] || currentDesignConfig.colorTheme}**. Ask me to try a different look, or pick one of the suggestions below.`,
     },
   ])
   const [input, setInput] = useState('')
@@ -50,24 +59,21 @@ export default function ChatInterface({
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
-    onLoadingChange?.(true)
 
     try {
-      const { reply, updatedExpansions } = await iterateProposalContent(
-        briefText,
-        parsedData,
-        currentExpansions,
+      const { reply, designConfig } = await iterateDesign(
+        currentDesignConfig,
         text.trim(),
         messages
       )
 
       setMessages((prev) => [...prev, { role: 'assistant', text: reply }])
 
-      if (updatedExpansions) {
-        onExpansionsUpdated(updatedExpansions)
+      if (designConfig) {
+        onDesignConfigUpdated(designConfig)
       }
     } catch (err) {
-      console.error('[ChatInterface] Error:', err)
+      console.error('[DesignChatInterface] Error:', err)
       setMessages((prev) => [
         ...prev,
         {
@@ -77,9 +83,8 @@ export default function ChatInterface({
       ])
     } finally {
       setIsLoading(false)
-      onLoadingChange?.(false)
     }
-  }, [briefText, parsedData, currentExpansions, messages, isLoading, onExpansionsUpdated, onLoadingChange])
+  }, [currentDesignConfig, messages, isLoading, onDesignConfigUpdated])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -90,8 +95,16 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Theme badge */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-xs text-navy-400">Current theme:</span>
+        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-navy-100 text-navy-700 border border-navy-200">
+          {THEME_LABELS[currentDesignConfig.colorTheme] || currentDesignConfig.colorTheme}
+        </span>
+      </div>
+
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-4">
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-4 min-h-0">
         <AnimatePresence initial={false}>
           {messages.map((msg, i) => (
             <motion.div
@@ -102,9 +115,10 @@ export default function ChatInterface({
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-7 h-7 rounded-full bg-gold-500/20 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
-                  <svg className="w-3.5 h-3.5 text-gold-400" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 0 2h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1 0-2h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z" />
+                <div className="w-7 h-7 rounded-full bg-navy-100 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5 border border-navy-200">
+                  <svg className="w-3.5 h-3.5 text-navy-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M8 12l2 2 4-4" />
                   </svg>
                 </div>
               )}
@@ -129,9 +143,10 @@ export default function ChatInterface({
             animate={{ opacity: 1, y: 0 }}
             className="flex justify-start"
           >
-            <div className="w-7 h-7 rounded-full bg-gold-500/20 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
-              <svg className="w-3.5 h-3.5 text-gold-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 0 2h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1 0-2h1a7 7 0 0 1 7-7h1V5.73A2 2 0 0 1 10 4a2 2 0 0 1 2-2z" />
+            <div className="w-7 h-7 rounded-full bg-navy-100 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5 border border-navy-200">
+              <svg className="w-3.5 h-3.5 text-navy-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12l2 2 4-4" />
               </svg>
             </div>
             <div className="bg-cream-100 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
@@ -155,7 +170,7 @@ export default function ChatInterface({
       {/* Suggested prompts */}
       {messages.length <= 1 && (
         <div className="flex flex-wrap gap-2 mb-3">
-          {SUGGESTED_PROMPTS.map((prompt) => (
+          {DESIGN_SUGGESTED_PROMPTS.map((prompt) => (
             <button
               key={prompt}
               onClick={() => sendMessage(prompt)}
@@ -175,10 +190,10 @@ export default function ChatInterface({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask for changes… (e.g. 'make it more concise')"
+          placeholder="Ask for a design change… (e.g. 'make it feel more modern')"
           disabled={isLoading}
           rows={2}
-          className="flex-1 resize-none rounded-xl border border-cream-400 bg-white px-4 py-3 text-sm text-navy-800 placeholder-navy-400 focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-transparent disabled:opacity-50 transition"
+          className="flex-1 resize-none rounded-xl border border-cream-400 bg-white px-4 py-3 text-sm text-navy-800 placeholder-navy-400 focus:outline-none focus:ring-2 focus:ring-navy-400 focus:border-transparent disabled:opacity-50 transition"
         />
         <button
           onClick={() => sendMessage(input)}
@@ -190,6 +205,19 @@ export default function ChatInterface({
             <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
         </button>
+      </div>
+
+      {/* Export section */}
+      <div className="border-t border-cream-300 pt-4 mt-4">
+        <p className="text-xs text-navy-400 mb-3 text-center">Happy with the design? Create your deck.</p>
+        <GoogleSlidesButton
+          data={parsedData}
+          briefText={briefText}
+          isEmpty={!briefText.trim()}
+          preGeneratedContent={expansions}
+          designConfig={currentDesignConfig}
+          onSuccess={onSlidesSuccess}
+        />
       </div>
     </div>
   )

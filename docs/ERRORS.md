@@ -306,19 +306,13 @@ npm install -D @types/<package-name>
 ---
 
 ### `TS2322: Type '"input"' is not assignable to type 'Step'`
-**Error:** TypeScript errors in `useProposalState.ts` referencing old step names after migration.
+**Error:** TypeScript errors referencing old step names after migration.
 
-**Cause:** The `Step` type was updated from `'input' | 'expand' | 'review' | 'success'` to `'draft' | 'iterate' | 'design' | 'share'` in `src/types/proposal.ts`. Any file using the old step IDs will fail.
+**Cause:** The `Step` type was updated from `'input' | 'expand' | 'review' | 'success'` → `'draft' | 'iterate' | 'design' | 'share'` → `'draft' | 'refine' | 'export'` in `src/types/proposal.ts`. Any file using old step IDs will fail.
 
-**Solution:** Update `useProposalState.ts` (and any other files) to map to the new step names:
-```
-case 0: return 'draft'  // was 'input'
-case 1: return 'iterate' // was 'expand'
-case 2: return 'design'  // was 'review'
-case 3: return 'share'   // was 'success'
-```
+**Solution:** Update all files to use current step names: `'draft' | 'refine' | 'export'`.
 
-**Fix applied:** `src/hooks/useProposalState.ts` updated.
+**Fix applied:** `useProposalState.ts` was deleted (state moved inline into `App.tsx`). Steps collapsed to 3.
 
 ---
 
@@ -328,7 +322,7 @@ case 3: return 'share'   // was 'success'
 |------|-------|------|----------|--------|
 | 2026-01-19 | useContext null (framer-motion) | App.tsx | Restart dev server / clear .vite cache | Workaround |
 | 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Migrated to Gemini — no longer applicable | Obsolete |
-| 2026-02-26 | TS2322 Step type mismatch after migration | useProposalState.ts | Updated step IDs to draft/iterate/design/share | Fixed |
+| 2026-02-26 | TS2322 Step type mismatch after migration | useProposalState.ts (deleted) | Steps collapsed to draft/refine/export; state inlined in App.tsx | Fixed |
 
 ---
 

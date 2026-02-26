@@ -9,27 +9,26 @@ interface BriefEditorProps {
 
 const PLACEHOLDER = `Paste your proposal brief here...
 
-Example (Starbucks Demo):
-Project: Digital Customer Experience Transformation
-Client: Sarah Martinez, sarah.martinez@starbucks.com, Starbucks
-Timeline: 4 months
-Budget: $175,000
-Platform Costs: $25,000
-Month 1 Investment: $60,000
-Month 2 Investment: $50,000
-Month 3 Investment: $40,000
+Format guide:
+Project: [project name]
+Client: [first last], [email], [company]
+Timeline: [duration]
+Budget: [total value]
+Month 1 Investment: [amount]
+Month 2 Investment: [amount]
+Month 3 Investment: [amount]
 
 Problems:
-- Mobile app engagement has dropped 23% since last quarter
-- Customer loyalty program data is siloed across multiple systems
-- Store-level analytics are delayed by 48+ hours
-- Personalization engine is serving generic recommendations
+- [challenge 1]
+- [challenge 2]
+- [challenge 3]
+- [challenge 4]
 
 Benefits:
-- Real-time unified customer view across all touchpoints
-- 15-20% lift in mobile app engagement within 90 days
-- Same-day actionable insights for store managers
-- AI-powered personalization driving 12% higher average order value`
+- [desired outcome 1]
+- [desired outcome 2]
+- [desired outcome 3]
+- [desired outcome 4]`
 
 export default function BriefEditor({ value, onChange, onClear }: BriefEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)

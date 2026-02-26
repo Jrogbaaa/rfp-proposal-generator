@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { ProposalData, ExpandedContent } from '../types/proposal'
+import type { ProposalData, ExpandedContent, DesignConfig } from '../types/proposal'
 import { getValidToken } from '../utils/googleAuth'
 import { createGoogleSlidesPresentation } from '../utils/googleSlides'
 import { generateProposalContent } from '../utils/llmService'
@@ -11,6 +11,7 @@ interface GoogleSlidesButtonProps {
   briefText: string
   isEmpty: boolean
   preGeneratedContent?: ExpandedContent | null
+  designConfig?: DesignConfig
   onSuccess?: (url: string) => void
 }
 
@@ -24,28 +25,29 @@ const PROGRESS_STEPS = [
   'Finalising...',
 ]
 
-/** Replicates the buildProposalData logic from App.tsx */
 function buildProposalData(parsedData: Partial<ProposalData>, llmContent?: ExpandedContent): ProposalData {
   const today = new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   })
 
+  const company = parsedData.client?.company || ''
+
   return {
     client: {
-      firstName: parsedData.client?.firstName || 'Client',
+      firstName: parsedData.client?.firstName || '',
       lastName: parsedData.client?.lastName || '',
-      email: parsedData.client?.email || 'client@example.com',
-      company: parsedData.client?.company || 'Company',
+      email: parsedData.client?.email || '',
+      company,
       companyDomain: parsedData.client?.companyDomain || '',
     },
     project: {
-      title: parsedData.project?.title || 'Proposal',
-      duration: parsedData.project?.duration || '3 months',
-      totalValue: parsedData.project?.totalValue || '$0',
-      platformCosts: parsedData.project?.platformCosts || '$0',
-      monthOneInvestment: parsedData.project?.monthOneInvestment || '$0',
-      monthTwoInvestment: parsedData.project?.monthTwoInvestment || '$0',
-      monthThreeInvestment: parsedData.project?.monthThreeInvestment || '$0',
+      title: parsedData.project?.title || '',
+      duration: parsedData.project?.duration || '',
+      totalValue: parsedData.project?.totalValue || '',
+      platformCosts: parsedData.project?.platformCosts || '',
+      monthOneInvestment: parsedData.project?.monthOneInvestment || '',
+      monthTwoInvestment: parsedData.project?.monthTwoInvestment || '',
+      monthThreeInvestment: parsedData.project?.monthThreeInvestment || '',
     },
     content: parsedData.content || {
       problems: ['', '', '', ''],
@@ -56,14 +58,14 @@ function buildProposalData(parsedData: Partial<ProposalData>, llmContent?: Expan
       benefitExpansions: parsedData.content?.benefits as [string, string, string, string] || ['', '', '', ''],
     },
     generated: {
-      slideFooter: `${parsedData.client?.company || 'Company'} | Confidential`,
+      slideFooter: company ? `${company} | Confidential` : 'Confidential',
       contractFooterSlug: `proposal-${Date.now()}`,
       createdDate: today,
     },
   }
 }
 
-export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, onSuccess }: GoogleSlidesButtonProps) {
+export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, designConfig, onSuccess }: GoogleSlidesButtonProps) {
   const [stage, setStage] = useState<Stage>('idle')
   const [progressStep, setProgressStep] = useState(0)
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
@@ -95,7 +97,7 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
       setProgressStep(3)
 
       // Step 4: Create presentation
-      const result = await createGoogleSlidesPresentation(proposalData, token)
+      const result = await createGoogleSlidesPresentation(proposalData, token, designConfig)
       setProgressStep(4)
 
       setSlidesUrl(result.presentationUrl)
