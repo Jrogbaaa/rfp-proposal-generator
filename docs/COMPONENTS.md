@@ -34,6 +34,24 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 ---
 
+### ChatInterface.tsx
+**Purpose:** Step 2 AI chat interface for multi-turn content iteration on the generated proposal.
+
+**Props:**
+- `briefText: string` — Raw brief text passed to Gemini as context
+- `parsedData: Partial<ProposalData> | null` — Structured brief data for richer context
+- `onExpansionsUpdated` — Callback fired when Gemini returns updated `problemExpansions` and/or `benefitExpansions`; `App.tsx` stores these for passing to `GoogleSlidesButton` as `preGeneratedContent`
+
+**Features:**
+- Multi-turn conversation history preserved across messages
+- Suggested prompt chips for common requests (tone changes, language adjustments, focus shifts)
+- Calls `iterateProposalContent()` from `llmService.ts`
+- Displays Gemini reply text; silently updates expansions in the background via callback
+
+**LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history)` → `{reply, updatedExpansions?}`
+
+---
+
 ### GoogleSlidesButton.tsx
 **Purpose:** Direct Google Slides API integration — creates a 10-slide presentation in the user's Google Drive and provides a link to open/edit it.
 
@@ -57,7 +75,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Utilities used:**
 - `src/utils/googleAuth.ts` — OAuth token management
 - `src/utils/googleSlides.ts` — Slides API calls
-- `src/utils/llmService.ts` — OpenAI content generation
+- `src/utils/llmService.ts` — Gemini content generation
 - `src/utils/errorHandler.ts` — `logError`
 
 ---
@@ -132,10 +150,10 @@ Auto-generated documentation for all React components in the Paramount applicati
 | contentExpander | `src/utils/contentExpander.ts` | Expands brief content into full sections |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash integration for generating personalized problem/benefit expansions |
+| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash integration: `analyzeBriefPdf()` (Vision PDF extraction), `generateProposalContent()` (problem/benefit expansions), `iterateProposalContent()` (multi-turn chat refinement) |
 
 ---
 
 ## Last Updated
-- Date: 2026-02-25
-- Changes: Cover slide redesigned with split-panel layout (right branded panel replaces decorative ellipse); logos moved into panel with labels and divider; closing slide ellipse replaced with orange bracket rules; `llmService` updated to Gemini 2.5 Flash
+- Date: 2026-02-26
+- Changes: Added Gemini Vision PDF analysis (`analyzeBriefPdf`); replaced fake PdfUploader animation with real extraction; added `ChatInterface` component (Step 2 AI iteration); added `iterateProposalContent()` and `ChatMessage` to `llmService`; redesigned App into 4-step flow (Draft → Iteration → Design → Share); `SlidePreview` now accepts real `data` prop; `GoogleSlidesButton` adds `preGeneratedContent` and `onSuccess` props; `Step` type updated to `draft | iterate | design | share`
