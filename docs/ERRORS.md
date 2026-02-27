@@ -316,6 +316,25 @@ npm install -D @types/<package-name>
 
 ---
 
+### E2E tests pass locally but fail in CI (12 failures in Step 2 Chat + Step 3 Share)
+**Error:** Tests that require AI responses or Google Slides creation fail in GitHub Actions with timeout or "Sorry, something went wrong" errors. Locally all tests pass.
+
+**Cause:** The CI workflow ran `npm run build` without `VITE_GEMINI_API_KEY` or `VITE_GOOGLE_CLIENT_ID` environment variables. Vite compiles `import.meta.env.VITE_*` values at build time — missing vars become `undefined` in the bundle. Guard checks in `llmService.ts` (line 4) and `googleAuth.ts` (line 46) throw before any `fetch()` call is made, so Playwright's `page.route()` mocks never intercept. Locally it works because the dev server reads from the gitignored `.env` file containing real keys.
+
+**Solution:** Add dummy env vars to the CI build step in `.github/workflows/e2e.yml`:
+```yaml
+- name: Build app
+  run: npm run build
+  env:
+    VITE_GEMINI_API_KEY: test-api-key
+    VITE_GOOGLE_CLIENT_ID: test-client-id.apps.googleusercontent.com
+```
+Actual values don't matter since all API calls are mocked by Playwright route handlers in the test suite.
+
+**Fix applied:** Added env vars to `.github/workflows/e2e.yml` build step. All 12 tests now pass in CI.
+
+---
+
 ## Error Log
 
 | Date | Error | File | Solution | Status |
@@ -323,6 +342,7 @@ npm install -D @types/<package-name>
 | 2026-01-19 | useContext null (framer-motion) | App.tsx | Restart dev server / clear .vite cache | Workaround |
 | 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Migrated to Gemini — no longer applicable | Obsolete |
 | 2026-02-26 | TS2322 Step type mismatch after migration | useProposalState.ts (deleted) | Steps collapsed to draft/refine/export; state inlined in App.tsx | Fixed |
+| 2026-02-27 | 12 E2E failures in CI (missing VITE_* env vars) | .github/workflows/e2e.yml | Added dummy env vars to build step | Fixed |
 
 ---
 

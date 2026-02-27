@@ -11,6 +11,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 | App | `src/App.tsx` | 3-step flow orchestrator: Draft → Refine → Export |
 | Header | `src/components/Header.tsx` | Application header with logo, auth badge, and New button |
 | BriefEditor | `src/components/BriefEditor.tsx` | Free-form brief text input (Step 1 paste mode) |
+| BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
 | ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Content tab — multi-turn Gemini conversation for refining proposal content |
 | DesignChatInterface | `src/components/DesignChatInterface.tsx` | Step 2 Design tab — Gemini-powered theme selection chat + export button |
@@ -34,6 +35,26 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 ---
 
+### BrandVoicePanel.tsx
+**Purpose:** Step 1 right panel component — lets users upload example Paramount proposals so the app learns their writing style and strategic approach before generating any content.
+
+**Props:**
+- `brandVoice: string | null` — Current extracted brand voice guide (from `localStorage`); null if not yet trained
+- `onBrandVoiceExtracted: (voice: string, fileCount: number) => void` — Callback fired on successful extraction or clear
+
+**Features:**
+- Collapsible — header always shows status badge ("Trained on X docs" / "Not configured"); body expands/collapses
+- Multi-file drag-and-drop or click-to-browse (PDF only); files staged before training starts
+- 3-stage loading animation matching `PdfUploader` visual style
+- On success: shows a 1-sentence preview of the extracted voice guide; collapses automatically
+- "Clear training" link removes localStorage entries; "Retrain" replaces existing training
+- Calls `extractBrandVoice(files)` from `llmService.ts`
+- Persists result in `localStorage` keys: `rfp_brand_voice` (text) + `rfp_brand_voice_count` (number)
+
+**LLM function used:** `extractBrandVoice(files: File[])` → `string` (plain prose brand voice guide)
+
+---
+
 ### ChatInterface.tsx
 **Purpose:** Step 2 AI chat interface for multi-turn content iteration on the generated proposal.
 
@@ -41,6 +62,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `briefText: string` — Raw brief text passed to Gemini as context
 - `parsedData: Partial<ProposalData> | null` — Structured brief data for richer context
 - `onExpansionsUpdated` — Callback fired when Gemini returns updated `problemExpansions` and/or `benefitExpansions`; `App.tsx` stores these for passing to `GoogleSlidesButton` as `preGeneratedContent`
+- `brandVoice?: string` — Optional brand voice guide; forwarded to `iterateProposalContent()` to ensure refinements maintain Paramount's writing style
 
 **Features:**
 - Multi-turn conversation history preserved across messages
@@ -48,7 +70,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - Calls `iterateProposalContent()` from `llmService.ts`
 - Displays Gemini reply text; silently updates expansions in the background via callback
 
-**LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history)` → `{reply, updatedExpansions?}`
+**LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history, brandVoice?)` → `{reply, updatedExpansions?}`
 
 ---
 
