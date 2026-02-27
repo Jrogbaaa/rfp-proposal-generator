@@ -8,6 +8,7 @@ import ChatInterface from './components/ChatInterface'
 import DesignChatInterface from './components/DesignChatInterface'
 import GoogleSlidesButton from './components/GoogleSlidesButton'
 import ProgressStepper from './components/ProgressStepper'
+import BrandVoicePanel from './components/BrandVoicePanel'
 import { useBriefParser } from './hooks/useBriefParser'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import DevTools from './components/DevTools'
@@ -34,6 +35,9 @@ export default function App() {
   // Design config
   const [designConfig, setDesignConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
   const [sidebarTab, setSidebarTab] = useState<'content' | 'design'>('content')
+
+  // Brand voice training
+  const [brandVoice, setBrandVoice] = useState<string | null>(() => localStorage.getItem('rfp_brand_voice'))
 
   // Loading / error states
   const [isGenerating, setIsGenerating] = useState(false)
@@ -94,7 +98,7 @@ export default function App() {
     if (!expansions) {
       setIsGenerating(true)
       try {
-        const result = await generateProposalContent(briefText, parsedData || {})
+        const result = await generateProposalContent(briefText, parsedData || {}, brandVoice ?? undefined)
         setExpansions(result)
       } catch (err) {
         console.error('[App] Failed to generate proposal content:', err)
@@ -109,7 +113,7 @@ export default function App() {
     setGenerationError(null)
     setIsGenerating(true)
     try {
-      const result = await generateProposalContent(briefText, parsedData || {})
+      const result = await generateProposalContent(briefText, parsedData || {}, brandVoice ?? undefined)
       setExpansions(result)
     } catch (err) {
       console.error('[App] Retry failed:', err)
@@ -252,6 +256,10 @@ export default function App() {
                 {/* Right: Parsed preview + CTA */}
                 <section className="relative bg-cream-50 flex flex-col border-l border-cream-400 min-h-[50vh] lg:min-h-0">
                   <div className="flex flex-col h-full p-6 lg:p-10">
+                    <BrandVoicePanel
+                      brandVoice={brandVoice}
+                      onBrandVoiceExtracted={(voice, _count) => setBrandVoice(voice || null)}
+                    />
                     <div className="mb-6">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-2">
                         Preview
@@ -464,6 +472,7 @@ export default function App() {
                           currentExpansions={expansions}
                           onExpansionsUpdated={setExpansions}
                           onLoadingChange={setIsSlideUpdating}
+                          brandVoice={brandVoice ?? undefined}
                         />
                       ) : (
                         <DesignChatInterface

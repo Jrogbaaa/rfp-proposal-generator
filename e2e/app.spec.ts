@@ -136,7 +136,9 @@ async function goToIterateStep(page: Page) {
   await page.getByRole('button', { name: 'Paste Text' }).click()
   await page.locator('textarea').fill(SAMPLE_BRIEF)
   await page.getByRole('button', { name: 'Continue to Refine' }).click()
-  await expect(page.getByText('Ask for changes')).toBeVisible()
+  await expect(
+    page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+  ).toBeVisible({ timeout: 10000 })
 }
 
 /** Navigate all the way to the Share (step 3) with all APIs mocked */
@@ -148,7 +150,9 @@ async function goToShareStep(page: Page) {
   await page.getByRole('button', { name: 'Paste Text' }).click()
   await page.locator('textarea').fill(SAMPLE_BRIEF)
   await page.getByRole('button', { name: 'Continue to Refine' }).click()
-  await expect(page.getByText('Ask for changes')).toBeVisible()
+  await expect(
+    page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+  ).toBeVisible({ timeout: 10000 })
   await page.getByLabel('Create Google Slides presentation').click()
   await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
 }
@@ -159,7 +163,7 @@ test.describe('App Shell', () => {
   test('loads with header and connection badge', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('header')).toBeVisible()
-    await expect(page.getByText('Google Slides Ready')).toBeVisible()
+    await expect(page.locator('header').getByText(/Google Slides Ready|Disconnected/)).toBeVisible()
   })
 
   test('shows 3-step progress bar (Draft, Refine, Export)', async ({ page }) => {
@@ -251,10 +255,10 @@ test.describe('Step 2 – Slide Preview', () => {
     await expect(page.getByText('Slide Preview')).toBeVisible()
   })
 
-  test('right sidebar shows "Refine with AI" and "Ask for changes" headings', async ({ page }) => {
+  test('right sidebar shows Content tab and chat input', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByText('Refine with AI')).toBeVisible()
-    await expect(page.getByText('Ask for changes')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Content', exact: true })).toBeVisible()
+    await expect(page.locator('textarea[placeholder*="Ask for changes"]')).toBeVisible()
   })
 
   test('export button is visible in the sidebar', async ({ page }) => {

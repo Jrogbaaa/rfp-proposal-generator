@@ -176,12 +176,32 @@ All 7 slide-builder functions (`titleSlide`, `challengeSlide`, `problemDeepDive`
 | contentExpander | `src/utils/contentExpander.ts` | Template-based content expansion for problems and benefits |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()`, `iterateDesign()` |
+| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()`, `iterateDesign()`, `extractBrandVoice()` |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system |
 
 ---
 
+---
+
+### llmService.ts (updated)
+**Location:** `src/utils/llmService.ts`
+
+**PDF size routing in `analyzeBriefPdf()`:**
+- `> 50 MB` → throws immediately (`MAX_PDF_SIZE` exported for `PdfUploader`)
+- `> 15 MB` → `uploadToFilesApi()` → `file_data: { mime_type, file_uri }` part; file deleted after extraction
+- `≤ 15 MB` → `fileToBase64()` → `inline_data: { mime_type, data }` part (original path)
+
+**Retry logic:** If `JSON.parse` fails (e.g. truncated output), retries once without `responseMimeType` + strips markdown fences via `extractJsonFromText()`.
+
+**New helpers:** `uploadToFilesApi(file, apiKey)`, `deleteFilesApiFile(fileUri, apiKey)`, `extractJsonFromText(text)`, `buildBriefText(extracted)`
+
+**New constants:** `FILES_API_UPLOAD`, `FILES_API_BASE`, `LARGE_PDF_THRESHOLD` (15 MB), `MAX_PDF_SIZE` (50 MB, exported)
+
+**New export:** `extractBrandVoice(files, apiKey)` — brand voice extraction from reference files; uses same Files API routing threshold
+
+---
+
 ## Last Updated
 - Date: 2026-02-27
-- Changes: Added detail sections for SlidePreview (ThemeTokens/THEME_MAP, designConfig prop, EDITABLE_SLIDES) and DesignChatInterface (props, iterateDesign flow, theme badge); expanded googleSlides.ts section with SlidePalette interface, PALETTE_MAP three-theme breakdown, and how palette threads through 7 slide builders
+- Changes: Added llmService.ts PDF robustness section (Files API routing, retry logic, new helpers/constants); updated llmService utility row to include `extractBrandVoice()`

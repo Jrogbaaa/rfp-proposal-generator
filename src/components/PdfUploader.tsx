@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { analyzeBriefPdf } from '../utils/llmService'
+import { analyzeBriefPdf, MAX_PDF_SIZE } from '../utils/llmService'
 
 interface PdfUploaderProps {
   uploadedFile: File | null
@@ -34,6 +34,10 @@ export default function PdfUploader({ uploadedFile, onFileUpload, onTextExtracte
     setExtractionDone(false)
     if (file.type !== 'application/pdf') {
       setError('Please upload a PDF file')
+      return
+    }
+    if (file.size > MAX_PDF_SIZE) {
+      setError('PDF too large (max 50MB). Please compress or split the file first.')
       return
     }
     onFileUpload(file)

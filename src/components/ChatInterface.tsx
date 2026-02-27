@@ -10,6 +10,7 @@ interface ChatInterfaceProps {
   currentExpansions: ExpandedContent | null
   onExpansionsUpdated: (expansions: ExpandedContent) => void
   onLoadingChange?: (loading: boolean) => void
+  brandVoice?: string
 }
 
 const SUGGESTED_PROMPTS = [
@@ -27,6 +28,7 @@ export default function ChatInterface({
   currentExpansions,
   onExpansionsUpdated,
   onLoadingChange,
+  brandVoice,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -58,7 +60,8 @@ export default function ChatInterface({
         parsedData,
         currentExpansions,
         text.trim(),
-        messages
+        messages,
+        brandVoice
       )
 
       setMessages((prev) => [...prev, { role: 'assistant', text: reply }])
@@ -79,7 +82,7 @@ export default function ChatInterface({
       setIsLoading(false)
       onLoadingChange?.(false)
     }
-  }, [briefText, parsedData, currentExpansions, messages, isLoading, onExpansionsUpdated, onLoadingChange])
+  }, [briefText, parsedData, currentExpansions, messages, isLoading, onExpansionsUpdated, onLoadingChange, brandVoice])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

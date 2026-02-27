@@ -1,8 +1,16 @@
 import type { ProposalData, ExpandedContent, DesignConfig } from '../types/proposal';
+import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const FILES_API_UPLOAD = `https://generativelanguage.googleapis.com/upload/v1beta/files`;
+const FILES_API_BASE = `https://generativelanguage.googleapis.com/v1beta`;
+
+// PDFs ≤ 15MB use inline_data; larger files upload via Files API first
+const LARGE_PDF_THRESHOLD = 15 * 1024 * 1024;
+// Gemini hard limit: 50MB / 1000 pages
+export const MAX_PDF_SIZE = 50 * 1024 * 1024;
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -15,6 +23,95 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
+}
+
+// Upload a file to Gemini Files API; returns the file URI for use in inference requests.
+// Used for PDFs > LARGE_PDF_THRESHOLD to avoid large base64-encoded request bodies.
+async function uploadToFilesApi(file: File, apiKey: string): Promise<string> {
+  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const metadata = JSON.stringify({ file: { display_name: file.name } });
+  const fileBuffer = await file.arrayBuffer();
+
+  const encoder = new TextEncoder();
+  const metadataPart = encoder.encode(
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${metadata}\r\n`
+  );
+  const filePart = encoder.encode(`--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`);
+  const closingPart = encoder.encode(`\r\n--${boundary}--`);
+
+  const body = new Uint8Array(
+    metadataPart.byteLength + filePart.byteLength + fileBuffer.byteLength + closingPart.byteLength
+  );
+  let offset = 0;
+  body.set(metadataPart, offset); offset += metadataPart.byteLength;
+  body.set(filePart, offset); offset += filePart.byteLength;
+  body.set(new Uint8Array(fileBuffer), offset); offset += fileBuffer.byteLength;
+  body.set(closingPart, offset);
+
+  const response = await fetch(`${FILES_API_UPLOAD}?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Files API upload failed: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  const fileUri: string | undefined = result.file?.uri;
+  if (!fileUri) throw new Error('Files API did not return a file URI');
+  return fileUri;
+}
+
+// Fire-and-forget cleanup; files auto-delete after 48h anyway
+function deleteFilesApiFile(fileUri: string, apiKey: string): void {
+  const match = fileUri.match(/\/files\/([^/?]+)/);
+  if (!match) return;
+  fetch(`${FILES_API_BASE}/files/${match[1]}?key=${apiKey}`, { method: 'DELETE' }).catch(() => {});
+}
+
+// Strip markdown code fences that Gemini sometimes wraps JSON in
+function extractJsonFromText(text: string): string {
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenceMatch) return fenceMatch[1].trim();
+  return text.trim();
+}
+
+// Build the brief text format that useBriefParser understands
+function buildBriefText(extracted: Record<string, unknown>): string {
+  const lines: string[] = [];
+
+  if (extracted.projectTitle) lines.push(`Project: ${extracted.projectTitle}`);
+
+  const nameParts = [extracted.clientFirstName, extracted.clientLastName].filter(Boolean);
+  const clientParts = [...nameParts];
+  if (extracted.clientEmail) clientParts.push(extracted.clientEmail as string);
+  if (extracted.clientCompany) clientParts.push(extracted.clientCompany as string);
+  if (clientParts.length) lines.push(`Client: ${clientParts.join(', ')}`);
+
+  if (extracted.timeline) lines.push(`Timeline: ${extracted.timeline}`);
+  if (extracted.budget) lines.push(`Budget: ${extracted.budget}`);
+
+  if (Array.isArray(extracted.problems) && extracted.problems.length) {
+    lines.push('');
+    lines.push('Problems:');
+    (extracted.problems as string[]).forEach(p => lines.push(`- ${p}`));
+  }
+
+  if (Array.isArray(extracted.benefits) && extracted.benefits.length) {
+    lines.push('');
+    lines.push('Benefits:');
+    (extracted.benefits as string[]).forEach(b => lines.push(`- ${b}`));
+  }
+
+  if (extracted.brandNotes) {
+    lines.push('');
+    lines.push(`Brand Notes: ${extracted.brandNotes}`);
+  }
+
+  return lines.join('\n');
 }
 
 const PDF_EXTRACTION_PROMPT = `You are analyzing a brand brief, RFP, or presentation PDF.
@@ -50,85 +147,154 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
     throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
   }
 
-  const base64Data = await fileToBase64(file);
-
-  const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        role: 'user',
-        parts: [
-          {
-            inline_data: {
-              mime_type: 'application/pdf',
-              data: base64Data,
-            },
-          },
-          { text: PDF_EXTRACTION_PROMPT },
-        ],
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 4096,
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[LLM Service] PDF analysis error:', errorText);
-    throw new Error(`Gemini PDF analysis failed: ${response.status}`);
+  if (file.size > MAX_PDF_SIZE) {
+    throw new Error('PDF too large. Maximum file size is 50MB.');
   }
 
-  const result = await response.json();
-  const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
+  // Choose upload strategy based on file size
+  let pdfPart: object;
+  let uploadedFileUri: string | null = null;
 
-  if (!content) {
-    throw new Error('No content returned from Gemini PDF analysis');
+  if (file.size > LARGE_PDF_THRESHOLD) {
+    console.log(`[LLM Service] Large PDF (${(file.size / 1024 / 1024).toFixed(1)}MB) — uploading via Files API`);
+    uploadedFileUri = await uploadToFilesApi(file, GEMINI_API_KEY);
+    pdfPart = { file_data: { mime_type: 'application/pdf', file_uri: uploadedFileUri } };
+  } else {
+    const base64Data = await fileToBase64(file);
+    pdfPart = { inline_data: { mime_type: 'application/pdf', data: base64Data } };
   }
 
-  let extracted: Record<string, unknown>;
+  const makeRequest = (withResponseMimeType: boolean) =>
+    fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [pdfPart, { text: PDF_EXTRACTION_PROMPT }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          ...(withResponseMimeType ? { responseMimeType: 'application/json' } : {}),
+        },
+      }),
+    });
+
   try {
-    extracted = JSON.parse(content);
-  } catch {
-    console.error('[LLM Service] Failed to parse PDF analysis response:', content);
-    throw new Error('Failed to parse PDF analysis response as JSON');
+    // First attempt — responseMimeType nudges Gemini toward clean JSON output
+    let response = await makeRequest(true);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[LLM Service] PDF analysis error:', errorText);
+      throw new Error(`Gemini PDF analysis failed: ${response.status}`);
+    }
+
+    let result = await response.json();
+    let contentText: string = result.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+    if (!contentText) {
+      throw new Error('No content returned from Gemini PDF analysis');
+    }
+
+    let extracted: Record<string, unknown> | null = null;
+    try {
+      extracted = JSON.parse(contentText);
+    } catch {
+      // JSON truncated or wrapped in fences — retry without responseMimeType
+      console.warn('[LLM Service] PDF JSON parse failed, retrying without responseMimeType...');
+      response = await makeRequest(false);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini PDF analysis retry failed: ${response.status} - ${errorText}`);
+      }
+      result = await response.json();
+      contentText = result.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      if (!contentText) throw new Error('No content returned from Gemini PDF analysis retry');
+      try {
+        extracted = JSON.parse(extractJsonFromText(contentText));
+      } catch {
+        console.error('[LLM Service] Failed to parse PDF analysis response after retry:', contentText.slice(0, 500));
+        throw new Error('Failed to parse PDF analysis response as JSON');
+      }
+    }
+
+    return buildBriefText(extracted!);
+  } finally {
+    // Clean up Files API upload (fire-and-forget; files auto-delete after 48h)
+    if (uploadedFileUri) deleteFilesApiFile(uploadedFileUri, GEMINI_API_KEY);
+  }
+}
+
+const BRAND_VOICE_PROMPT = `You are analyzing proposal documents to extract a brand voice profile.
+
+Examine all content and produce a concise brand voice guide (200-400 words) that a copywriter could follow to match this style exactly.
+
+Cover:
+1. Tone: Is it formal, conversational, authoritative, direct, inspirational? Any notable tonal qualities?
+2. Sentence patterns: Long/complex or short/punchy? Active or passive voice? Use of questions or imperatives?
+3. Vocabulary: Preferred terms, industry language, power words, phrases they favour, words they avoid
+4. Problem framing: How do they describe client challenges — empathetic, urgent, analytical, business-focused?
+5. Value articulation: How do they express ROI and outcomes — specific numbers, qualitative benefits, risk avoidance?
+6. Recurring signatures: Distinctive expressions, constructions, or stylistic habits that appear repeatedly
+
+Return the guide as plain prose paragraphs — no headings, no JSON, no bullet lists. Write it so a writer can absorb and immediately apply the style.`;
+
+export async function extractBrandVoice(files: File[]): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
   }
 
-  // Convert extracted data into the brief text format that useBriefParser understands
-  const lines: string[] = [];
-
-  if (extracted.projectTitle) lines.push(`Project: ${extracted.projectTitle}`);
-
-  const nameParts = [extracted.clientFirstName, extracted.clientLastName].filter(Boolean);
-  const clientParts = [...nameParts];
-  if (extracted.clientEmail) clientParts.push(extracted.clientEmail as string);
-  if (extracted.clientCompany) clientParts.push(extracted.clientCompany as string);
-  if (clientParts.length) lines.push(`Client: ${clientParts.join(', ')}`);
-
-  if (extracted.timeline) lines.push(`Timeline: ${extracted.timeline}`);
-  if (extracted.budget) lines.push(`Budget: ${extracted.budget}`);
-
-  if (Array.isArray(extracted.problems) && extracted.problems.length) {
-    lines.push('');
-    lines.push('Problems:');
-    (extracted.problems as string[]).forEach(p => lines.push(`- ${p}`));
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  if (totalSize > MAX_PDF_SIZE) {
+    throw new Error('Combined file size too large. Maximum total is 50MB.');
   }
 
-  if (Array.isArray(extracted.benefits) && extracted.benefits.length) {
-    lines.push('');
-    lines.push('Benefits:');
-    (extracted.benefits as string[]).forEach(b => lines.push(`- ${b}`));
-  }
+  // If total size exceeds threshold, upload all files via Files API
+  const useFilesApi = totalSize > LARGE_PDF_THRESHOLD;
+  const uploadedUris: string[] = [];
 
-  if (extracted.brandNotes) {
-    lines.push('');
-    lines.push(`Brand Notes: ${extracted.brandNotes}`);
-  }
+  let fileParts: object[];
+  try {
+    if (useFilesApi) {
+      console.log(`[LLM Service] Large brand voice files (${(totalSize / 1024 / 1024).toFixed(1)}MB total) — uploading via Files API`);
+      const uris = await Promise.all(files.map(f => uploadToFilesApi(f, GEMINI_API_KEY!)));
+      uploadedUris.push(...uris);
+      fileParts = uris.map(uri => ({ file_data: { mime_type: 'application/pdf', file_uri: uri } }));
+    } else {
+      const base64Files = await Promise.all(files.map(fileToBase64));
+      fileParts = base64Files.map((data, i) => ({
+        inline_data: { mime_type: files[i].type || 'application/pdf', data },
+      }));
+    }
 
-  return lines.join('\n');
+    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [...fileParts, { text: BRAND_VOICE_PROMPT }] }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2048,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[LLM Service] Brand voice extraction error:', errorText);
+      throw new Error(`Gemini brand voice extraction failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const content: string | undefined = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!content) {
+      throw new Error('No content returned from brand voice extraction');
+    }
+
+    return content.trim();
+  } finally {
+    uploadedUris.forEach(uri => deleteFilesApiFile(uri, GEMINI_API_KEY!));
+  }
 }
 
 export interface ChatMessage {
@@ -162,7 +328,8 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
 export async function generateProposalContent(
   briefText: string,
-  parsedData: Partial<ProposalData>
+  parsedData: Partial<ProposalData>,
+  brandVoice?: string
 ): Promise<ExpandedContent> {
   if (!GEMINI_API_KEY) {
     throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
@@ -195,12 +362,18 @@ Parsed information:
 
 Generate personalized expansions for each problem and benefit that reference specific details from this brief. Make the content feel tailored to ${clientCompany}, not generic.`;
 
+  const systemPrompt = [
+    brandVoice ? `BRAND VOICE GUIDE — follow this writing style exactly in all copy you produce:\n${brandVoice}` : null,
+    PARAMOUNT_TRAINING_CONTEXT,
+    SYSTEM_PROMPT,
+  ].filter(Boolean).join('\n\n');
+
   const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [{ text: SYSTEM_PROMPT }],
+        parts: [{ text: systemPrompt }],
       },
       contents: [
         { role: 'user', parts: [{ text: userPrompt }] },
@@ -277,7 +450,8 @@ export async function iterateProposalContent(
   parsedData: Partial<ProposalData>,
   currentExpansions: ExpandedContent | null,
   userInstruction: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  brandVoice?: string
 ): Promise<{ reply: string; updatedExpansions?: ExpandedContent }> {
   if (!GEMINI_API_KEY) {
     throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
@@ -315,11 +489,17 @@ User request: ${userInstruction}`;
     { role: 'user', parts: [{ text: contextPrompt }] },
   ];
 
+  const iterateSystemPrompt = [
+    brandVoice ? `BRAND VOICE GUIDE — maintain this writing style in all revisions:\n${brandVoice}` : null,
+    PARAMOUNT_TRAINING_CONTEXT,
+    ITERATE_SYSTEM_PROMPT,
+  ].filter(Boolean).join('\n\n');
+
   const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: ITERATE_SYSTEM_PROMPT }] },
+      systemInstruction: { parts: [{ text: iterateSystemPrompt }] },
       contents,
       generationConfig: {
         temperature: 0.7,

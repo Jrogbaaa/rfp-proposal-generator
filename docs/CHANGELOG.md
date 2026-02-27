@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-02-27] — PDF Robustness & E2E Fixes
+
+### Added
+- **Gemini Files API path for large PDFs** — `src/utils/llmService.ts`; PDFs > 15MB now upload via `POST /upload/v1beta/files` (multipart) instead of base64 inline_data; the inference request references the file by `file_uri`; uploaded files are deleted after extraction (non-blocking); files auto-expire after 48h regardless
+- **JSON retry path for truncated Gemini responses** — `src/utils/llmService.ts`; if `JSON.parse` fails on the first response (e.g. output token limit truncation), retries once without `responseMimeType: 'application/json'` and strips markdown fences via `extractJsonFromText()`; resolved TMUS PDF (2.5 MB) silently failing with only 157 output tokens
+- **`uploadToFilesApi()` helper** — `src/utils/llmService.ts`; constructs multipart/related body with metadata + raw PDF binary; returns `file_uri` string
+- **`deleteFilesApiFile()` helper** — `src/utils/llmService.ts`; fire-and-forget `DELETE` call; errors silently ignored
+- **`extractJsonFromText()` helper** — `src/utils/llmService.ts`; strips ````json … ```` fences from model output before `JSON.parse`
+- **`MAX_PDF_SIZE` constant exported** — `src/utils/llmService.ts`; 50 MB hard limit (Gemini's ceiling); consumed by `PdfUploader`
+- **Vision API diagnostic script** — `test-vision.mjs` at project root; standalone Node.js tool that calls Gemini 2.5 Flash directly with the 4 Paramount PDFs; prints extracted fields, brand notes, and a quality score (N/5); confirmed Gemini reads actual photographs (flag football athletes, soldiers) not just text
+
+### Changed
+- **`analyzeBriefPdf()` size routing** — `src/utils/llmService.ts`; > 50 MB throws immediately; > 15 MB takes Files API path; ≤ 15 MB uses existing inline_data path
+- **`maxOutputTokens` increased to 8192** — `src/utils/llmService.ts`; was 4096; TMUS PDF required more output tokens for complete JSON
+- **`PdfUploader` validates file size** — `src/components/PdfUploader.tsx`; added 50 MB check using imported `MAX_PDF_SIZE`; shows user-friendly error message before calling Gemini
+- **E2E test helpers updated** — `e2e/app.spec.ts`; `goToIterateStep` and `goToShareStep` now wait for the ChatInterface greeting bubble (`"Hi! I've reviewed the brief for"`) instead of the stale `"Ask for changes"` heading text that was removed in the sidebar redesign
+- **E2E connection badge test fixed** — `e2e/app.spec.ts`; `loads with header and connection badge` now matches `/Google Slides Ready|Disconnected/` regex to handle CI environments where OAuth is unavailable
+- **E2E sidebar headings test updated** — `e2e/app.spec.ts`; `right sidebar shows Content tab and chat input` replaces the stale `"Refine with AI"` / `"Ask for changes"` heading assertions with `Content` tab button and `textarea[placeholder*="Ask for changes"]`
+
+---
+
 ## [2026-02-26] — Workflow Audit
 
 ### Added
