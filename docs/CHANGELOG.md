@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-02-27] — CI E2E Fix: Missing Build-Time Env Vars
+
+### Fixed
+- **12 E2E test failures in GitHub Actions** — `.github/workflows/e2e.yml`; the CI build step ran `npm run build` without `VITE_GEMINI_API_KEY` or `VITE_GOOGLE_CLIENT_ID`, so Vite compiled both to `undefined`; guard checks in `llmService.ts` and `googleAuth.ts` threw before any `fetch()` call, preventing Playwright route mocks from intercepting; added dummy env vars (`test-api-key`, `test-client-id.apps.googleusercontent.com`) to the build step — actual values are irrelevant since all API calls are mocked in tests
+
+### Added
+- **`.env.example`** — documents required `VITE_GEMINI_API_KEY` and `VITE_GOOGLE_CLIENT_ID` environment variables for new contributors
+
+---
+
 ## [2026-02-27] — Brand Voice Training & Proposal Playbook
 
 ### Added
