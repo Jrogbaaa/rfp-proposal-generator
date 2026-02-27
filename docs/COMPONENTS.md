@@ -81,6 +81,41 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 ---
 
+### SlidePreview.tsx
+**Purpose:** Renders 10 slide cards from live `ProposalData` in Step 2; applies the active color theme to the HTML preview.
+
+**Props:**
+- `fileName?: string` — Presentation title shown in header
+- `data?: Partial<ProposalData> | null` — Proposal content; shows an empty state when null
+- `designConfig?: DesignConfig` — Active color theme; resolved to `ThemeTokens` via `THEME_MAP`
+- `isUpdating?: boolean` — Shows a shimmer overlay while Gemini is rewriting content
+- `onSlideEdit?: (slideNumber: number, bulletIndex: number, newText: string) => void` — Inline edit callback; only `EDITABLE_SLIDES = Set([3, 4, 7, 8])` fire this
+
+**Theme system:** `ThemeTokens` interface maps 6 Tailwind slot names (`accentBar`, `badgeBg`, `badgeText`, `title`, `subtitle`, `bullet`) to class strings. `THEME_MAP` provides token objects for all three `ColorTheme` values (navy-gold, slate-blue, forest-green). Defaults to navy-gold when no `designConfig` is provided.
+
+**Slide data:** Calls `buildSlidesFromData()` from `src/utils/slideBuilder.ts` to convert `ProposalData` into 10 `SlideData` cards; uses `'—'` as placeholder for missing fields.
+
+---
+
+### DesignChatInterface.tsx
+**Purpose:** Step 2 Design tab — Gemini-powered chatbot for selecting and previewing color themes; includes a direct export button.
+
+**Props:**
+- `currentDesignConfig: DesignConfig` — Active theme passed in from `App.tsx`
+- `onDesignConfigUpdated: (config: DesignConfig) => void` — Fires when Gemini classifies user input as a theme change; App updates `designConfig` state which propagates to `SlidePreview` and `GoogleSlidesButton`
+- `parsedData: Partial<ProposalData> | null` — Proposal data forwarded to `GoogleSlidesButton`
+- `briefText: string` — Raw brief forwarded to `GoogleSlidesButton`
+- `expansions` — Pre-generated LLM expansions forwarded to `GoogleSlidesButton`
+- `onSlidesSuccess: (url: string) => void` — Fired when export succeeds; advances to Export step
+
+**Features:**
+- 6 suggested prompts for theme requests
+- Current theme badge shows active selection (Navy & Gold / Slate & Blue / Forest Green)
+- Calls `iterateDesign()` from `llmService.ts`; extracts `designConfig` from JSON response when present
+- Embeds `GoogleSlidesButton` at bottom for one-click export with active theme applied
+
+---
+
 ### googleAuth.ts
 **Location:** `src/utils/googleAuth.ts`
 
@@ -108,11 +143,18 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all 10 slides in one atomic request
 **Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught)
 
-**Brand:** Paramount navy (`#0D1F40`) + orange (`#F27321`), Montserrat headings, Inter body text. Logos auto-fetched via Google Favicon API (`google.com/s2/favicons?sz=128`).
+**Brand:** Montserrat headings, Inter body text. Brand colors are driven by `designConfig`. Logos auto-fetched via Google Favicon API (`google.com/s2/favicons?sz=128`).
 
-**Cover slide layout:** Split-panel design — left 65% content zone, right 35% branded panel (`NAVY_LIGHTER`). Panel contains client label, client logo, orange divider rule, "PARAMOUNT" label, and Paramount logo — all vertically centered. Labels/divider drawn in Phase 2; logo images inserted in Phase 3 using shared layout constants (`LOGO_X`, `COVER_CLOGO_Y`, `COVER_PLOGO_Y`).
+**Palette system:** `SlidePalette` interface defines four `RgbColor` slots — `primary`, `primaryLighter`, `primaryDarker`, `accent`. `PALETTE_MAP: Record<ColorTheme, SlidePalette>` maps each theme to concrete RGB values:
+- `navy-gold` — primary `#0D1F40`, accent `#F27321` (Paramount brand defaults)
+- `slate-blue` — primary `#1E3A5F`, accent `#3B82F5`
+- `forest-green` — primary `#1A3A2A`, accent `#22C55E`
 
-**Closing slide layout:** Navy background, two thin orange horizontal rules bracket the CTA text, Paramount logo centered above the rules (Phase 3).
+All 7 slide-builder functions (`titleSlide`, `challengeSlide`, `problemDeepDive`, `problemsCombined`, `solutionSlide`, `investmentSlide`, `closingSlide`) accept `palette: SlidePalette` as their last parameter. `createGoogleSlidesPresentation` resolves the palette from `designConfig` (defaults to `'navy-gold'`) and passes it through to every builder.
+
+**Cover slide layout:** Split-panel design — left 65% content zone, right 35% branded panel (`primaryLighter`). Panel contains client label, client logo, orange divider rule, "PARAMOUNT" label, and Paramount logo — all vertically centered. Labels/divider drawn in Phase 2; logo images inserted in Phase 3 using shared layout constants (`LOGO_X`, `COVER_CLOGO_Y`, `COVER_PLOGO_Y`).
+
+**Closing slide layout:** `primary` background, two thin `accent`-colored horizontal rules bracket the CTA text, Paramount logo centered above the rules (Phase 3).
 
 **Returns:** `{ presentationId, presentationUrl, title }`
 
@@ -141,5 +183,5 @@ Auto-generated documentation for all React components in the Paramount applicati
 ---
 
 ## Last Updated
-- Date: 2026-02-26
-- Changes: Workflow audit — removed 9 dead files; integrated DesignChatInterface; cleaned mock data from exports and previews; added error/retry for AI gen; guarded step navigation; capped chat history; extracted slideBuilder util; wired Header auth state
+- Date: 2026-02-27
+- Changes: Added detail sections for SlidePreview (ThemeTokens/THEME_MAP, designConfig prop, EDITABLE_SLIDES) and DesignChatInterface (props, iterateDesign flow, theme badge); expanded googleSlides.ts section with SlidePalette interface, PALETTE_MAP three-theme breakdown, and how palette threads through 7 slide builders
