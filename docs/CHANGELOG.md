@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-02-27] — Brand Voice Training & Proposal Playbook
+
+### Added
+- **`BrandVoicePanel` component** — `src/components/BrandVoicePanel.tsx`; collapsible panel on Step 1 right side; accepts multiple PDF uploads; shows "Trained on X docs" badge when active; persists extracted voice guide in `localStorage` (`rfp_brand_voice` + `rfp_brand_voice_count`) so training survives page refreshes; includes staging area, drag-and-drop, 3-stage loading animation, voice preview snippet, and "Clear training" / "Retrain" actions
+- **`extractBrandVoice(files: File[])` LLM function** — `src/utils/llmService.ts`; accepts multiple PDFs; routes small batches (< 15 MB total) via inline_data, larger batches via Gemini Files API; sends all files in a single Gemini call with `BRAND_VOICE_PROMPT`; cleans up uploaded URIs in finally block; returns a 200–400 word plain-prose brand voice guide
+- **`PARAMOUNT_TRAINING_CONTEXT` constant** — `src/utils/trainingContext.ts`; pre-seeded playbook derived from 5 real Paramount documents (Dunkin' 2026 Content Day proposal, Under Armour Q1'26 GRAMMYs proposal, U.S. Army FY26 HPP brief, T-Mobile FY25/26 Upfront brief, Under Armour Q4 Flag Football brief); covers 5 brief archetypes (QSR/Entertainment, Sports/Performance, Government/Recruitment, Telecom/Tech Lifestyle, Women's Sport/Cultural Moment) each with incoming brief signals and Paramount's winning response approach; injected into every generation call automatically
+
+### Changed
+- **`generateProposalContent()` system prompt** — `src/utils/llmService.ts`; now injects `PARAMOUNT_TRAINING_CONTEXT` (always-on) and optional `brandVoice` guide before the existing `SYSTEM_PROMPT`; accepts new `brandVoice?: string` parameter
+- **`iterateProposalContent()` system prompt** — `src/utils/llmService.ts`; same pattern as above — injects training context and optional brand voice into `ITERATE_SYSTEM_PROMPT`; accepts new `brandVoice?: string` parameter
+- **`ChatInterface` props** — `src/components/ChatInterface.tsx`; added `brandVoice?: string` prop; forwarded to `iterateProposalContent()` calls; added to `useCallback` dependency array
+- **`App.tsx` Step 1 right panel** — `src/App.tsx`; added `brandVoice` state initialised from `localStorage`; renders `<BrandVoicePanel>` above the brief preview section; passes `brandVoice` to `generateProposalContent()` (initial generation + retry) and to `<ChatInterface>`
+
+---
+
 ## [2026-02-27] — PDF Robustness & E2E Fixes
 
 ### Added
