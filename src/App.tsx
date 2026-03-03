@@ -32,7 +32,7 @@ export default function App() {
   const [expansions, setExpansions] = useState<ExpandedContent | null>(null)
 
   // Design config
-  const [designConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
+  const [designConfig, setDesignConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
 
   // Brand voice training
   const [brandVoice, setBrandVoice] = useState<string | null>(() => localStorage.getItem('rfp_brand_voice'))
@@ -123,6 +123,14 @@ export default function App() {
 
   const handleSlideEdit = (slideNumber: number, bulletIndex: number, newText: string) => {
     if (!expansions) return
+    // Slide 2: edit the problem bullets (stored as editedProblems override)
+    if (slideNumber === 2) {
+      const base = expansions.editedProblems ?? parsedData?.content?.problems ?? ['', '', '', '']
+      const edited = [...base] as [string, string, string, string]
+      edited[bulletIndex] = newText
+      setExpansions({ ...expansions, editedProblems: edited })
+      return
+    }
     const probs = [...expansions.problemExpansions] as [string, string, string, string]
     const bens = [...expansions.benefitExpansions] as [string, string, string, string]
     if (slideNumber === 3 && bulletIndex === 0) probs[0] = newText
@@ -145,6 +153,11 @@ export default function App() {
 
   const handleSlideTitleEdit = (slideNumber: number, newTitle: string) => {
     if (!expansions) return
+    // Slide 1: edit the project title (stored as editedProjectTitle override)
+    if (slideNumber === 1) {
+      setExpansions({ ...expansions, editedProjectTitle: newTitle })
+      return
+    }
     setExpansions({
       ...expansions,
       customTitles: { ...(expansions.customTitles ?? {}), [slideNumber]: newTitle },
@@ -465,7 +478,30 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+                      {/* Design style picker — toggle before export to test each layout */}
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-2">Slide Style</p>
+                        <div className="flex gap-1.5">
+                          {([
+                            { value: 'standard',          label: 'Classic' },
+                            { value: 'bold-agency',        label: 'Bold' },
+                            { value: 'executive-minimal',  label: 'Executive' },
+                          ] as const).map(({ value, label }) => (
+                            <button
+                              key={value}
+                              onClick={() => setDesignConfig(c => ({ ...c, designStyle: value }))}
+                              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold transition-colors ${
+                                (designConfig.designStyle ?? 'standard') === value
+                                  ? 'bg-gold-500 text-navy-900'
+                                  : 'bg-white/10 text-navy-300 hover:bg-white/20'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <GoogleSlidesButton
                         data={parsedData}
                         briefText={briefText}

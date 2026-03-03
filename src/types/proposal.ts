@@ -31,6 +31,9 @@ export interface ExpandedContent {
   benefitExpansions: [string, string, string, string];
   additionalSlides?: AdditionalSlide[];
   customTitles?: Record<number, string>;
+  // User edits from the Refine tab (slides 1 & 2)
+  editedProjectTitle?: string;
+  editedProblems?: [string, string, string, string];
 }
 
 export interface GeneratedContent {
@@ -67,12 +70,21 @@ export const STEPS: { id: Step; label: string; number: number }[] = [
   { id: 'share', label: 'Export', number: 3 },
 ];
 
-export type ColorTheme = 'navy-gold' | 'slate-blue' | 'forest-green';
+export type ColorTheme = 'navy-gold' | 'slate-blue' | 'forest-green' | 'executive-dark';
+
+// Controls slide layout variant (Option 2 / Option 3)
+// 'standard'           — original layout (default)
+// 'bold-agency'        — dramatic layouts: dark challenge slides, split solution panel, corner ellipses on close
+// 'executive-minimal'  — all-dark slides, hairline rules, premium consulting feel
+export type DesignStyle = 'standard' | 'bold-agency' | 'executive-minimal';
 
 export interface DesignConfig {
   colorTheme: ColorTheme;
+  designStyle?: DesignStyle;
+  disableBrandDetection?: boolean; // set true to override auto brand color detection
 }
 
 export const DEFAULT_DESIGN_CONFIG: DesignConfig = {
   colorTheme: 'navy-gold',
+  designStyle: 'standard',
 };

@@ -48,6 +48,14 @@ const THEME_MAP: Record<string, ThemeTokens> = {
     subtitle: 'text-green-700',
     bullet: 'text-green-500',
   },
+  'executive-dark': {
+    accentBar: 'from-stone-300 via-stone-200 to-stone-300',
+    badgeBg: 'bg-stone-700',
+    badgeText: 'text-stone-100',
+    title: 'text-navy-800',
+    subtitle: 'text-stone-500',
+    bullet: 'text-stone-400',
+  },
 }
 
 const DEFAULT_THEME = THEME_MAP['navy-gold']
@@ -111,8 +119,8 @@ function SlideCard({
         </div>
 
         <div className={`px-6 pb-5 ${isTitle || isClosing ? 'text-center pt-4 pb-8' : ''}`}>
-          {/* Title — editable on content slides that support it */}
-          {onTitleEdit && !isTitle && !isClosing ? (
+          {/* Title — editable on all slides except closing (slide 1 title = project title) */}
+          {onTitleEdit && !isClosing ? (
             editingTitle ? (
               <input
                 autoFocus
@@ -196,8 +204,8 @@ function SlideCard({
   )
 }
 
-// Editable slides: AI expansion text slides + any additional slides (slideNumber >= 11)
-const EDITABLE_SLIDES = new Set([3, 4, 7, 8])
+// Editable slides: cover title (1), challenge bullets (2), AI expansions (3,4,7,8), additional (11+)
+const EDITABLE_SLIDES = new Set([1, 2, 3, 4, 7, 8])
 const isEditableSlide = (n: number) => EDITABLE_SLIDES.has(n) || n >= 11
 
 export default function SlidePreview({ fileName, data, designConfig, isUpdating, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
