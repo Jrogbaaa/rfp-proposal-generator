@@ -174,6 +174,14 @@ function hexToPalette(hex: string): SlidePalette {
 // ---------------------------------------------------------------------------
 
 /**
+ * Derives a full SlidePalette from a single hex color string (e.g. "#FF6600").
+ * Exported for direct use when a user supplies a custom brand hex.
+ */
+export function derivePaletteFromHex(hex: string): SlidePalette {
+  return hexToPalette(hex)
+}
+
+/**
  * Returns a SlidePalette derived from the company's brand color,
  * or null if the company is not in the lookup table.
  */

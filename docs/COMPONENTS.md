@@ -32,9 +32,11 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Workflow Steps:**
 1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content chat, sticky sidebar, slide preview with inline editing, export) → 3. Export (success screen with Google Slides link and mailto)
 
-**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, a **Slide Style picker** (Classic / Bold / Executive), and `GoogleSlidesButton`. Does not scroll with the slide preview.
+**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, a **Slide Style picker** (Professional / Agency / Executive), and `GoogleSlidesButton`. Does not scroll with the slide preview.
 
-**Slide Style Picker:** Three-button toggle above the export button; updates `designConfig.designStyle` in state. Options: `standard` (classic), `bold-agency` (dramatic dark layouts), `executive-minimal` (hairline rules, all-dark).
+**Slide Style Picker:** Three-button toggle above the export button with inline SVG thumbnails; updates `designConfig.designStyle` in state. Options: `standard` (Professional — white slides, accent bars), `bold-agency` (Agency — dark slides, watermark numbers, split panels), `executive-minimal` (Executive — near-black slides, hairline rules, premium consulting feel).
+
+**Custom Brand Color:** Hex color input below the style picker; stores to `designConfig.customBrandHex`. On input, calls `derivePaletteFromHex()` to show a live 4-swatch palette preview (primary, primaryLighter, primaryDarker, accent). Takes priority over company auto-detection in `googleSlides.ts`.
 
 ---
 
@@ -42,19 +44,19 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Purpose:** Step 1 right panel component — lets users upload example Paramount proposals so the app learns their writing style and strategic approach before generating any content.
 
 **Props:**
-- `brandVoice: string | null` — Current extracted brand voice guide (from `localStorage`); null if not yet trained
-- `onBrandVoiceExtracted: (voice: string, fileCount: number) => void` — Callback fired on successful extraction or clear
+- `brandVoice: BrandVoiceProfile | null` — Structured brand voice profile (from `localStorage`); null if not yet trained
+- `onBrandVoiceExtracted: (voice: BrandVoiceProfile, fileCount: number) => void` — Callback fired on successful extraction or clear
 
 **Features:**
-- Collapsible — header always shows status badge ("Trained on X docs" / "Not configured"); body expands/collapses
+- Collapsible — header always shows "Trained on X docs" badge + up to 2 tone chips when trained
 - Multi-file drag-and-drop or click-to-browse (PDF only); files staged before training starts
-- 3-stage loading animation matching `PdfUploader` visual style
-- On success: shows a 1-sentence preview of the extracted voice guide; collapses automatically
+- 3-stage loading animation (Reading → Analysing → Building profile)
+- On success: collapses automatically and displays structured profile: `proseSummary` in italic, tone chips (amber), two-column "Use / Avoid" vocabulary grid (up to 5 items each)
 - "Clear training" link removes localStorage entries; "Retrain" replaces existing training
 - Calls `extractBrandVoice(files)` from `llmService.ts`
-- Persists result in `localStorage` keys: `rfp_brand_voice` (text) + `rfp_brand_voice_count` (number)
+- Persists result in `localStorage` keys: `rfp_brand_voice` (JSON string of `BrandVoiceProfile`) + `rfp_brand_voice_count`
 
-**LLM function used:** `extractBrandVoice(files: File[])` → `string` (plain prose brand voice guide)
+**LLM function used:** `extractBrandVoice(files: File[])` → `BrandVoiceProfile` (structured JSON, 7 typed fields)
 
 ---
 
@@ -65,7 +67,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `briefText: string` — Raw brief text passed to Gemini as context
 - `parsedData: Partial<ProposalData> | null` — Structured brief data for richer context
 - `onExpansionsUpdated` — Callback fired when Gemini returns updated `problemExpansions` and/or `benefitExpansions`; `App.tsx` stores these for passing to `GoogleSlidesButton` as `preGeneratedContent`
-- `brandVoice?: string` — Optional brand voice guide; forwarded to `iterateProposalContent()` to ensure refinements maintain Paramount's writing style
+- `brandVoice?: BrandVoiceProfile` — Optional structured brand voice profile; forwarded to `iterateProposalContent()` as typed constraints ensuring refinements maintain the client's writing style
 
 **Features:**
 - Multi-turn conversation history preserved across messages
@@ -73,7 +75,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - Calls `iterateProposalContent()` from `llmService.ts`
 - Displays Gemini reply text; silently updates expansions in the background via callback
 
-**LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history, brandVoice?)` → `{reply, updatedExpansions?}`
+**LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history, brandVoice?: BrandVoiceProfile)` → `{reply, updatedExpansions?}`
 
 ---
 
@@ -175,7 +177,10 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `slate-blue` — primary `#1E3A5F`, accent `#3B82F5`
 - `forest-green` — primary `#1A3A2A`, accent `#22C55E`
 
-All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts` as their last parameters. `createGoogleSlidesPresentation` resolves the palette from `designConfig` (defaults to `'navy-gold'`) and passes it through to every builder.
+All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts` as their last parameters. `createGoogleSlidesPresentation` resolves the palette using a **priority chain**:
+1. `designConfig.customBrandHex` → `derivePaletteFromHex(hex)` (user-supplied color, highest priority)
+2. Company name auto-detection → `getBrandPalette(data.client.company)` (skipped if `disableBrandDetection`)
+3. Preset theme → `PALETTE_MAP[colorTheme]` (fallback)
 
 **Slide builders:** `titleSlide`, `challengeSlide`, `problemDeepDive`, `problemsCombined`, `solutionSlide`, `approachSlide`, `benefitsCombined`, `nextStepsSlide`, `investmentSlide`, `closingSlide`
 
@@ -208,6 +213,7 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 | llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()` (returns 4 content arrays incl. `approachSteps`/`nextSteps`), `iterateProposalContent()` (preserves/updates all 4 arrays), `iterateDesign()`, `extractBrandVoice()` |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system |
+| brandColors | `src/utils/brandColors.ts` | Brand palette derivation: `getBrandPalette(company)` for ~50 known brands; `derivePaletteFromHex(hex)` derives a full 4-stop `SlidePalette` from any hex color |
 
 ---
 
@@ -233,4 +239,4 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 ## Last Updated
 - Date: 2026-03-03
-- Changes: Added `approachSlide`, `benefitsCombined`, `nextStepsSlide` builders; updated deck from 10 to 13 slides; updated llmService to generate/iterate `approachSteps` and `nextSteps`; logo URL upgraded to faviconV2
+- Changes: Structured `BrandVoiceProfile` (typed JSON replacing prose), `formatBrandVoiceConstraints()` for explicit prompt injection, custom hex color picker in App.tsx with live palette preview, `derivePaletteFromHex()` exported from brandColors.ts, priority palette chain in googleSlides.ts, SVG thumbnails in style picker, Professional/Agency/Executive labels

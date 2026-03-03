@@ -1,13 +1,14 @@
 import { useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { extractBrandVoice } from '../utils/llmService'
+import type { BrandVoiceProfile } from '../types/proposal'
 
 const STORAGE_KEY = 'rfp_brand_voice'
 const STORAGE_COUNT_KEY = 'rfp_brand_voice_count'
 
 interface BrandVoicePanelProps {
-  brandVoice: string | null
-  onBrandVoiceExtracted: (voice: string, fileCount: number) => void
+  brandVoice: BrandVoiceProfile | null
+  onBrandVoiceExtracted: (voice: BrandVoiceProfile, fileCount: number) => void
 }
 
 const STAGES = [
@@ -73,12 +74,12 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
     const t2 = setTimeout(() => setProcessingStage(2), 4000)
 
     try {
-      const voice = await extractBrandVoice(stagedFiles)
+      const profile = await extractBrandVoice(stagedFiles)
       clearTimeout(t1)
       clearTimeout(t2)
-      localStorage.setItem(STORAGE_KEY, voice)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile))
       localStorage.setItem(STORAGE_COUNT_KEY, String(stagedFiles.length))
-      onBrandVoiceExtracted(voice, stagedFiles.length)
+      onBrandVoiceExtracted(profile, stagedFiles.length)
       setStagedFiles([])
       setIsExpanded(false)
     } catch (err) {
@@ -95,14 +96,10 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
   const handleClear = () => {
     localStorage.removeItem(STORAGE_KEY)
     localStorage.removeItem(STORAGE_COUNT_KEY)
-    onBrandVoiceExtracted('', 0)
+    onBrandVoiceExtracted({ tone: [], sentenceStyle: '', perspective: '', forbiddenPhrases: [], preferredVocabulary: [], ctaStyle: '', proseSummary: '' }, 0)
     setStagedFiles([])
     setIsExpanded(true)
   }
-
-  const voicePreview = brandVoice
-    ? brandVoice.split(/[.!?]/).filter(s => s.trim().length > 20).slice(0, 1).join('.').trim() + '.'
-    : null
 
   return (
     <div className="rounded-xl border border-cream-300 bg-white overflow-hidden mb-4">
@@ -134,6 +131,12 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
               Not configured
             </span>
           )}
+          {/* Tone chips — shown in header when trained + collapsed */}
+          {brandVoice && !isExpanded && brandVoice.tone.slice(0, 2).map(t => (
+            <span key={t} className="px-2 py-0.5 rounded-full bg-navy-50 text-navy-600 text-[10px] font-medium border border-navy-200 hidden sm:inline-flex">
+              {t}
+            </span>
+          ))}
         </div>
         <motion.svg
           animate={{ rotate: isExpanded ? 180 : 0 }}
@@ -156,11 +159,57 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
             style={{ overflow: 'hidden' }}
           >
             <div className="px-4 pb-4 pt-1 border-t border-cream-200">
-              {/* Voice preview if trained */}
-              {voicePreview && !stagedFiles.length && (
-                <p className="text-xs text-navy-500 italic mb-3 leading-relaxed line-clamp-2">
-                  "{voicePreview}"
-                </p>
+              {/* Structured profile display when trained */}
+              {brandVoice && !stagedFiles.length && (
+                <div className="mb-3 space-y-2.5">
+                  {/* Prose summary */}
+                  {brandVoice.proseSummary && (
+                    <p className="text-xs text-navy-500 italic leading-relaxed">
+                      "{brandVoice.proseSummary}"
+                    </p>
+                  )}
+
+                  {/* Tone chips */}
+                  {brandVoice.tone.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {brandVoice.tone.map(t => (
+                        <span key={t} className="px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-700 text-[10px] font-semibold">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Two-column: preferred vocab + forbidden phrases */}
+                  {(brandVoice.preferredVocabulary.length > 0 || brandVoice.forbiddenPhrases.length > 0) && (
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      {brandVoice.preferredVocabulary.length > 0 && (
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-emerald-600 mb-1">Use</p>
+                          <div className="flex flex-wrap gap-1">
+                            {brandVoice.preferredVocabulary.slice(0, 5).map(v => (
+                              <span key={v} className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-medium border border-emerald-200">
+                                {v}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {brandVoice.forbiddenPhrases.length > 0 && (
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-red-500 mb-1">Avoid</p>
+                          <div className="flex flex-wrap gap-1">
+                            {brandVoice.forbiddenPhrases.slice(0, 5).map(p => (
+                              <span key={p} className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-medium border border-red-200">
+                                {p}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Drop zone */}
@@ -207,7 +256,7 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
                       <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" />
                     </svg>
                     <p className="text-sm font-medium text-navy-600">
-                      {isDragActive ? 'Release to add' : 'Drop example proposals here'}
+                      {isDragActive ? 'Release to add' : brandVoice ? 'Drop new docs to retrain' : 'Drop example proposals here'}
                     </p>
                     <p className="text-xs text-navy-400">or click to browse · multiple PDFs supported</p>
                   </div>

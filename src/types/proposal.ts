@@ -85,6 +85,18 @@ export interface DesignConfig {
   colorTheme: ColorTheme;
   designStyle?: DesignStyle;
   disableBrandDetection?: boolean; // set true to override auto brand color detection
+  customBrandHex?: string;         // user-supplied hex e.g. "#FF6600" — takes priority over auto-detection
+}
+
+// Structured brand voice profile — extracted from example PDFs
+export interface BrandVoiceProfile {
+  tone: string[];              // e.g. ["authoritative", "direct", "data-driven"]
+  sentenceStyle: string;       // e.g. "Short punchy statements. Lead with outcome."
+  perspective: string;         // e.g. "Second-person 'you' focus"
+  forbiddenPhrases: string[];  // hedging words/phrases to avoid
+  preferredVocabulary: string[]; // power words and brand-specific terms to use
+  ctaStyle: string;            // how CTAs and closing statements are written
+  proseSummary: string;        // 2-3 sentence human-readable summary for display
 }
 
 export const DEFAULT_DESIGN_CONFIG: DesignConfig = {

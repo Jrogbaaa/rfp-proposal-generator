@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-03] — Structured Brand Voice Profile + Custom Hex Color Picker
+
+### Added
+- **`BrandVoiceProfile` typed interface** — `src/types/proposal.ts`; replaces plain-string brand voice with a structured object: `tone: string[]`, `sentenceStyle`, `perspective`, `forbiddenPhrases: string[]`, `preferredVocabulary: string[]`, `ctaStyle`, `proseSummary`; gives the LLM explicit typed constraints instead of a prose guide to interpret
+- **`customBrandHex?: string` on `DesignConfig`** — `src/types/proposal.ts`; user-supplied hex color (e.g. `"#FF6600"`) that takes priority over auto-detection and preset themes in the palette resolution chain
+- **`derivePaletteFromHex(hex: string): SlidePalette`** — `src/utils/brandColors.ts`; public export of the internal `hexToPalette()` function; converts a single hex to a full 4-stop `SlidePalette` via HSL math; used by both the UI palette preview and the Google Slides renderer
+- **`formatBrandVoiceConstraints(profile: BrandVoiceProfile): string`** — `src/utils/llmService.ts`; private helper that serializes a `BrandVoiceProfile` into a structured prompt block with labeled sections (Tone, Sentence style, Perspective, FORBIDDEN phrases, Preferred vocabulary, CTA style); replaces verbatim prose injection with typed, actionable constraints
+- **Custom brand color picker** — `src/App.tsx`; native `<input type="color">` in the design panel; selecting a hex immediately renders a 4-swatch palette preview row computed via `derivePaletteFromHex()`; "Reset to auto" clears the override back to company auto-detection
+- **Mini SVG slide thumbnails** on design style buttons — `src/App.tsx`; each of the three style buttons now includes an inline 40×25px SVG preview illustrating its key visual signature (white + thick bar, dark + watermark + split panel, near-black + hairlines); accent color in thumbnails tracks the active `customBrandHex`
+- **Structured profile display in `BrandVoicePanel`** — `src/components/BrandVoicePanel.tsx`; when trained, the expanded panel shows: `proseSummary` in italic, tone chips (amber), and a two-column "Use / Avoid" vocabulary grid; tone chips also visible in collapsed header
+
+### Changed
+- **`BRAND_VOICE_PROMPT`** — `src/utils/llmService.ts`; changed from "return 200–400 word prose guide" to "return JSON with 7 typed fields"; added `responseMimeType: 'application/json'`; `extractBrandVoice()` return type changed from `Promise<string>` to `Promise<BrandVoiceProfile>` with JSON parse + safe defaults validation
+- **`generateProposalContent()` brand voice parameter** — `src/utils/llmService.ts`; `brandVoice?: string` → `brandVoice?: BrandVoiceProfile`; injection now calls `formatBrandVoiceConstraints(profile)` instead of embedding prose directly
+- **`iterateProposalContent()` brand voice parameter** — `src/utils/llmService.ts`; same change as above; structured constraints maintained across all refinement passes
+- **`DESIGN_ITERATE_SYSTEM_PROMPT`** — `src/utils/llmService.ts`; added `"customBrandHex": "#RRGGBB" | null` to the response schema; added instruction to extract hex codes the user mentions; `iterateDesign()` now passes `customBrandHex` through in the returned `DesignConfig`
+- **`BrandVoicePanel` props** — `src/components/BrandVoicePanel.tsx`; `brandVoice: string | null` → `BrandVoiceProfile | null`; `onBrandVoiceExtracted` callback updated accordingly; component stores profile as JSON in `localStorage` (was plain string)
+- **`ChatInterface` props** — `src/components/ChatInterface.tsx`; `brandVoice?: string` → `BrandVoiceProfile | undefined`; forwarded to `iterateProposalContent()`
+- **`brandVoice` state in `App.tsx`** — type changed from `string | null` to `BrandVoiceProfile | null`; `localStorage` initializer now JSON-parses with a backward-compat guard (old plain-string values silently cleared); `onBrandVoiceExtracted` callback checks `voice.tone.length > 0 || voice.proseSummary` before storing
+- **Palette resolution in `createGoogleSlidesPresentation()`** — `src/utils/googleSlides.ts`; updated priority chain: 1) `designConfig.customBrandHex` via `derivePaletteFromHex()`, 2) auto-detect by company name via `getBrandPalette()`, 3) preset theme from `PALETTE_MAP`
+- **Design style labels** — `src/App.tsx`; "Classic" → "Professional", "Bold" → "Agency" (Executive unchanged)
+
+---
+
 ## [2026-03-03] — Approach & Next Steps Slides + Expanded Deck (up to 13 slides)
 
 ### Added

@@ -1,4 +1,4 @@
-import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide } from '../types/proposal';
+import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile } from '../types/proposal';
 import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -224,21 +224,31 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
   }
 }
 
-const BRAND_VOICE_PROMPT = `You are analyzing proposal documents to extract a brand voice profile.
+const BRAND_VOICE_PROMPT = `You are analyzing proposal documents to extract a structured brand voice profile.
 
-Examine all content and produce a concise brand voice guide (200-400 words) that a copywriter could follow to match this style exactly.
+Examine all content and return ONLY valid JSON with this exact structure:
+{
+  "tone": ["descriptor1", "descriptor2"],
+  "sentenceStyle": "Description of sentence patterns and rhythm",
+  "perspective": "Description of POV and address style",
+  "forbiddenPhrases": ["phrase1", "phrase2"],
+  "preferredVocabulary": ["term1", "term2", "term3"],
+  "ctaStyle": "Description of call-to-action language and closing patterns",
+  "proseSummary": "2-3 sentence human-readable summary of this brand's writing style."
+}
 
-Cover:
-1. Tone: Is it formal, conversational, authoritative, direct, inspirational? Any notable tonal qualities?
-2. Sentence patterns: Long/complex or short/punchy? Active or passive voice? Use of questions or imperatives?
-3. Vocabulary: Preferred terms, industry language, power words, phrases they favour, words they avoid
-4. Problem framing: How do they describe client challenges — empathetic, urgent, analytical, business-focused?
-5. Value articulation: How do they express ROI and outcomes — specific numbers, qualitative benefits, risk avoidance?
-6. Recurring signatures: Distinctive expressions, constructions, or stylistic habits that appear repeatedly
+Instructions:
+- tone: 2-5 short descriptors (e.g. ["authoritative", "direct", "data-driven", "urgent"])
+- sentenceStyle: describe sentence length, rhythm, active vs passive, use of imperatives or questions
+- perspective: describe POV (e.g. "Second-person 'you' focus", "First-person plural 'we/our'")
+- forbiddenPhrases: 3-8 hedging words or phrases this brand avoids (e.g. ["might", "could potentially", "we believe", "perhaps"])
+- preferredVocabulary: 5-10 power words, industry terms, or signature phrases this brand uses
+- ctaStyle: describe call-to-action patterns — preferred verbs, urgency, how they close arguments
+- proseSummary: 2-3 sentences a copywriter can quickly read to absorb and apply the style
 
-Return the guide as plain prose paragraphs — no headings, no JSON, no bullet lists. Write it so a writer can absorb and immediately apply the style.`;
+IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
-export async function extractBrandVoice(files: File[]): Promise<string> {
+export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfile> {
   if (!GEMINI_API_KEY) {
     throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
   }
@@ -274,6 +284,7 @@ export async function extractBrandVoice(files: File[]): Promise<string> {
         generationConfig: {
           temperature: 0.2,
           maxOutputTokens: 2048,
+          responseMimeType: 'application/json',
         },
       }),
     });
@@ -291,10 +302,39 @@ export async function extractBrandVoice(files: File[]): Promise<string> {
       throw new Error('No content returned from brand voice extraction');
     }
 
-    return content.trim();
+    let profile: BrandVoiceProfile;
+    try {
+      profile = JSON.parse(extractJsonFromText(content));
+    } catch {
+      console.error('[LLM Service] Failed to parse brand voice JSON:', content.slice(0, 300));
+      throw new Error('Failed to parse brand voice response as JSON');
+    }
+
+    // Ensure required fields exist with safe defaults
+    return {
+      tone: Array.isArray(profile.tone) ? profile.tone : [],
+      sentenceStyle: profile.sentenceStyle || '',
+      perspective: profile.perspective || '',
+      forbiddenPhrases: Array.isArray(profile.forbiddenPhrases) ? profile.forbiddenPhrases : [],
+      preferredVocabulary: Array.isArray(profile.preferredVocabulary) ? profile.preferredVocabulary : [],
+      ctaStyle: profile.ctaStyle || '',
+      proseSummary: profile.proseSummary || '',
+    };
   } finally {
     uploadedUris.forEach(uri => deleteFilesApiFile(uri, GEMINI_API_KEY!));
   }
+}
+
+// Format a BrandVoiceProfile as structured constraints for injection into LLM prompts
+function formatBrandVoiceConstraints(profile: BrandVoiceProfile): string {
+  const lines = ['BRAND VOICE CONSTRAINTS — follow these rules exactly in all copy you produce:'];
+  if (profile.tone.length) lines.push(`- Tone: ${profile.tone.join(', ')}`);
+  if (profile.sentenceStyle) lines.push(`- Sentence style: ${profile.sentenceStyle}`);
+  if (profile.perspective) lines.push(`- Perspective: ${profile.perspective}`);
+  if (profile.forbiddenPhrases.length) lines.push(`- FORBIDDEN phrases (never use): ${profile.forbiddenPhrases.join(', ')}`);
+  if (profile.preferredVocabulary.length) lines.push(`- Preferred vocabulary: ${profile.preferredVocabulary.join(', ')}`);
+  if (profile.ctaStyle) lines.push(`- CTA style: ${profile.ctaStyle}`);
+  return lines.join('\n');
 }
 
 export interface ChatMessage {
@@ -349,7 +389,7 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 export async function generateProposalContent(
   briefText: string,
   parsedData: Partial<ProposalData>,
-  brandVoice?: string
+  brandVoice?: BrandVoiceProfile
 ): Promise<ExpandedContent> {
   if (!GEMINI_API_KEY) {
     throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
@@ -383,7 +423,7 @@ Parsed information:
 Generate personalized expansions for each problem and benefit that reference specific details from this brief. Make the content feel tailored to ${clientCompany}, not generic.`;
 
   const systemPrompt = [
-    brandVoice ? `BRAND VOICE GUIDE — follow this writing style exactly in all copy you produce:\n${brandVoice}` : null,
+    brandVoice ? formatBrandVoiceConstraints(brandVoice) : null,
     PARAMOUNT_TRAINING_CONTEXT,
     SYSTEM_PROMPT,
   ].filter(Boolean).join('\n\n');
@@ -492,7 +532,7 @@ export async function iterateProposalContent(
   currentExpansions: ExpandedContent | null,
   userInstruction: string,
   history: ChatMessage[],
-  brandVoice?: string
+  brandVoice?: BrandVoiceProfile
 ): Promise<{ reply: string; updatedExpansions?: ExpandedContent }> {
   if (!GEMINI_API_KEY) {
     throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
@@ -537,7 +577,7 @@ User request: ${userInstruction}`;
   ];
 
   const iterateSystemPrompt = [
-    brandVoice ? `BRAND VOICE GUIDE — maintain this writing style in all revisions:\n${brandVoice}` : null,
+    brandVoice ? formatBrandVoiceConstraints(brandVoice) : null,
     PARAMOUNT_TRAINING_CONTEXT,
     ITERATE_SYSTEM_PROMPT,
   ].filter(Boolean).join('\n\n');
@@ -654,9 +694,12 @@ Return ONLY valid JSON with this structure:
   "reply": "Brief conversational response describing the change (1-2 sentences)",
   "designConfig": {
     "colorTheme": "navy-gold" | "slate-blue" | "forest-green" | "executive-dark",
-    "designStyle": "standard" | "bold-agency" | "executive-minimal"
+    "designStyle": "standard" | "bold-agency" | "executive-minimal",
+    "customBrandHex": "#RRGGBB" | null
   }
 }
+
+CUSTOM COLOR: If the user provides a specific hex color code (e.g. "#FF6600", "#0066CC") or mentions a precise brand color, set "customBrandHex" to that hex value (with # prefix, 6 digits). Otherwise set "customBrandHex" to null.
 
 If the user's request does not relate to visual design, set "designConfig" to null and explain in "reply".
 Only include "designStyle" when the user implies a layout change (e.g. "more dramatic", "executive style", "agency feel"). For pure color requests, omit designStyle from the response.

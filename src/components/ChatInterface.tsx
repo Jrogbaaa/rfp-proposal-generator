@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ChatMessage } from '../utils/llmService'
-import type { ProposalData, ExpandedContent } from '../types/proposal'
+import type { ProposalData, ExpandedContent, BrandVoiceProfile } from '../types/proposal'
 import { iterateProposalContent } from '../utils/llmService'
 
 interface ChatInterfaceProps {
@@ -10,7 +10,7 @@ interface ChatInterfaceProps {
   currentExpansions: ExpandedContent | null
   onExpansionsUpdated: (expansions: ExpandedContent) => void
   onLoadingChange?: (loading: boolean) => void
-  brandVoice?: string
+  brandVoice?: BrandVoiceProfile
 }
 
 const SUGGESTED_PROMPTS = [

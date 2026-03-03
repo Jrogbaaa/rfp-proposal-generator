@@ -52,6 +52,22 @@ When to update:
 - Better solution found → Update existing entry
 - Error pattern identified → Add to Common Error Categories
 
+### Step 5: Commit and push to GitHub
+After all documentation is updated, stage and push all changed files:
+
+```bash
+git add src/ docs/ directives/ .claude/
+git commit -m "feat/fix/refactor: <short summary of changes>
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
+git push origin main
+```
+
+When to push:
+- Always push after completing the full documenter cycle
+- Include both code changes AND documentation updates in the same commit
+- Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`
+
 ## Entry Format Examples
 
 ### CHANGELOG Entry
@@ -91,7 +107,8 @@ Before completing documentation update:
 
 The Documenter works as part of the self-annealing loop:
 1. Make change
-2. **Documenter reviews and documents** ← You are here
-3. Test change
-4. Update directives if new patterns discovered
-5. System is now stronger and better documented
+2. Run `npm run build` + `npm test` — verify no regressions
+3. **Documenter reviews and documents** ← You are here
+4. Commit and push (Step 5 above)
+5. Update directives if new patterns discovered
+6. System is now stronger, better documented, and synced to GitHub

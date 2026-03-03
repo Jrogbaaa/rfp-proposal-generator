@@ -9,7 +9,7 @@
  */
 
 import type { ProposalData, DesignConfig } from '../types/proposal'
-import { getBrandPalette } from './brandColors'
+import { getBrandPalette, derivePaletteFromHex } from './brandColors'
 
 const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 
@@ -1040,13 +1040,15 @@ export async function createGoogleSlidesPresentation(
   accessToken: string,
   designConfig?: DesignConfig
 ): Promise<CreateSlidesResult> {
-  // Option 1: Brand Color Intelligence — auto-detect palette from company name
-  const brandPalette = !designConfig?.disableBrandDetection
-    ? getBrandPalette(data.client.company)
-    : null
-  const palette = brandPalette
-    ?? PALETTE_MAP[designConfig?.colorTheme ?? 'navy-gold']
-    ?? PALETTE_MAP['navy-gold']
+  // Option 1: Palette selection priority:
+  //   1. Custom hex supplied by user (designConfig.customBrandHex)
+  //   2. Auto-detect from company name (unless disableBrandDetection)
+  //   3. Manual color theme preset
+  const palette = designConfig?.customBrandHex
+    ? derivePaletteFromHex(designConfig.customBrandHex)
+    : (!designConfig?.disableBrandDetection ? getBrandPalette(data.client.company) : null)
+      ?? PALETTE_MAP[designConfig?.colorTheme ?? 'navy-gold']
+      ?? PALETTE_MAP['navy-gold']
 
   // Option 2 / 3: Layout variant
   const designStyle = designConfig?.designStyle ?? 'standard'
