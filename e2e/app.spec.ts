@@ -160,10 +160,10 @@ async function goToShareStep(page: Page) {
 // ─── App Shell ────────────────────────────────────────────────────────────────
 
 test.describe('App Shell', () => {
-  test('loads with header and connection badge', async ({ page }) => {
+  test('loads with header and New button', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('header')).toBeVisible()
-    await expect(page.locator('header').getByText(/Google Slides Ready|Disconnected/)).toBeVisible()
+    await expect(page.locator('header').getByText('New')).toBeVisible()
   })
 
   test('shows 3-step progress bar (Draft, Refine, Export)', async ({ page }) => {
@@ -255,9 +255,9 @@ test.describe('Step 2 – Slide Preview', () => {
     await expect(page.getByText('Slide Preview')).toBeVisible()
   })
 
-  test('right sidebar shows Content tab and chat input', async ({ page }) => {
+  test('right sidebar shows Refine Content label and chat input', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByRole('button', { name: 'Content', exact: true })).toBeVisible()
+    await expect(page.getByText('Refine Content', { exact: true })).toBeVisible()
     await expect(page.locator('textarea[placeholder*="Ask for changes"]')).toBeVisible()
   })
 

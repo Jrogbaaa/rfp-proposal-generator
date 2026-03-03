@@ -294,9 +294,11 @@ function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette):
 
     // Panel: client company label (above client logo placeholder)
     createTextBox(clientLblId, slideId, labelX, COVER_CLABEL_Y, labelW, 180000),
-    insertText(clientLblId, data.client.company.toUpperCase()),
-    styleText(clientLblId, { color: GRAY, fontSize: 10, fontFamily: 'Inter', bold: true }),
-    paragraphAlign(clientLblId, 'CENTER'),
+    ...(data.client.company ? [
+      insertText(clientLblId, data.client.company.toUpperCase()),
+      styleText(clientLblId, { color: GRAY, fontSize: 10, fontFamily: 'Inter', bold: true }),
+      paragraphAlign(clientLblId, 'CENTER'),
+    ] : []),
 
     // Panel: thin accent horizontal rule between the two logos
     ...createRect(panelDivId, slideId, PANEL_X + 300000, COVER_DIV_Y, PANEL_W - 600000, 12000, palette.accent),
@@ -319,8 +321,10 @@ function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette):
 
     // Project title (supporting, smaller)
     createTextBox(titleId, slideId, MARGIN_X, 2400000, CONTENT_W, 500000),
-    insertText(titleId, data.project.title),
-    styleText(titleId, { color: GRAY, fontSize: 22, fontFamily: 'Inter' }),
+    ...(data.project.title ? [
+      insertText(titleId, data.project.title),
+      styleText(titleId, { color: GRAY, fontSize: 22, fontFamily: 'Inter' }),
+    ] : []),
 
     // Thin accent divider rule
     ...createRect(ruleId, slideId, MARGIN_X, 2960000, CONTENT_W, 18000, palette.accent),
@@ -352,15 +356,17 @@ function challengeSlide(slideId: string, data: ProposalData, palette: SlidePalet
 
     // Shifted right to clear the left accent bar, with extra top spacing
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1100000, FULL_W - 80000, 3500000),
-    insertText(bodyId, problems.join('\n')),
-    styleText(bodyId, { color: palette.primary, fontSize: 20, fontFamily: 'Inter' }),
-    {
-      createParagraphBullets: {
-        objectId: bodyId,
-        textRange: { type: 'ALL' },
-        bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+    ...(problems.length ? [
+      insertText(bodyId, problems.join('\n')),
+      styleText(bodyId, { color: palette.primary, fontSize: 20, fontFamily: 'Inter' }),
+      {
+        createParagraphBullets: {
+          objectId: bodyId,
+          textRange: { type: 'ALL' },
+          bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+        },
       },
-    },
+    ] : []),
   ]
 }
 
@@ -462,15 +468,17 @@ function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalett
     styleText(headId, { color: palette.accent, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
 
     createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
-    insertText(bodyId, benefits.join('\n')),
-    styleText(bodyId, { color: WHITE, fontSize: 20, fontFamily: 'Inter' }),
-    {
-      createParagraphBullets: {
-        objectId: bodyId,
-        textRange: { type: 'ALL' },
-        bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+    ...(benefits.length ? [
+      insertText(bodyId, benefits.join('\n')),
+      styleText(bodyId, { color: WHITE, fontSize: 20, fontFamily: 'Inter' }),
+      {
+        createParagraphBullets: {
+          objectId: bodyId,
+          textRange: { type: 'ALL' },
+          bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+        },
       },
-    },
+    ] : []),
   ]
 }
 
@@ -536,9 +544,11 @@ function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette
     paragraphAlign(headId, 'CENTER'),
 
     createTextBox(footerId, slideId, MARGIN_X, H - 200000, FULL_W, 150000),
-    insertText(footerId, data.generated.slideFooter),
-    styleText(footerId, { color: GRAY, fontSize: 11, fontFamily: 'Inter' }),
-    paragraphAlign(footerId, 'CENTER'),
+    ...(data.generated.slideFooter ? [
+      insertText(footerId, data.generated.slideFooter),
+      styleText(footerId, { color: GRAY, fontSize: 11, fontFamily: 'Inter' }),
+      paragraphAlign(footerId, 'CENTER'),
+    ] : []),
   ]
 }
 

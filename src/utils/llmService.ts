@@ -1,4 +1,4 @@
-import type { ProposalData, ExpandedContent, DesignConfig } from '../types/proposal';
+import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide } from '../types/proposal';
 import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -430,12 +430,19 @@ Return ONLY valid JSON with this structure:
   "updatedExpansions": {
     "problemExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
     "benefitExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"]
-  }
+  } | null,
+  "additionalSlides": [{"title": "Slide Title", "bullets": ["point 1", "point 2", "point 3"]}] | null
 }
 
-CRITICAL: You MUST always return exactly 4 items in each array. If the original only had 2 real problems, the other 2 will be placeholders — refine them too in the same style as the others.
+CRITICAL: You MUST always return exactly 4 items in each array when returning updatedExpansions.
 
-If the user asks for a design change (colors, layout, visuals) that cannot be reflected in text, set "updatedExpansions" to null and explain in "reply" that design changes will be applied when exporting to Google Slides.
+If the user asks to add more slides, expand the deck, or make it longer:
+- Generate 1-3 new slides in "additionalSlides" with a clear title and 2-4 bullet points each
+- These will be appended to the end of the deck
+- Set "updatedExpansions" to null unless the user also asked to change the existing content
+- In "reply" confirm the new slides that were added
+
+If the user asks for a design change (colors, layout, visuals), set both "updatedExpansions" and "additionalSlides" to null and explain in "reply" that visual design isn't supported in the editor.
 
 Guidelines for content changes:
 - Preserve all specific facts, numbers, and company details from the original
@@ -522,12 +529,14 @@ User request: ${userInstruction}`;
     throw new Error('No content returned from Gemini iterate');
   }
 
-  let parsed: { reply: string; updatedExpansions: ExpandedContent | null };
+  let parsed: { reply: string; updatedExpansions: ExpandedContent | null; additionalSlides: AdditionalSlide[] | null };
   try {
     parsed = JSON.parse(content);
   } catch {
     throw new Error('Failed to parse iterate response as JSON');
   }
+
+  const output: { reply: string; updatedExpansions?: ExpandedContent } = { reply: parsed.reply };
 
   if (parsed.updatedExpansions) {
     const e = parsed.updatedExpansions;
@@ -540,10 +549,37 @@ User request: ${userInstruction}`;
     // Pad to 4 if Gemini returned fewer than expected
     while (e.problemExpansions.length < 4) e.problemExpansions.push('Additional challenge to be identified.');
     while (e.benefitExpansions.length < 4) e.benefitExpansions.push('Additional benefit to be identified.');
-    return { reply: parsed.reply, updatedExpansions: e };
+    // Preserve existing customTitles and additionalSlides from current expansions
+    output.updatedExpansions = {
+      ...e,
+      customTitles: currentExpansions?.customTitles,
+      additionalSlides: currentExpansions?.additionalSlides,
+    };
   }
 
-  return { reply: parsed.reply };
+  // Merge additional slides into updatedExpansions (or create a shell if only additional slides were returned)
+  if (Array.isArray(parsed.additionalSlides) && parsed.additionalSlides.length > 0) {
+    if (!output.updatedExpansions && currentExpansions) {
+      // Keep existing expansions, just add the new slides
+      output.updatedExpansions = {
+        ...currentExpansions,
+        additionalSlides: [
+          ...(currentExpansions.additionalSlides ?? []),
+          ...parsed.additionalSlides,
+        ],
+      };
+    } else if (output.updatedExpansions) {
+      output.updatedExpansions = {
+        ...output.updatedExpansions,
+        additionalSlides: [
+          ...(currentExpansions?.additionalSlides ?? []),
+          ...parsed.additionalSlides,
+        ],
+      };
+    }
+  }
+
+  return output;
 }
 
 const DESIGN_ITERATE_SYSTEM_PROMPT = `You are a design consultant refining a sales presentation's visual style.

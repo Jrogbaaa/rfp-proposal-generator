@@ -16,6 +16,8 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
 
   const activeProblemCount = problems.filter(Boolean).length
   const activeBenefitCount = benefits.filter(Boolean).length
+  const customTitles = expanded?.customTitles ?? {}
+  const additionalSlides = expanded?.additionalSlides ?? []
 
   return [
     {
@@ -42,7 +44,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     {
       slideNumber: 3,
       type: 'content',
-      title: problems[0] || 'Challenge',
+      title: customTitles[3] ?? problems[0] ?? 'Challenge',
       subtitle: undefined,
       bullets: problemExpansions
         ? [problemExpansions[0]].filter(Boolean)
@@ -51,7 +53,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     {
       slideNumber: 4,
       type: 'content',
-      title: problems[1] || 'Challenge',
+      title: customTitles[4] ?? problems[1] ?? 'Challenge',
       subtitle: undefined,
       bullets: problemExpansions
         ? [problemExpansions[1]].filter(Boolean)
@@ -81,7 +83,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     {
       slideNumber: 7,
       type: 'content',
-      title: benefits[0] || 'Outcome',
+      title: customTitles[7] ?? benefits[0] ?? 'Outcome',
       subtitle: undefined,
       bullets: benefitExpansions
         ? [benefitExpansions[0]].filter(Boolean)
@@ -90,7 +92,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     {
       slideNumber: 8,
       type: 'content',
-      title: benefits[1] || 'Outcome',
+      title: customTitles[8] ?? benefits[1] ?? 'Outcome',
       subtitle: undefined,
       bullets: benefitExpansions
         ? [benefitExpansions[1]].filter(Boolean)
@@ -119,5 +121,12 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         client?.email ? `Reach us at ${client.email}` : '',
       ].filter(Boolean),
     },
+    ...additionalSlides.map((s, i) => ({
+      slideNumber: 11 + i,
+      type: 'content' as const,
+      title: customTitles[11 + i] ?? s.title,
+      subtitle: undefined,
+      bullets: s.bullets,
+    })),
   ]
 }

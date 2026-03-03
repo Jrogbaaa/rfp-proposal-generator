@@ -21,9 +21,16 @@ export interface ProblemsAndBenefits {
   benefits: [string, string, string, string];
 }
 
+export interface AdditionalSlide {
+  title: string;
+  bullets: string[];
+}
+
 export interface ExpandedContent {
   problemExpansions: [string, string, string, string];
   benefitExpansions: [string, string, string, string];
+  additionalSlides?: AdditionalSlide[];
+  customTitles?: Record<number, string>;
 }
 
 export interface GeneratedContent {
