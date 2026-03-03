@@ -10,6 +10,7 @@ interface SlidePreviewProps {
   designConfig?: DesignConfig
   isUpdating?: boolean
   onSlideEdit?: (slideNumber: number, bulletIndex: number, newText: string) => void
+  onSlideTitleEdit?: (slideNumber: number, newTitle: string) => void
 }
 
 // Theme token shapes for dynamic coloring
@@ -56,14 +57,18 @@ function SlideCard({
   index,
   theme = DEFAULT_THEME,
   onBulletEdit,
+  onTitleEdit,
 }: {
   slide: SlideData
   index: number
   theme?: ThemeTokens
   onBulletEdit?: (bulletIndex: number, newText: string) => void
+  onTitleEdit?: (newTitle: string) => void
 }) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState('')
   const isTitle = slide.type === 'title'
   const isClosing = slide.type === 'closing'
 
@@ -79,13 +84,18 @@ function SlideCard({
     setEditingIndex(null)
   }
 
+  const handleTitleSave = () => {
+    if (onTitleEdit) onTitleEdit(titleValue.trim() || slide.title)
+    setEditingTitle(false)
+  }
+
   return (
     <motion.div
       key={`${slide.slideNumber}-${slide.bullets[0]?.slice(0, 20)}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.06, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-      className="mb-5 last:mb-0"
+      className="mb-5 last:mb-0 group"
     >
       <div className="preview-paper rounded-lg overflow-hidden">
         <div className="flex items-center gap-3 px-6 pt-5 pb-3">
@@ -95,15 +105,37 @@ function SlideCard({
           <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-navy-400">
             Slide {slide.slideNumber}
           </span>
-          {onBulletEdit && (
-            <span className="ml-auto text-[10px] text-navy-300 font-medium">click text to edit</span>
+          {(onBulletEdit || onTitleEdit) && (
+            <span className="ml-auto text-[10px] text-navy-300 font-medium">click to edit</span>
           )}
         </div>
 
         <div className={`px-6 pb-5 ${isTitle || isClosing ? 'text-center pt-4 pb-8' : ''}`}>
-          <h3 className={`font-display mb-1 ${isTitle ? 'text-2xl' : 'text-lg'} ${theme.title}`}>
-            {slide.title}
-          </h3>
+          {/* Title — editable on content slides that support it */}
+          {onTitleEdit && !isTitle && !isClosing ? (
+            editingTitle ? (
+              <input
+                autoFocus
+                value={titleValue}
+                onChange={(e) => setTitleValue(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave() }}
+                className={`font-display text-lg w-full bg-transparent border-0 outline-none p-0 m-0 mb-1 ${theme.title}`}
+              />
+            ) : (
+              <h3
+                className={`font-display mb-1 text-lg ${theme.title} cursor-pointer hover:bg-gold-50 rounded px-1 -mx-1 transition-colors inline-flex items-center gap-1`}
+                onClick={() => { setEditingTitle(true); setTitleValue(slide.title) }}
+              >
+                {slide.title}
+                <span className="opacity-0 group-hover:opacity-100 text-navy-300 text-[11px] transition-opacity">✏</span>
+              </h3>
+            )
+          ) : (
+            <h3 className={`font-display mb-1 ${isTitle ? 'text-2xl' : 'text-lg'} ${theme.title}`}>
+              {slide.title}
+            </h3>
+          )}
 
           {slide.subtitle && (
             <p className={`font-medium mb-4 ${isTitle ? 'text-base' : 'text-sm'} ${theme.subtitle}`}>
@@ -129,7 +161,7 @@ function SlideCard({
                     onChange={(e) => setEditValue(e.target.value)}
                     onBlur={() => handleEditSave(i)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditSave(i) } }}
-                    className="w-full text-sm leading-relaxed text-navy-700 border border-gold-400 rounded-md p-2 resize-none bg-gold-50 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                    className="w-full text-sm leading-relaxed text-navy-600 pl-3 resize-none bg-transparent border-0 outline-none focus:outline-none p-0 shadow-none"
                     rows={3}
                   />
                 )
@@ -145,16 +177,13 @@ function SlideCard({
                     ${isPunchLine ? 'text-navy-600 font-medium' : ''}
                     ${isQuote ? `font-semibold italic text-base ${theme.subtitle}` : ''}
                     ${!isLabel && !isPunchLine && !isQuote ? 'text-navy-600 pl-3' : ''}
-                    ${isEditable ? 'cursor-pointer hover:bg-gold-50 rounded-md px-2 -mx-2 transition-colors group' : ''}
+                    ${isEditable ? 'cursor-pointer hover:bg-gold-50 rounded-md px-2 -mx-2 transition-colors' : ''}
                   `}
                 >
                   {!isLabel && !isPunchLine && !isQuote && !isTitle && !isClosing && (
                     <span className={`${theme.bullet} mr-2`}>&#x2022;</span>
                   )}
                   {bullet}
-                  {isEditable && (
-                    <span className="hidden group-hover:inline ml-2 text-navy-300 text-[11px]">✏</span>
-                  )}
                 </p>
               )
             })}
@@ -167,10 +196,11 @@ function SlideCard({
   )
 }
 
-// Editable slides: the ones that use AI expansion text (not structural slides)
+// Editable slides: AI expansion text slides + any additional slides (slideNumber >= 11)
 const EDITABLE_SLIDES = new Set([3, 4, 7, 8])
+const isEditableSlide = (n: number) => EDITABLE_SLIDES.has(n) || n >= 11
 
-export default function SlidePreview({ fileName, data, designConfig, isUpdating, onSlideEdit }: SlidePreviewProps) {
+export default function SlidePreview({ fileName, data, designConfig, isUpdating, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
   const hasRealData = !!(data && (data.client?.company || data.project?.title || data.content?.problems?.[0]))
   const slides = hasRealData ? buildSlidesFromData(data!) : null
   const theme = THEME_MAP[designConfig?.colorTheme ?? 'navy-gold'] ?? DEFAULT_THEME
@@ -214,8 +244,12 @@ export default function SlidePreview({ fileName, data, designConfig, isUpdating,
                 slide={slide}
                 index={index}
                 theme={theme}
-                onBulletEdit={onSlideEdit && EDITABLE_SLIDES.has(slide.slideNumber)
+                onBulletEdit={onSlideEdit && isEditableSlide(slide.slideNumber)
                   ? (bulletIndex, newText) => onSlideEdit(slide.slideNumber, bulletIndex, newText)
+                  : undefined
+                }
+                onTitleEdit={onSlideTitleEdit && isEditableSlide(slide.slideNumber)
+                  ? (newTitle) => onSlideTitleEdit(slide.slideNumber, newTitle)
                   : undefined
                 }
               />

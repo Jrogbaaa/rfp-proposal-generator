@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-03] — Refine Step UI Overhaul & Sticky Sidebar
+
+### Added
+- **Inline slide title editing** — `src/components/SlidePreview.tsx`; clicking the title on editable slides (3, 4, 7, 8 and any AI-added slides) shows a transparent inline `<input>` matching the title font; saves on blur or Enter; wired to new `handleSlideTitleEdit` in `App.tsx` which stores overrides in `expansions.customTitles`
+- **"Add more slides" via chat** — `src/utils/llmService.ts`, `src/utils/slideBuilder.ts`, `src/types/proposal.ts`; when the user asks to add slides or make the deck longer, Gemini returns an `additionalSlides` array; new slides are appended after slide 10 and rendered as fully editable cards; bullet and title edits on slides 11+ update `expansions.additionalSlides` in place
+- **`AdditionalSlide` interface** — `src/types/proposal.ts`; `{ title: string; bullets: string[] }`
+- **`additionalSlides` and `customTitles` fields on `ExpandedContent`** — `src/types/proposal.ts`; both optional; `customTitles` stores per-slide title overrides keyed by slide number
+
+### Changed
+- **Right sidebar is now sticky** — `src/App.tsx`; the Refine step right panel uses `lg:sticky lg:top-[8.5rem] lg:h-[calc(100vh-8.5rem)]`; the "Refine Content" label, chat, and export button stay locked in the viewport while the slide preview scrolls freely on the left
+- **Design tab removed from Refine step** — `src/App.tsx`; the Content/Design tab toggle and `DesignChatInterface` are removed; the panel now shows a "Refine Content" label and renders `ChatInterface` directly; `sidebarTab` state removed; export button always visible
+- **"Disconnected" badge hidden** — `src/components/Header.tsx`; the red "Disconnected" status badge is no longer shown; the "Google Slides Ready" badge only appears when the user is authenticated
+- **Flat inline bullet editing** — `src/components/SlidePreview.tsx`; clicking editable bullet text now shows a transparent, borderless `<textarea>` that blends into the slide face instead of a gold-bordered box
+- **`ITERATE_SYSTEM_PROMPT` updated** — `src/utils/llmService.ts`; added instructions for generating `additionalSlides`; redirects design change requests instead of slide-count requests; preserves `customTitles` and `additionalSlides` across content refinement passes
+- **`buildSlidesFromData` updated** — `src/utils/slideBuilder.ts`; applies `customTitles` overrides to slides 3, 4, 7, 8; appends `additionalSlides` after the closing slide
+- **`googleSlides.ts` null-safety** — `src/utils/googleSlides.ts`; guards `insertText` calls for `client.company`, `project.title`, `problems`, `benefits`, and `slideFooter` against empty strings to prevent batch request failures
+
+### Fixed
+- **E2E tests updated** — `e2e/app.spec.ts`; "loads with header and connection badge" → "loads with header and New button" (no Disconnected badge); "right sidebar shows Content tab" → "right sidebar shows Refine Content label"
+
+---
+
 ## [2026-02-27] — CI E2E Fix: Missing Build-Time Env Vars
 
 ### Fixed

@@ -13,9 +13,8 @@ Auto-generated documentation for all React components in the Paramount applicati
 | BriefEditor | `src/components/BriefEditor.tsx` | Free-form brief text input (Step 1 paste mode) |
 | BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
-| ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Content tab — multi-turn Gemini conversation for refining proposal content |
-| DesignChatInterface | `src/components/DesignChatInterface.tsx` | Step 2 Design tab — Gemini-powered theme selection chat + export button |
-| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders 10 slide cards from real `ProposalData`; shows empty state when no data |
+| ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides |
+| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (10 base + any additional); supports inline title and bullet editing |
 | GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → Google Slides; accepts `preGeneratedContent`, `designConfig`, `onSuccess` |
 | ProgressStepper | `src/components/ProgressStepper.tsx` | 3-step stepper (Draft/Refine/Export); only backward navigation to completed steps |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
@@ -31,7 +30,9 @@ Auto-generated documentation for all React components in the Paramount applicati
 **State Management:** Uses inline `useState` hooks for all state (brief text, expansions, design config, loading, errors, Google auth).
 
 **Workflow Steps:**
-1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content + design chat, slide preview, export) → 3. Export (success screen with Google Slides link and mailto)
+1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content chat, sticky sidebar, slide preview with inline editing, export) → 3. Export (success screen with Google Slides link and mailto)
+
+**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, and `GoogleSlidesButton`. Does not scroll with the slide preview.
 
 ---
 

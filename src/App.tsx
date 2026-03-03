@@ -5,7 +5,6 @@ import BriefEditor from './components/BriefEditor'
 import PdfUploader from './components/PdfUploader'
 import SlidePreview from './components/SlidePreview'
 import ChatInterface from './components/ChatInterface'
-import DesignChatInterface from './components/DesignChatInterface'
 import GoogleSlidesButton from './components/GoogleSlidesButton'
 import ProgressStepper from './components/ProgressStepper'
 import BrandVoicePanel from './components/BrandVoicePanel'
@@ -33,8 +32,7 @@ export default function App() {
   const [expansions, setExpansions] = useState<ExpandedContent | null>(null)
 
   // Design config
-  const [designConfig, setDesignConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
-  const [sidebarTab, setSidebarTab] = useState<'content' | 'design'>('content')
+  const [designConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
 
   // Brand voice training
   const [brandVoice, setBrandVoice] = useState<string | null>(() => localStorage.getItem('rfp_brand_voice'))
@@ -131,8 +129,26 @@ export default function App() {
     else if (slideNumber === 4 && bulletIndex === 0) probs[1] = newText
     else if (slideNumber === 7 && bulletIndex === 0) bens[0] = newText
     else if (slideNumber === 8 && bulletIndex === 0) bens[1] = newText
-    else return
-    setExpansions({ problemExpansions: probs, benefitExpansions: bens })
+    else if (slideNumber >= 11) {
+      const additionalIdx = slideNumber - 11
+      const additional = [...(expansions.additionalSlides ?? [])]
+      if (additional[additionalIdx]) {
+        const bullets = [...additional[additionalIdx].bullets]
+        bullets[bulletIndex] = newText
+        additional[additionalIdx] = { ...additional[additionalIdx], bullets }
+        setExpansions({ ...expansions, additionalSlides: additional })
+      }
+      return
+    } else return
+    setExpansions({ ...expansions, problemExpansions: probs, benefitExpansions: bens })
+  }
+
+  const handleSlideTitleEdit = (slideNumber: number, newTitle: string) => {
+    if (!expansions) return
+    setExpansions({
+      ...expansions,
+      customTitles: { ...(expansions.customTitles ?? {}), [slideNumber]: newTitle },
+    })
   }
 
   return (
@@ -423,82 +439,42 @@ export default function App() {
                           designConfig={designConfig}
                           isUpdating={isSlideUpdating}
                           onSlideEdit={expansions ? handleSlideEdit : undefined}
+                          onSlideTitleEdit={expansions ? handleSlideTitleEdit : undefined}
                         />
                       </div>
                     )}
                   </div>
                 </section>
 
-                {/* Right: Content/Design Chat + Export */}
-                <section className="bg-navy-800 flex flex-col min-h-[50vh] lg:min-h-0">
+                {/* Right: Content/Design Chat + Export — sticky so it stays in viewport while slides scroll */}
+                <section className="bg-navy-800 flex flex-col lg:sticky lg:top-[8.5rem] lg:h-[calc(100vh-8.5rem)] overflow-hidden">
                   <div className="flex flex-col h-full p-6 lg:p-8">
-                    {/* Tab toggle */}
-                    <div className="flex gap-1 mb-4 p-1 bg-white/[0.04] rounded-lg">
-                      <button
-                        onClick={() => setSidebarTab('content')}
-                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                          sidebarTab === 'content'
-                            ? 'bg-white/[0.1] text-cream-100 shadow-sm'
-                            : 'text-navy-400 hover:text-cream-300'
-                        }`}
-                      >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                        </svg>
-                        Content
-                      </button>
-                      <button
-                        onClick={() => setSidebarTab('design')}
-                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                          sidebarTab === 'design'
-                            ? 'bg-white/[0.1] text-cream-100 shadow-sm'
-                            : 'text-navy-400 hover:text-cream-300'
-                        }`}
-                      >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                        Design
-                      </button>
+                    {/* Section label */}
+                    <div className="mb-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400">Refine Content</p>
                     </div>
 
                     <div className="flex-1 min-h-0 bg-cream-50 rounded-xl p-4 overflow-hidden">
-                      {sidebarTab === 'content' ? (
-                        <ChatInterface
-                          briefText={briefText}
-                          parsedData={parsedData || {}}
-                          currentExpansions={expansions}
-                          onExpansionsUpdated={setExpansions}
-                          onLoadingChange={setIsSlideUpdating}
-                          brandVoice={brandVoice ?? undefined}
-                        />
-                      ) : (
-                        <DesignChatInterface
-                          currentDesignConfig={designConfig}
-                          onDesignConfigUpdated={setDesignConfig}
-                          parsedData={parsedData}
-                          briefText={briefText}
-                          expansions={expansions}
-                          onSlidesSuccess={handleSlidesSuccess}
-                        />
-                      )}
+                      <ChatInterface
+                        briefText={briefText}
+                        parsedData={parsedData || {}}
+                        currentExpansions={expansions}
+                        onExpansionsUpdated={setExpansions}
+                        onLoadingChange={setIsSlideUpdating}
+                        brandVoice={brandVoice ?? undefined}
+                      />
                     </div>
 
-                    {/* Export to Google Slides (only on content tab — design tab has its own) */}
-                    {sidebarTab === 'content' && (
-                      <div className="mt-4 pt-4 border-t border-white/10">
-                        <GoogleSlidesButton
-                          data={parsedData}
-                          briefText={briefText}
-                          isEmpty={!briefText.trim()}
-                          preGeneratedContent={expansions}
-                          designConfig={designConfig}
-                          onSuccess={handleSlidesSuccess}
-                        />
-                      </div>
-                    )}
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <GoogleSlidesButton
+                        data={parsedData}
+                        briefText={briefText}
+                        isEmpty={!briefText.trim()}
+                        preGeneratedContent={expansions}
+                        designConfig={designConfig}
+                        onSuccess={handleSlidesSuccess}
+                      />
+                    </div>
                   </div>
                 </section>
               </motion.div>

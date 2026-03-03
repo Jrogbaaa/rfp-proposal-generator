@@ -24,20 +24,13 @@ export default function Header({ isConnected, onNew }: HeaderProps) {
           animate={{ opacity: 1, x: 0 }}
           className="flex items-center gap-4"
         >
-          {/* Connection Status */}
-          <div className={`
-            flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium
-            ${isConnected
-              ? 'bg-gold-100 text-gold-700'
-              : 'bg-red-50 text-red-600'
-            }
-          `}>
-            <span className={`
-              w-1.5 h-1.5 rounded-full
-              ${isConnected ? 'bg-gold-500' : 'bg-red-500'}
-            `} />
-            {isConnected ? 'Google Slides Ready' : 'Disconnected'}
-          </div>
+          {/* Connection Status — only shown when connected */}
+          {isConnected && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gold-100 text-gold-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-gold-500" />
+              Google Slides Ready
+            </div>
+          )}
 
           {/* New Document Button */}
           <button onClick={onNew} className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-navy-800 text-cream-100 hover:bg-navy-700 rounded-lg transition-colors">
