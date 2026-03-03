@@ -389,7 +389,7 @@ export default function App() {
                             ? 'Rewriting slides…'
                             : expansions
                             ? 'Click any paragraph to edit it directly'
-                            : '10-slide deck · ready to preview'}
+                            : 'Up to 13 slides · ready to preview'}
                         </p>
                       </div>
                     </div>
@@ -543,7 +543,7 @@ export default function App() {
                     Presentation created!
                   </h1>
                   <p className="text-navy-400 mb-8">
-                    Your 10-slide deck for{' '}
+                    Your proposal deck for{' '}
                     <span className="font-semibold text-navy-700">
                       {parsedData?.client?.company || 'your client'}
                     </span>{' '}

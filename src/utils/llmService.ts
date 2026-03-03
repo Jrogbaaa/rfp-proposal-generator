@@ -305,24 +305,44 @@ export interface ChatMessage {
 interface LLMResponse {
   problemExpansions: [string, string, string, string];
   benefitExpansions: [string, string, string, string];
+  approachSteps: string[];
+  nextSteps: string[];
 }
 
-const SYSTEM_PROMPT = `You are a proposal writer for a consulting/agency. Generate persuasive, revenue-focused content based on the client brief provided.
+const SYSTEM_PROMPT = `You are a senior proposal writer at a consulting/agency. Generate persuasive, specific, revenue-focused content based on the client brief.
 
 You MUST output valid JSON with this exact structure:
 {
   "problemExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
-  "benefitExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"]
+  "benefitExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
+  "approachSteps": ["step1", "step2", "step3", "step4"],
+  "nextSteps": ["action1", "action2", "action3", "action4", "action5"]
 }
 
-Guidelines:
-- Each expansion should be 2-3 sentences
-- Reference specific details from the brief - don't be generic
-- Use direct "you" language (not "the client" or "they")
-- Focus on business impact and revenue implications
-- Be persuasive but professional
-- Each problem expansion should explain why this issue costs them money or limits growth
-- Each benefit expansion should explain the ROI and concrete outcomes they'll see
+PROBLEM EXPANSIONS (4 items):
+- 2-3 sentences each
+- Open with a specific business consequence: a cost, a risk, a missed opportunity, or a bottleneck
+- Name the consequence directly — don't hedge ("this could lead to..." → never; "this costs you..." → yes)
+- Reference specific details from the brief — no generic filler
+- Use direct "you" language
+
+BENEFIT EXPANSIONS (4 items):
+- 2-3 sentences each
+- Lead with the concrete outcome the client will see (include a measurable estimate where possible: %, time saved, cost avoided)
+- Connect the outcome back to their specific context from the brief
+- Use direct "you" language
+
+APPROACH STEPS (3-4 items — how Paramount will deliver the solution):
+- Each step is 1-2 sentences: a clear phase name + what happens in it
+- Should feel like a logical, professional delivery methodology
+- Examples: "Discovery & Audit", "Strategy & Roadmap", "Build & Launch", "Optimise & Scale"
+- Make them specific to the type of project in the brief, not generic
+
+NEXT STEPS (4-5 items — post-agreement actions):
+- Short, action-oriented lines (15-25 words max each)
+- These are the concrete actions that happen once the client signs
+- Mix of client actions and Paramount actions (e.g. "Kick-off call within 48 hours", "Sign agreement and return")
+- Should feel energising and low-friction — make it easy to say yes
 
 IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
@@ -414,27 +434,41 @@ Generate personalized expansions for each problem and benefit that reference spe
     throw new Error('Invalid benefitExpansions in LLM response');
   }
 
+  // approachSteps and nextSteps are new — pad gracefully if LLM returns fewer than expected
+  const approachSteps: string[] = Array.isArray(parsed.approachSteps) ? parsed.approachSteps : [];
+  const nextSteps: string[] = Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [];
+
   return {
     problemExpansions: parsed.problemExpansions as [string, string, string, string],
     benefitExpansions: parsed.benefitExpansions as [string, string, string, string],
+    approachSteps,
+    nextSteps,
   };
 }
 
 const ITERATE_SYSTEM_PROMPT = `You are refining a sales proposal. The user will request changes to the content (tone, length, focus, etc.).
 
-You will be given the CURRENT expanded content (4 problem paragraphs and 4 benefit paragraphs). Your job is to refine ALL 4 of each based on the user's request and return them.
+You will be given the CURRENT expanded content (4 problem paragraphs, 4 benefit paragraphs, approach steps, and next steps). Refine the relevant sections based on the user's request.
 
 Return ONLY valid JSON with this structure:
 {
   "reply": "A brief conversational response acknowledging the change (1-2 sentences)",
   "updatedExpansions": {
     "problemExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
-    "benefitExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"]
+    "benefitExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
+    "approachSteps": ["step1", "step2", "step3"] | null,
+    "nextSteps": ["action1", "action2", "action3", "action4"] | null
   } | null,
   "additionalSlides": [{"title": "Slide Title", "bullets": ["point 1", "point 2", "point 3"]}] | null
 }
 
 CRITICAL: You MUST always return exactly 4 items in each array when returning updatedExpansions.
+
+For approachSteps and nextSteps inside updatedExpansions:
+- If the user's request relates to methodology, approach, process, or next steps — update those arrays
+- Otherwise set them to null (the existing values will be preserved automatically)
+- approachSteps: 3-4 items, each 1-2 sentences describing a delivery phase
+- nextSteps: 4-5 items, short action-oriented lines (15-25 words max each)
 
 If the user asks to add more slides, expand the deck, or make it longer:
 - Generate 1-3 new slides in "additionalSlides" with a clear title and 2-4 bullet points each
@@ -483,7 +517,13 @@ Problems:
 ${currentExpansions.problemExpansions.map((p, i) => `${i + 1}. ${p}`).join('\n')}
 
 Benefits:
-${currentExpansions.benefitExpansions.map((b, i) => `${i + 1}. ${b}`).join('\n')}` : ''}
+${currentExpansions.benefitExpansions.map((b, i) => `${i + 1}. ${b}`).join('\n')}${currentExpansions.approachSteps?.length ? `
+
+Approach steps:
+${currentExpansions.approachSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}${currentExpansions.nextSteps?.length ? `
+
+Next steps:
+${currentExpansions.nextSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}` : ''}
 
 User request: ${userInstruction}`;
 
@@ -529,7 +569,16 @@ User request: ${userInstruction}`;
     throw new Error('No content returned from Gemini iterate');
   }
 
-  let parsed: { reply: string; updatedExpansions: ExpandedContent | null; additionalSlides: AdditionalSlide[] | null };
+  let parsed: {
+    reply: string;
+    updatedExpansions: {
+      problemExpansions: string[];
+      benefitExpansions: string[];
+      approachSteps: string[] | null;
+      nextSteps: string[] | null;
+    } | null;
+    additionalSlides: AdditionalSlide[] | null;
+  };
   try {
     parsed = JSON.parse(content);
   } catch {
@@ -549,9 +598,12 @@ User request: ${userInstruction}`;
     // Pad to 4 if Gemini returned fewer than expected
     while (e.problemExpansions.length < 4) e.problemExpansions.push('Additional challenge to be identified.');
     while (e.benefitExpansions.length < 4) e.benefitExpansions.push('Additional benefit to be identified.');
-    // Preserve existing customTitles and additionalSlides from current expansions
+    // Use LLM-returned values when present; fall back to current values for untouched fields
     output.updatedExpansions = {
-      ...e,
+      problemExpansions: e.problemExpansions as [string, string, string, string],
+      benefitExpansions: e.benefitExpansions as [string, string, string, string],
+      approachSteps: e.approachSteps ?? currentExpansions?.approachSteps,
+      nextSteps: e.nextSteps ?? currentExpansions?.nextSteps,
       customTitles: currentExpansions?.customTitles,
       additionalSlides: currentExpansions?.additionalSlides,
     };

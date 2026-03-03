@@ -614,14 +614,224 @@ function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalett
   return reqs
 }
 
-/** Slide 9: Investment & Timeline */
+/** Slide 7: Our Approach — numbered methodology steps */
+function approachSlide(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
+  const steps = data.expanded.approachSteps ?? []
+  if (steps.length === 0) return []   // skip if no steps generated
+
+  const headId   = `${slideId}_head`
+  const labelId  = `${slideId}_label`
+  const barId    = `${slideId}_bar`
+
+  const isDark = opts.boldAgency || opts.minimal
+  const bg      = isDark ? palette.primary : WHITE
+  const headClr = isDark ? WHITE : palette.primary
+
+  const reqs: object[] = [bgFill(slideId, bg)]
+
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000,
+      isDark ? palette.primaryDarker : palette.primary))
+    if (!isDark) {
+      reqs.push(...createRect(`${slideId}_accent`, slideId, 0, 0, 12000, H, palette.accent))
+    }
+  }
+
+  // "OUR APPROACH" eyebrow label
+  reqs.push(
+    createTextBox(labelId, slideId, MARGIN_X, 300000, FULL_W, 180000),
+    insertText(labelId, 'OUR APPROACH'),
+    styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 500000, FULL_W, 500000),
+    insertText(headId, 'How We Deliver'),
+    styleText(headId, { color: headClr, fontSize: 32, fontFamily: 'Montserrat', bold: true }),
+  )
+
+  // Numbered step cards — up to 4 steps arranged horizontally
+  const visSteps = steps.slice(0, 4)
+  const colW = Math.floor(FULL_W / visSteps.length) - 60000
+  const cardH = 2000000
+  const cardY = 1250000
+  const textColor = isDark ? LTGRAY : { red: 0.25, green: 0.28, blue: 0.38 }
+
+  visSteps.forEach((step, i) => {
+    const cardX = MARGIN_X + i * (colW + 60000)
+    const numId   = `${slideId}_n${i}`
+    const ruleId  = `${slideId}_r${i}`
+    const textId  = `${slideId}_t${i}`
+
+    // Accent-colored step number
+    reqs.push(
+      createTextBox(numId, slideId, cardX, cardY, 300000, 400000),
+      insertText(numId, String(i + 1).padStart(2, '0')),
+      styleText(numId, { color: palette.accent, fontSize: 28, fontFamily: 'Montserrat', bold: true }),
+
+      // Thin accent rule under number
+      ...createRect(ruleId, slideId, cardX, cardY + 430000, colW, 4000, palette.accent),
+
+      // Step description
+      createTextBox(textId, slideId, cardX, cardY + 490000, colW, cardH - 490000),
+      ...(step ? [
+        insertText(textId, step),
+        styleText(textId, { color: textColor, fontSize: 14, fontFamily: 'Inter' }),
+      ] : []),
+    )
+  })
+
+  return reqs
+}
+
+/** Slide 10: Benefits 3 & 4 combined (mirrors problemsCombined) */
+function benefitsCombined(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
+  const b3 = (data.expanded.editedBenefits?.[2] ?? data.content.benefits[2]) || ''
+  const b4 = (data.expanded.editedBenefits?.[3] ?? data.content.benefits[3]) || ''
+  const e3 = data.expanded.benefitExpansions[2] || ''
+  const e4 = data.expanded.benefitExpansions[3] || ''
+
+  if (!b3 && !b4) return []  // skip if no benefits 3 & 4
+
+  const head1Id = `${slideId}_h1`
+  const body1Id = `${slideId}_b1`
+  const head2Id = `${slideId}_h2`
+  const body2Id = `${slideId}_b2`
+  const barId   = `${slideId}_bar`
+  const divId   = `${slideId}_div`
+  const lblId   = `${slideId}_lbl`
+
+  const colW = W / 2 - MARGIN_X - 80000
+  const isDark = opts.minimal  // bold-agency keeps light bg for benefits (matches benefit deep-dives)
+  const headColor = isDark ? WHITE : palette.primary
+  const bodyColor = isDark ? LTGRAY : { red: 0.25, green: 0.28, blue: 0.38 }
+  const divColor  = isDark ? palette.primaryLighter : { red: 0.9, green: 0.91, blue: 0.93 }
+
+  const reqs: object[] = [
+    bgFill(slideId, isDark ? palette.primary : WHITE),
+    ...createRect(divId, slideId, W / 2 - 15000, MARGIN_TOP, 30000, H - MARGIN_TOP - 50000, divColor),
+  ]
+
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 8000, palette.accent),
+      ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary),
+    )
+  }
+
+  reqs.push(
+    createTextBox(lblId, slideId, MARGIN_X, 220000, FULL_W, 160000),
+    insertText(lblId, 'BENEFIT 03 & 04'),
+    styleText(lblId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(head1Id, slideId, MARGIN_X, MARGIN_TOP + 120000, colW, 700000),
+    ...(b3 ? [insertText(head1Id, b3), styleText(head1Id, { color: headColor, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
+
+    createTextBox(body1Id, slideId, MARGIN_X, 1400000, colW, 3200000),
+    ...(e3 ? [insertText(body1Id, e3), styleText(body1Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
+
+    createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP + 120000, colW, 700000),
+    ...(b4 ? [insertText(head2Id, b4), styleText(head2Id, { color: headColor, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
+
+    createTextBox(body2Id, slideId, W / 2 + 80000, 1400000, colW, 3200000),
+    ...(e4 ? [insertText(body2Id, e4), styleText(body2Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
+  )
+
+  return reqs
+}
+
+/** Slide 12: Next Steps — numbered action items */
+function nextStepsSlide(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
+  const steps = data.expanded.nextSteps ?? []
+  if (steps.length === 0) return []  // skip if no steps generated
+
+  const headId  = `${slideId}_head`
+  const labelId = `${slideId}_label`
+  const barId   = `${slideId}_bar`
+
+  const isDark = opts.boldAgency || opts.minimal
+  const bg      = isDark ? palette.primary : LTGRAY
+  const headClr = isDark ? palette.accent : palette.primary
+  const textClr = isDark ? LTGRAY : { red: 0.25, green: 0.28, blue: 0.38 }
+
+  const reqs: object[] = [bgFill(slideId, bg)]
+
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000,
+      isDark ? palette.primaryDarker : palette.primary))
+    if (opts.boldAgency) {
+      reqs.push(...createRect(`${slideId}_acctop`, slideId, 0, 0, W, 60000, palette.accent))
+    }
+  }
+
+  reqs.push(
+    createTextBox(labelId, slideId, MARGIN_X, 300000, FULL_W, 160000),
+    insertText(labelId, 'WHAT HAPPENS NEXT'),
+    styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 500000, FULL_W, 500000),
+    insertText(headId, 'Next Steps'),
+    styleText(headId, { color: headClr, fontSize: 32, fontFamily: 'Montserrat', bold: true }),
+  )
+
+  // Two-column layout for up to 5 steps
+  const visSteps = steps.slice(0, 5)
+  const leftSteps  = visSteps.slice(0, Math.ceil(visSteps.length / 2))
+  const rightSteps = visSteps.slice(Math.ceil(visSteps.length / 2))
+  const colW = FULL_W / 2 - 100000
+  const startY = 1200000
+  const stepH  = 600000
+
+  const renderColumn = (colSteps: string[], xOffset: number, indexOffset: number) => {
+    colSteps.forEach((step, i) => {
+      const idx    = i + indexOffset
+      const y      = startY + i * stepH
+      const numId  = `${slideId}_cn${idx}`
+      const txtId  = `${slideId}_ct${idx}`
+      const ruleId = `${slideId}_cr${idx}`
+
+      reqs.push(
+        createTextBox(numId, slideId, xOffset, y, 300000, stepH),
+        insertText(numId, String(idx + 1).padStart(2, '0')),
+        styleText(numId, { color: palette.accent, fontSize: 22, fontFamily: 'Montserrat', bold: true }),
+
+        createTextBox(txtId, slideId, xOffset + 380000, y, colW - 380000, stepH - 50000),
+        ...(step ? [
+          insertText(txtId, step),
+          styleText(txtId, { color: textClr, fontSize: 14, fontFamily: 'Inter' }),
+        ] : []),
+
+        ...createRect(ruleId, slideId, xOffset, y + stepH - 30000, colW, 2000, { red: 0.85, green: 0.86, blue: 0.88 }),
+      )
+    })
+  }
+
+  renderColumn(leftSteps, MARGIN_X, 0)
+  if (rightSteps.length > 0) {
+    renderColumn(rightSteps, MARGIN_X + FULL_W / 2 + 100000, leftSteps.length)
+  }
+
+  return reqs
+}
+
+/** Slide 11: Investment & Timeline — visual card grid */
 function investmentSlide(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
   const headId  = `${slideId}_head`
   const totalId = `${slideId}_total`
   const timeId  = `${slideId}_time`
-  const m1Id    = `${slideId}_m1`
-  const m2Id    = `${slideId}_m2`
-  const m3Id    = `${slideId}_m3`
   const barId   = `${slideId}_bar`
 
   // Minimal goes full dark; bold-agency keeps light LTGRAY background for visual relief
@@ -641,7 +851,6 @@ function investmentSlide(slideId: string, data: ProposalData, palette: SlidePale
   } else {
     reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary))
     if (opts.boldAgency) {
-      // Accent top strip for visual continuity with the dark slides around it
       reqs.push(...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 60000, palette.accent))
     }
   }
@@ -658,19 +867,43 @@ function investmentSlide(slideId: string, data: ProposalData, palette: SlidePale
     createTextBox(timeId, slideId, MARGIN_X, 1550000, FULL_W / 2, 300000),
     insertText(timeId, `Timeline: ${data.project.duration}`),
     styleText(timeId, { color: valueColor, fontSize: 18, fontFamily: 'Inter' }),
-
-    createTextBox(m1Id, slideId, MARGIN_X, 2100000, FULL_W, 300000),
-    insertText(m1Id, `Month 1: ${data.project.monthOneInvestment}`),
-    styleText(m1Id, { color: valueColor, fontSize: 16, fontFamily: 'Inter' }),
-
-    createTextBox(m2Id, slideId, MARGIN_X, 2500000, FULL_W, 300000),
-    insertText(m2Id, `Month 2: ${data.project.monthTwoInvestment}`),
-    styleText(m2Id, { color: valueColor, fontSize: 16, fontFamily: 'Inter' }),
-
-    createTextBox(m3Id, slideId, MARGIN_X, 2900000, FULL_W, 300000),
-    insertText(m3Id, `Month 3: ${data.project.monthThreeInvestment}`),
-    styleText(m3Id, { color: valueColor, fontSize: 16, fontFamily: 'Inter' }),
   )
+
+  // Month cards — 3 side-by-side colored rectangles
+  const months = [
+    { label: 'Month 1', value: data.project.monthOneInvestment },
+    { label: 'Month 2', value: data.project.monthTwoInvestment },
+    { label: 'Month 3', value: data.project.monthThreeInvestment },
+  ].filter(m => m.value)
+
+  if (months.length > 0) {
+    const cardGap  = 80000
+    const cardW    = Math.floor((FULL_W - cardGap * (months.length - 1)) / months.length)
+    const cardH    = 1300000
+    const cardY    = 2100000
+    const cardBg   = isDark ? palette.primaryLighter : palette.primary
+
+    months.forEach((month, i) => {
+      const cardX     = MARGIN_X + i * (cardW + cardGap)
+      const cardId    = `${slideId}_card${i}`
+      const mLblId    = `${slideId}_mlbl${i}`
+      const mValId    = `${slideId}_mval${i}`
+
+      reqs.push(
+        ...createRect(cardId, slideId, cardX, cardY, cardW, cardH, cardBg),
+
+        createTextBox(mLblId, slideId, cardX + 100000, cardY + 150000, cardW - 200000, 280000),
+        insertText(mLblId, month.label.toUpperCase()),
+        styleText(mLblId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+        paragraphAlign(mLblId, 'CENTER'),
+
+        createTextBox(mValId, slideId, cardX + 60000, cardY + 480000, cardW - 120000, 600000),
+        insertText(mValId, month.value),
+        styleText(mValId, { color: WHITE, fontSize: 20, fontFamily: 'Inter', bold: true }),
+        paragraphAlign(mValId, 'CENTER'),
+      )
+    })
+  }
 
   return reqs
 }
@@ -742,13 +975,14 @@ function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette
 // ---------------------------------------------------------------------------
 
 const PARAMOUNT_DOMAIN = 'paramount.com'
-// Google's favicon service returns direct PNG (no redirect) — reliable with Google Slides API.
-// ClearBit's free logo API was deprecated after HubSpot acquisition and now returns 302
-// redirects which the Google Slides createImage endpoint does not follow, resulting in blank images.
-const FAVICON_API = 'https://www.google.com/s2/favicons'
+// Google faviconV2 returns direct PNG at up to 256px — no redirects, reliable with Google Slides API.
+// The older s2/favicons maxed at 128px. faviconV2 doubles the resolution at the same zero-auth cost.
+// ClearBit's free logo API was deprecated (HubSpot acquisition) and now returns 302 redirects
+// which the Google Slides createImage endpoint does not follow, resulting in blank images.
+const FAVICON_V2 = 'https://t1.gstatic.com/faviconV2'
 
 function logoUrl(domain: string): string {
-  return `${FAVICON_API}?domain=${domain}&sz=128`
+  return `${FAVICON_V2}?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${domain}&size=256`
 }
 
 function getClientDomain(data: ProposalData): string | null {
@@ -843,14 +1077,43 @@ export async function createGoogleSlidesPresentation(
   const defaultSlideId: string = presentation.slides?.[0]?.objectId
 
   // Phase 2: Build all slides via batchUpdate
+  // Base 13-slide deck:
+  //  1 Cover  2 Challenge  3 Prob1  4 Prob2  5 Prob3&4
+  //  6 Solution  7 Approach  8 Ben1  9 Ben2  10 Ben3&4
+  //  11 Investment  12 NextSteps  13 Close
   const slideIds = [
-    's01_cover', 's02_challenge', 's03_prob1', 's04_prob2',
-    's05_prob34', 's06_solution', 's07_ben1', 's08_ben23',
-    's09_invest', 's10_close',
+    's01_cover',    's02_challenge', 's03_prob1',  's04_prob2',
+    's05_prob34',   's06_solution',  's07_approach','s08_ben1',
+    's09_ben2',     's10_ben34',     's11_invest',  's12_next',
+    's13_close',
   ]
 
   const p = data
   const e = data.expanded
+
+  // Approach and NextSteps slides are optional — skip if LLM returned no content
+  const hasApproach  = (e.approachSteps?.length ?? 0) > 0
+  const hasNextSteps = (e.nextSteps?.length ?? 0) > 0
+
+  // Build the final ordered list, filtering empty optional slides
+  const orderedSlides = [
+    { id: 's01_cover',    reqs: () => titleSlide(slideIds[0], p, palette) },
+    { id: 's02_challenge',reqs: () => challengeSlide(slideIds[1], p, palette, opts) },
+    { id: 's03_prob1',    reqs: () => problemDeepDive(slideIds[2], 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || '', palette, true, opts, 0) },
+    { id: 's04_prob2',    reqs: () => problemDeepDive(slideIds[3], 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || '', palette, true, opts, 1) },
+    { id: 's05_prob34',   reqs: () => problemsCombined(slideIds[4], p, palette, opts) },
+    { id: 's06_solution', reqs: () => solutionSlide(slideIds[5], p, palette, opts) },
+    ...(hasApproach ? [{ id: 's07_approach', reqs: () => approachSlide(slideIds[6], p, palette, opts) }] : []),
+    { id: 's08_ben1',     reqs: () => problemDeepDive(slideIds[7], 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', palette, false, opts, 0) },
+    { id: 's09_ben2',     reqs: () => problemDeepDive(slideIds[8], 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', palette, false, opts, 1) },
+    { id: 's10_ben34',    reqs: () => benefitsCombined(slideIds[9], p, palette, opts) },
+    { id: 's11_invest',   reqs: () => investmentSlide(slideIds[10], p, palette, opts) },
+    ...(hasNextSteps ? [{ id: 's12_next', reqs: () => nextStepsSlide(slideIds[11], p, palette, opts) }] : []),
+    { id: 's13_close',    reqs: () => closingSlide(slideIds[12], p, palette, opts) },
+  ].filter(s => {
+    const r = s.reqs()
+    return r.length > 0  // benefitsCombined / approachSlide / nextStepsSlide return [] when empty
+  })
 
   const slideRequests: object[] = []
 
@@ -858,28 +1121,17 @@ export async function createGoogleSlidesPresentation(
     slideRequests.push({ deleteObject: { objectId: defaultSlideId } })
   }
 
-  for (let i = 0; i < slideIds.length; i++) {
+  orderedSlides.forEach((slide, i) => {
     slideRequests.push({
       createSlide: {
-        objectId: slideIds[i],
+        objectId: slide.id,
         insertionIndex: i,
         slideLayoutReference: { predefinedLayout: 'BLANK' },
       },
     })
-  }
+  })
 
-  const populationRequests: object[] = [
-    ...titleSlide(slideIds[0], p, palette),
-    ...challengeSlide(slideIds[1], p, palette, opts),
-    ...problemDeepDive(slideIds[2], 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || '', palette, true, opts, 0),
-    ...problemDeepDive(slideIds[3], 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || '', palette, true, opts, 1),
-    ...problemsCombined(slideIds[4], p, palette, opts),
-    ...solutionSlide(slideIds[5], p, palette, opts),
-    ...problemDeepDive(slideIds[6], 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', palette, false, opts, 0),
-    ...problemDeepDive(slideIds[7], 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', palette, false, opts, 1),
-    ...investmentSlide(slideIds[8], p, palette, opts),
-    ...closingSlide(slideIds[9], p, palette, opts),
-  ]
+  const populationRequests: object[] = orderedSlides.flatMap(s => s.reqs())
 
   const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
     method: 'POST',
@@ -893,8 +1145,10 @@ export async function createGoogleSlidesPresentation(
   }
 
   // Phase 3: Insert logos (separate request so failures don't break the deck)
+  const coverSlideId = orderedSlides[0].id
+  const closeSlideId = orderedSlides[orderedSlides.length - 1].id
   try {
-    const logoReqs = logoRequests(slideIds[0], slideIds[9], p)
+    const logoReqs = logoRequests(coverSlideId, closeSlideId, p)
     if (logoReqs.length > 0) {
       const logoResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
         method: 'POST',

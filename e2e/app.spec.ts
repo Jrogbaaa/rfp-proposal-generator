@@ -357,10 +357,10 @@ test.describe('Step 2 – Export Button', () => {
     await expect(page.getByLabel('Create Google Slides presentation')).toBeEnabled()
   })
 
-  test('shows helper hint "Creates a 10-slide presentation"', async ({ page }) => {
+  test('shows helper hint about creating a presentation', async ({ page }) => {
     await goToIterateStep(page)
     await expect(
-      page.getByText('Creates a 10-slide presentation in your Google Drive')
+      page.getByText('Creates a professional presentation in your Google Drive')
     ).toBeVisible()
   })
 })

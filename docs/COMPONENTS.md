@@ -78,7 +78,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 ---
 
 ### GoogleSlidesButton.tsx
-**Purpose:** Direct Google Slides API integration — creates a 10-slide presentation in the user's Google Drive and provides a link to open/edit it.
+**Purpose:** Direct Google Slides API integration — creates a presentation (10–13 slides) in the user's Google Drive and provides a link to open/edit it.
 
 **Props:**
 - `data: Partial<ProposalData> | null` — Parsed brief data
@@ -96,7 +96,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 3. `createGoogleSlidesPresentation()` creates presentation via Google Slides REST API
 4. "Open in Google Slides" link appears; `onSuccess` callback fires to advance to Export step
 
-**10-slide structure:** Title, Challenge (problems list), Problem Deep Dives ×3, Solution (benefits list), Benefit Deep Dives ×2, Investment & Timeline, Closing CTA
+**Slide structure (up to 13):** Title, Challenge, Prob Deep Dive ×2, Prob3&4 Combined, Solution, **Approach** (optional), Ben Deep Dive ×2, **Ben3&4 Combined**, Investment, **Next Steps** (optional), Closing CTA. Approach and Next Steps slides are skipped when the LLM returns empty arrays for those fields.
 
 **Utilities used:**
 - `src/utils/googleAuth.ts` — OAuth token management
@@ -107,7 +107,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 ---
 
 ### SlidePreview.tsx
-**Purpose:** Renders 10 slide cards from live `ProposalData` in Step 2; applies the active color theme to the HTML preview.
+**Purpose:** Renders slide cards (10+ when approach/next steps are present) from live `ProposalData` in Step 2; applies the active color theme to the HTML preview.
 
 **Props:**
 - `fileName?: string` — Presentation title shown in header
@@ -165,8 +165,8 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `createGoogleSlidesPresentation(data: ProposalData, accessToken: string, designConfig?: DesignConfig): Promise<CreateSlidesResult>`
 
 **Phase 1:** `POST /v1/presentations` — create empty presentation
-**Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all 10 slides in one atomic request
-**Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught)
+**Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all slides (10–13) in one atomic request; `orderedSlides` array filters out optional slides (`approachSlide`, `benefitsCombined`, `nextStepsSlide`) when their data arrays are empty
+**Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught); cover/close IDs resolved dynamically from `orderedSlides` so they're correct regardless of which optional slides are present
 
 **Brand:** Montserrat headings, Inter body text. Brand colors are driven by `designConfig`. Logos auto-fetched via Google Favicon API (`google.com/s2/favicons?sz=128`).
 
@@ -175,7 +175,11 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `slate-blue` — primary `#1E3A5F`, accent `#3B82F5`
 - `forest-green` — primary `#1A3A2A`, accent `#22C55E`
 
-All 7 slide-builder functions (`titleSlide`, `challengeSlide`, `problemDeepDive`, `problemsCombined`, `solutionSlide`, `investmentSlide`, `closingSlide`) accept `palette: SlidePalette` as their last parameter. `createGoogleSlidesPresentation` resolves the palette from `designConfig` (defaults to `'navy-gold'`) and passes it through to every builder.
+All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts` as their last parameters. `createGoogleSlidesPresentation` resolves the palette from `designConfig` (defaults to `'navy-gold'`) and passes it through to every builder.
+
+**Slide builders:** `titleSlide`, `challengeSlide`, `problemDeepDive`, `problemsCombined`, `solutionSlide`, `approachSlide`, `benefitsCombined`, `nextStepsSlide`, `investmentSlide`, `closingSlide`
+
+**Logo URL:** `faviconV2?size=256` (Google's higher-res endpoint, no redirects)
 
 **Cover slide layout:** Split-panel design — left 65% content zone, right 35% branded panel (`primaryLighter`). Panel contains client label, client logo, orange divider rule, "PARAMOUNT" label, and Paramount logo — all vertically centered. Labels/divider drawn in Phase 2; logo images inserted in Phase 3 using shared layout constants (`LOGO_X`, `COVER_CLOGO_Y`, `COVER_PLOGO_Y`).
 
@@ -197,11 +201,11 @@ All 7 slide-builder functions (`titleSlide`, `challengeSlide`, `problemDeepDive`
 
 | Utility | Location | Purpose |
 |---------|----------|---------|
-| slideBuilder | `src/utils/slideBuilder.ts` | `buildSlidesFromData()` — converts `ProposalData` into 10 `SlideData` cards for preview |
+| slideBuilder | `src/utils/slideBuilder.ts` | `buildSlidesFromData()` — converts `ProposalData` into `SlideData` cards for preview (10+ when approach/next steps present) |
 | contentExpander | `src/utils/contentExpander.ts` | Template-based content expansion for problems and benefits |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()`, `iterateDesign()`, `extractBrandVoice()` |
+| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()` (returns 4 content arrays incl. `approachSteps`/`nextSteps`), `iterateProposalContent()` (preserves/updates all 4 arrays), `iterateDesign()`, `extractBrandVoice()` |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system |
 
@@ -229,4 +233,4 @@ All 7 slide-builder functions (`titleSlide`, `challengeSlide`, `problemDeepDive`
 
 ## Last Updated
 - Date: 2026-03-03
-- Changes: Updated `googleAuth.ts` notes to reflect localStorage token persistence
+- Changes: Added `approachSlide`, `benefitsCombined`, `nextStepsSlide` builders; updated deck from 10 to 13 slides; updated llmService to generate/iterate `approachSteps` and `nextSteps`; logo URL upgraded to faviconV2

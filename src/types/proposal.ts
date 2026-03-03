@@ -29,11 +29,14 @@ export interface AdditionalSlide {
 export interface ExpandedContent {
   problemExpansions: [string, string, string, string];
   benefitExpansions: [string, string, string, string];
+  approachSteps?: string[];   // 3-4 methodology step descriptions (LLM-generated)
+  nextSteps?: string[];       // 3-5 post-agreement action items (LLM-generated)
   additionalSlides?: AdditionalSlide[];
   customTitles?: Record<number, string>;
   // User edits from the Refine tab (slides 1 & 2)
   editedProjectTitle?: string;
   editedProblems?: [string, string, string, string];
+  editedBenefits?: [string, string, string, string];
 }
 
 export interface GeneratedContent {

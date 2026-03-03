@@ -290,7 +290,7 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
             exit={{ opacity: 0 }}
             className="mt-2 text-xs text-navy-400 text-center"
           >
-            Creates a 10-slide presentation in your Google Drive
+            Creates a professional presentation in your Google Drive
           </motion.p>
         )}
       </AnimatePresence>

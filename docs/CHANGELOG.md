@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-03] — Approach & Next Steps Slides + Expanded Deck (up to 13 slides)
+
+### Added
+- **`approachSlide` (slide 7)** — `src/utils/googleSlides.ts`; numbered horizontal card layout ("OUR APPROACH / How We Deliver"); 3-4 delivery phases with accent-colored step numbers and a thin rule below each; theme-aware (dark bg for bold-agency/minimal); skipped entirely when `approachSteps` is empty
+- **`benefitsCombined` (slide 10)** — `src/utils/googleSlides.ts`; two-column split layout for Benefits 3 & 4 (mirrors the `problemsCombined` pattern); skipped when both b3 and b4 are absent; respects `editedBenefits` overrides
+- **`nextStepsSlide` (slide 12)** — `src/utils/googleSlides.ts`; two-column numbered layout ("WHAT HAPPENS NEXT / Next Steps"); up to 5 action items; theme-aware; skipped when `nextSteps` is empty
+- **`approachSteps` and `nextSteps` on `ExpandedContent`** — `src/types/proposal.ts`; `approachSteps?: string[]` (3-4 methodology phases) and `nextSteps?: string[]` (4-5 post-agreement actions); both optional so existing proposals without them continue to render without these slides
+- **`editedBenefits` on `ExpandedContent`** — `src/types/proposal.ts`; `editedBenefits?: [string, string, string, string]`; stores user inline edits for benefit bullets, consumed by `benefitsCombined` and benefit deep-dive slides
+- **`approachSteps` and `nextSteps` in LLM generation** — `src/utils/llmService.ts`; `LLMResponse` interface extended with both fields; `SYSTEM_PROMPT` updated with content quality guidelines (problem expansions open with a specific business consequence; benefit expansions lead with a concrete measurable outcome); `generateProposalContent` returns all 4 content arrays
+- **`approachSteps` and `nextSteps` in LLM iteration** — `src/utils/llmService.ts`; `ITERATE_SYSTEM_PROMPT` updated with schema for both new fields and instructions to update them only when the user's request relates to methodology/process/next steps; `iterateProposalContent` context prompt now includes current approach and next steps; merge logic uses `??` so LLM-returned updates win while `null` falls back to current values
+
+### Changed
+- **Deck expanded from 10 to up to 13 slides** — `src/utils/googleSlides.ts`; new slide order: Cover → Challenge → Prob1 → Prob2 → Prob3&4 → Solution → **Approach** → Ben1 → Ben2 → **Ben3&4** → Investment → **NextSteps** → Close; Approach and NextSteps are conditional (skipped when empty); deck always has at least 10 slides
+- **`investmentSlide` visual redesign** — `src/utils/googleSlides.ts`; month breakdown replaced with a row of colored card rectangles (primary bg, accent labels, white values) instead of plain text lines; cards only rendered when month values are present
+- **Logo URL upgraded** — `src/utils/googleSlides.ts`; switched from `s2/favicons?sz=128` to `faviconV2?size=256` (Google's newer endpoint); doubles resolution at the same zero-auth cost; removes 302 redirect risk
+- **`logoRequests` now uses dynamic slide IDs** — `src/utils/googleSlides.ts`; cover and closing slide IDs resolved from `orderedSlides[0]` and `orderedSlides[last]` instead of hardcoded `slideIds[0]` / `slideIds[9]`; correct regardless of which optional slides are present
+- **UI copy updated** — `src/App.tsx`, `src/components/GoogleSlidesButton.tsx`; "10-slide deck" references updated to "Up to 13 slides" and "professional presentation" to reflect variable deck size
+- **E2E tests updated** — `e2e/app.spec.ts`; "Creates a 10-slide presentation" assertion updated to match new copy
+
+---
+
 ## [2026-03-03] — Slide Design Overhaul & Extended Inline Editing
 
 ### Added
