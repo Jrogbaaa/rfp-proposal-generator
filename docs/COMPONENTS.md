@@ -152,7 +152,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `getAuthState(): GoogleAuthState` — Current token state
 - `revokeToken(): void` — Clears cached token and revokes with Google
 
-**Notes:** Token stored in-memory only. 1-hour expiry. No backend required.
+**Notes:** Token persisted to `localStorage` (`gis_access_token` + `gis_token_expires_at`) on sign-in and restored on page load. Survives refreshes for the ~1-hour token lifetime. GIS `prompt: ''` attempts silent re-auth after expiry. No backend required.
 
 ---
 
@@ -228,5 +228,5 @@ All 7 slide-builder functions (`titleSlide`, `challengeSlide`, `problemDeepDive`
 ---
 
 ## Last Updated
-- Date: 2026-02-27
-- Changes: Added llmService.ts PDF robustness section (Files API routing, retry logic, new helpers/constants); updated llmService utility row to include `extractBrandVoice()`
+- Date: 2026-03-03
+- Changes: Updated `googleAuth.ts` notes to reflect localStorage token persistence

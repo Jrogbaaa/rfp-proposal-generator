@@ -1,8 +1,9 @@
 /**
  * Google OAuth 2.0 token management via Google Identity Services (GIS)
  *
- * Uses the implicit token flow — no backend required. The access token lives
- * in memory only (never localStorage) and expires after 1 hour.
+ * Uses the implicit token flow — no backend required. The access token is
+ * persisted in localStorage so it survives page refreshes until it expires
+ * (~1 hour). After expiry, GIS silently re-authenticates when possible.
  *
  * Scopes requested:
  *   - presentations: create & write Google Slides presentations
@@ -14,9 +15,20 @@ const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
 ].join(' ')
 
-// In-memory token store — wiped on page refresh (intentional, forces re-auth)
+const TOKEN_STORAGE_KEY = 'gis_access_token'
+const TOKEN_EXPIRY_KEY = 'gis_token_expires_at'
+
+// In-memory token store — pre-populated from localStorage on module load
 let cachedToken: string | null = null
 let tokenExpiresAt: number | null = null
+
+// Restore persisted token (survives page refresh until expiry)
+const _storedToken = localStorage.getItem(TOKEN_STORAGE_KEY)
+const _storedExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY)
+if (_storedToken && _storedExpiry && Date.now() < Number(_storedExpiry)) {
+  cachedToken = _storedToken
+  tokenExpiresAt = Number(_storedExpiry)
+}
 
 export interface GoogleAuthState {
   isSignedIn: boolean
@@ -60,6 +72,8 @@ export function requestGoogleToken(): Promise<string> {
         cachedToken = response.access_token
         // GIS tokens are valid for 3600 seconds; subtract 60s buffer
         tokenExpiresAt = Date.now() + (response.expires_in - 60) * 1000
+        localStorage.setItem(TOKEN_STORAGE_KEY, cachedToken)
+        localStorage.setItem(TOKEN_EXPIRY_KEY, String(tokenExpiresAt))
         resolve(response.access_token)
       },
     })
@@ -84,5 +98,7 @@ export function revokeToken(): void {
     window.google.accounts.oauth2.revoke(cachedToken, () => {})
     cachedToken = null
     tokenExpiresAt = null
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    localStorage.removeItem(TOKEN_EXPIRY_KEY)
   }
 }

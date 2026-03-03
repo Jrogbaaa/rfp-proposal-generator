@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Slide 1 title edit gating** — `src/components/SlidePreview.tsx`; removed `!isTitle` guard from the title edit condition so cover slides can have their title edited inline
 - **Design chatbot system prompt updated** — `src/utils/llmService.ts`; now aware of `executive-dark` theme and all three `designStyle` values; returns `designStyle` in JSON response when user implies a layout change
 - **`setDesignConfig` setter exposed** — `src/App.tsx`; `designConfig` state now has setter used by the style picker
+- **`googleAuth.ts` token persistence** — `src/utils/googleAuth.ts`; access token now saved to `localStorage` (`gis_access_token` + `gis_token_expires_at`) on successful sign-in and restored on module load; users stay signed in across page refreshes for the ~1-hour token lifetime without re-prompting; `revokeToken()` clears both localStorage keys on sign-out
 
 ---
 
