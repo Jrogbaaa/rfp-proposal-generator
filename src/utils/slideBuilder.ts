@@ -8,8 +8,10 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   const expanded = data.expanded
 
   const company = client?.company || '—'
-  const projectTitle = project?.title || '—'
-  const problems = content?.problems || ['', '', '', '']
+  // editedProjectTitle overrides the parsed project title when the user edits it in the Refine tab
+  const projectTitle = expanded?.editedProjectTitle ?? project?.title ?? '—'
+  // editedProblems overrides parsed problems when the user edits slide 2 in the Refine tab
+  const problems = (expanded?.editedProblems ?? content?.problems ?? ['', '', '', '']) as string[]
   const benefits = content?.benefits || ['', '', '', '']
   const problemExpansions = expanded?.problemExpansions
   const benefitExpansions = expanded?.benefitExpansions

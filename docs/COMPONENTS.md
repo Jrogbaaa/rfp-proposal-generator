@@ -14,7 +14,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 | BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
 | ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides |
-| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (10 base + any additional); supports inline title and bullet editing |
+| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (10 base + any additional); inline title editing on slides 1–4, 7–8, 11+; inline bullet editing on slides 2–4, 7–8, 11+ |
 | GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → Google Slides; accepts `preGeneratedContent`, `designConfig`, `onSuccess` |
 | ProgressStepper | `src/components/ProgressStepper.tsx` | 3-step stepper (Draft/Refine/Export); only backward navigation to completed steps |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
@@ -32,7 +32,9 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Workflow Steps:**
 1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content chat, sticky sidebar, slide preview with inline editing, export) → 3. Export (success screen with Google Slides link and mailto)
 
-**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, and `GoogleSlidesButton`. Does not scroll with the slide preview.
+**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, a **Slide Style picker** (Classic / Bold / Executive), and `GoogleSlidesButton`. Does not scroll with the slide preview.
+
+**Slide Style Picker:** Three-button toggle above the export button; updates `designConfig.designStyle` in state. Options: `standard` (classic), `bold-agency` (dramatic dark layouts), `executive-minimal` (hairline rules, all-dark).
 
 ---
 

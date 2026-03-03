@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-03] — Slide Design Overhaul & Extended Inline Editing
+
+### Added
+- **Brand Color Intelligence** — `src/utils/brandColors.ts` (new); auto-detects client brand palette from `data.client.company` at export time; ~50 major brands mapped (Nike, Starbucks, Google, Salesforce, McKinsey, etc.); derives full `SlidePalette` via HSL math; falls back to manual `colorTheme` for unknown brands
+- **Bold Agency layout style** (`designStyle: 'bold-agency'`) — `src/utils/googleSlides.ts`; problem deep-dive slides go dark with large watermark numbers ("01"/"02"); solution slide becomes a left-accent / right-primary split panel; closing slide adds corner ellipses and a 44pt CTA with client company sub-line
+- **Executive Minimal layout style** (`designStyle: 'executive-minimal'`) + **`executive-dark` palette** — all 10 slides use dark backgrounds; thick bars replaced with 4k EMU hairline rules; decorative ellipses removed; near-black primary with warm platinum accent
+- **Slide Style picker** — `src/App.tsx`; three-button toggle (Classic / Bold / Executive) above the Google Slides export button in the Refine step; updates `designConfig.designStyle` in state
+- **`DesignStyle` type** and extended `DesignConfig` — `src/types/proposal.ts`; `designStyle?: 'standard' | 'bold-agency' | 'executive-minimal'`; `disableBrandDetection?: boolean` to opt out of auto brand detection
+- **Slide 1 (Cover) title editing** — `src/components/SlidePreview.tsx`, `src/App.tsx`, `src/utils/slideBuilder.ts`, `src/utils/googleSlides.ts`; clicking the project title on slide 1 opens an inline input; saves to `expansions.editedProjectTitle`; applied to both the preview and the exported Google Slides deck
+- **Slide 2 (Challenge) bullet editing** — same files; clicking any problem bullet on slide 2 opens an inline textarea; saves to `expansions.editedProblems`; overrides parsed problems in both the preview and the exported deck
+- **`editedProjectTitle` and `editedProblems` fields on `ExpandedContent`** — `src/types/proposal.ts`; optional overrides storing user edits for slides 1 and 2
+
+### Changed
+- **`EDITABLE_SLIDES` set expanded** — `src/components/SlidePreview.tsx`; was `[3, 4, 7, 8]`; now `[1, 2, 3, 4, 7, 8]`
+- **Slide 1 title edit gating** — `src/components/SlidePreview.tsx`; removed `!isTitle` guard from the title edit condition so cover slides can have their title edited inline
+- **Design chatbot system prompt updated** — `src/utils/llmService.ts`; now aware of `executive-dark` theme and all three `designStyle` values; returns `designStyle` in JSON response when user implies a layout change
+- **`setDesignConfig` setter exposed** — `src/App.tsx`; `designConfig` state now has setter used by the style picker
+
+---
+
 ## [2026-03-03] — Refine Step UI Overhaul & Sticky Sidebar
 
 ### Added

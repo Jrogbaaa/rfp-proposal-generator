@@ -9,6 +9,7 @@
  */
 
 import type { ProposalData, DesignConfig } from '../types/proposal'
+import { getBrandPalette } from './brandColors'
 
 const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 
@@ -59,6 +60,13 @@ const PALETTE_MAP: Record<string, SlidePalette> = {
     primaryLighter: { red: 0.14,  green: 0.28,  blue: 0.21  },
     primaryDarker:  { red: 0.06,  green: 0.14,  blue: 0.10  },
     accent:         { red: 0.133, green: 0.773, blue: 0.369 },  // #22C55E
+  },
+  // Option 3: Executive Minimal — near-black with warm platinum accent
+  'executive-dark': {
+    primary:        { red: 0.055, green: 0.055, blue: 0.065 },  // #0E0E10 near-black
+    primaryLighter: { red: 0.12,  green: 0.12,  blue: 0.14  },  // dark charcoal (hairline rules)
+    primaryDarker:  { red: 0.03,  green: 0.03,  blue: 0.04  },  // deepest tone
+    accent:         { red: 0.85,  green: 0.82,  blue: 0.75  },  // warm platinum/champagne
   },
 }
 
@@ -239,6 +247,25 @@ function createEllipse(id: string, slideId: string, x: number, y: number, w: num
 }
 
 // ---------------------------------------------------------------------------
+// Layout variant options — derived from DesignConfig.designStyle
+// ---------------------------------------------------------------------------
+
+interface SlideOpts {
+  boldAgency: boolean  // Option 2: dramatic dark slides, split panel, corner shapes
+  minimal: boolean     // Option 3: hairline rules, all-dark, premium consulting feel
+}
+
+// Decorative large background number ("01", "02") — purely visual, low-contrast watermark
+function decorativeNumber(id: string, slideId: string, num: string, color: RgbColor): object[] {
+  return [
+    createTextBox(id, slideId, W - 2800000, H - 1800000, 2600000, 1800000),
+    insertText(id, num),
+    styleText(id, { color, fontSize: 160, fontFamily: 'Montserrat', bold: true }),
+    paragraphAlign(id, 'END'),
+  ]
+}
+
+// ---------------------------------------------------------------------------
 // Slide builders — each returns an array of batchUpdate requests
 // ---------------------------------------------------------------------------
 
@@ -319,10 +346,10 @@ function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette):
     insertText(heroId, `${data.client.company} \u00d7 Paramount`),
     styleText(heroId, { color: WHITE, fontSize: 52, fontFamily: 'Montserrat', bold: true }),
 
-    // Project title (supporting, smaller)
+    // Project title (supporting, smaller) — user edits in Refine tab take priority
     createTextBox(titleId, slideId, MARGIN_X, 2400000, CONTENT_W, 500000),
-    ...(data.project.title ? [
-      insertText(titleId, data.project.title),
+    ...((data.expanded?.editedProjectTitle ?? data.project.title) ? [
+      insertText(titleId, data.expanded?.editedProjectTitle ?? data.project.title),
       styleText(titleId, { color: GRAY, fontSize: 22, fontFamily: 'Inter' }),
     ] : []),
 
@@ -337,28 +364,41 @@ function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette):
 }
 
 /** Slide 2: The Challenge — bullet list of problems */
-function challengeSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
+function challengeSlide(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
   const headId   = `${slideId}_head`
   const bodyId   = `${slideId}_body`
   const barId    = `${slideId}_bar`
   const accentId = `${slideId}_accent`
-  const problems = data.content.problems.filter(p => p.trim())
+  const problems = (data.expanded?.editedProblems ?? data.content.problems).filter(p => p.trim())
 
-  return [
-    bgFill(slideId, WHITE),
-    ...createRect(barId,    slideId, 0, H - 50000, W, 50000, palette.accent),
-    // Thin left accent bar echoing the problem deep-dive slides
-    ...createRect(accentId, slideId, 0, 0, 12000, H, palette.accent),
+  const isDark = opts.boldAgency || opts.minimal
+  const textColor = isDark ? WHITE : palette.primary
+  const accentW   = opts.minimal ? 6000 : 12000
 
+  const reqs: object[] = [
+    bgFill(slideId, isDark ? palette.primary : WHITE),
+    ...createRect(accentId, slideId, 0, 0, accentW, H, palette.accent),
+  ]
+
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000,
+      isDark ? palette.primaryDarker : palette.accent))
+  }
+
+  reqs.push(
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 600000),
     insertText(headId, 'The Challenge'),
-    styleText(headId, { color: palette.primary, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    styleText(headId, { color: textColor, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
 
-    // Shifted right to clear the left accent bar, with extra top spacing
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1100000, FULL_W - 80000, 3500000),
     ...(problems.length ? [
       insertText(bodyId, problems.join('\n')),
-      styleText(bodyId, { color: palette.primary, fontSize: 20, fontFamily: 'Inter' }),
+      styleText(bodyId, { color: isDark ? LTGRAY : palette.primary, fontSize: 20, fontFamily: 'Inter' }),
       {
         createParagraphBullets: {
           objectId: bodyId,
@@ -367,55 +407,78 @@ function challengeSlide(slideId: string, data: ProposalData, palette: SlidePalet
         },
       },
     ] : []),
-  ]
+  )
+
+  return reqs
 }
 
-/** Slide 3 / 4: Problem deep dive — headline + expanded copy */
+/** Slide 3 / 4 / 7 / 8: Problem or benefit deep dive — headline + expanded copy */
 function problemDeepDive(
   slideId: string,
   label: string,
   headline: string,
   body: string,
   palette: SlidePalette,
-  accent = true
+  accent = true,
+  opts: SlideOpts = { boldAgency: false, minimal: false },
+  slideIndex = 0,
 ): object[] {
-  const labelId = `${slideId}_label`
-  const headId  = `${slideId}_head`
-  const bodyId  = `${slideId}_body`
-  const barId   = `${slideId}_bar`
+  const labelId  = `${slideId}_label`
+  const headId   = `${slideId}_head`
+  const bodyId   = `${slideId}_body`
+  const barId    = `${slideId}_bar`
   const accentId = `${slideId}_accent`
 
+  // Bold-agency makes problem slides dark; benefit slides keep standard treatment
+  const isDark = (opts.boldAgency && accent) || opts.minimal
+  const headColor = isDark ? WHITE : palette.primary
+  const bodyColor = isDark ? LTGRAY : { red: 0.25, green: 0.28, blue: 0.38 }
   const xOff = accent ? 80000 : 0
+
   const reqs: object[] = [
-    bgFill(slideId, WHITE),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary),
+    bgFill(slideId, isDark ? palette.primary : WHITE),
   ]
 
-  if (accent) {
-    reqs.push(...createRect(accentId, slideId, 0, 0, 20000, H, palette.accent))
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+    if (accent) {
+      reqs.push(...createRect(accentId, slideId, 0, 0, 6000, H, palette.accent))
+    }
   } else {
-    // Hairline accent top bar on benefit slides
-    reqs.push(...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 8000, palette.accent))
+    reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000,
+      isDark ? palette.primaryDarker : palette.primary))
+    if (accent) {
+      reqs.push(...createRect(accentId, slideId, 0, 0, 20000, H, palette.accent))
+    } else {
+      reqs.push(...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 8000, palette.accent))
+    }
+  }
+
+  // Bold-agency: low-contrast watermark number behind problem slide content
+  if (opts.boldAgency && accent) {
+    const nums = ['01', '02', '03', '04']
+    reqs.push(...decorativeNumber(`${slideId}_wm`, slideId, nums[slideIndex] ?? '01', palette.primaryLighter))
   }
 
   reqs.push(
     createTextBox(labelId, slideId, MARGIN_X + xOff, 300000, FULL_W, 180000),
     ...(label ? [insertText(labelId, label), styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true })] : []),
 
-    // Taller headline box so multi-line headlines don't crowd the body
     createTextBox(headId, slideId, MARGIN_X + xOff, 520000, FULL_W - xOff, 1100000),
-    ...(headline ? [insertText(headId, headline), styleText(headId, { color: palette.primary, fontSize: 24, fontFamily: 'Montserrat', bold: true })] : []),
+    ...(headline ? [insertText(headId, headline), styleText(headId, { color: headColor, fontSize: 24, fontFamily: 'Montserrat', bold: true })] : []),
 
-    // Body pushed down to give headline breathing room
     createTextBox(bodyId, slideId, MARGIN_X + xOff, 1750000, FULL_W - xOff, 3000000),
-    ...(body ? [insertText(bodyId, body), styleText(bodyId, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 16, fontFamily: 'Inter' })] : []),
+    ...(body ? [insertText(bodyId, body), styleText(bodyId, { color: bodyColor, fontSize: 16, fontFamily: 'Inter' })] : []),
   )
 
   return reqs
 }
 
 /** Slide 5: Problems 3 & 4 combined */
-function problemsCombined(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
+function problemsCombined(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
   const head1Id = `${slideId}_h1`
   const body1Id = `${slideId}_b1`
   const head2Id = `${slideId}_h2`
@@ -429,40 +492,107 @@ function problemsCombined(slideId: string, data: ProposalData, palette: SlidePal
   const e4 = data.expanded.problemExpansions[3] || ''
 
   const colW = W / 2 - MARGIN_X - 80000
+  const isDark = opts.boldAgency || opts.minimal
+  const headColor = isDark ? WHITE : palette.primary
+  const bodyColor = isDark ? LTGRAY : { red: 0.25, green: 0.28, blue: 0.38 }
+  const divColor  = isDark ? palette.primaryLighter : { red: 0.9, green: 0.91, blue: 0.93 }
 
-  return [
-    bgFill(slideId, WHITE),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary),
-    ...createRect(divId, slideId, W / 2 - 15000, MARGIN_TOP, 30000, H - MARGIN_TOP - 50000, { red: 0.9, green: 0.91, blue: 0.93 }),
+  const reqs: object[] = [
+    bgFill(slideId, isDark ? palette.primary : WHITE),
+    ...createRect(divId, slideId, W / 2 - 15000, MARGIN_TOP, 30000, H - MARGIN_TOP - 50000, divColor),
+  ]
 
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000,
+      isDark ? palette.primaryDarker : palette.primary))
+  }
+
+  reqs.push(
     createTextBox(head1Id, slideId, MARGIN_X, MARGIN_TOP, colW, 700000),
-    ...(p3 ? [insertText(head1Id, p3), styleText(head1Id, { color: palette.primary, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
+    ...(p3 ? [insertText(head1Id, p3), styleText(head1Id, { color: headColor, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
     createTextBox(body1Id, slideId, MARGIN_X, 1300000, colW, 3300000),
-    ...(e3 ? [insertText(body1Id, e3), styleText(body1Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' })] : []),
+    ...(e3 ? [insertText(body1Id, e3), styleText(body1Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
 
     createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP, colW, 700000),
-    ...(p4 ? [insertText(head2Id, p4), styleText(head2Id, { color: palette.primary, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
+    ...(p4 ? [insertText(head2Id, p4), styleText(head2Id, { color: headColor, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
     createTextBox(body2Id, slideId, W / 2 + 80000, 1300000, colW, 3300000),
-    ...(e4 ? [insertText(body2Id, e4), styleText(body2Id, { color: { red: 0.25, green: 0.28, blue: 0.38 }, fontSize: 14, fontFamily: 'Inter' })] : []),
-  ]
+    ...(e4 ? [insertText(body2Id, e4), styleText(body2Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
+  )
+
+  return reqs
 }
 
 /** Slide 6: The Solution — bullet list of benefits */
-function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
+function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
   const headId    = `${slideId}_head`
   const bodyId    = `${slideId}_body`
   const barId     = `${slideId}_bar`
   const ellipseId = `${slideId}_ellipse`
-  const benefits = data.content.benefits.filter(b => b.trim())
+  const benefits  = data.content.benefits.filter(b => b.trim())
 
-  return [
+  // Bold-agency: split panel — left 40% accent color, right 60% primary
+  if (opts.boldAgency) {
+    const splitX       = Math.round(W * 0.4)  // 3,657,600 EMU
+    const leftLblId    = `${slideId}_lbl`
+    const leftPanelId  = `${slideId}_lpanel`
+    const rightPanelId = `${slideId}_rpanel`
+    const divId        = `${slideId}_div`
+
+    return [
+      ...createRect(leftPanelId,  slideId, 0,      0, splitX,     H, palette.accent),
+      ...createRect(rightPanelId, slideId, splitX, 0, W - splitX, H, palette.primary),
+      ...createRect(divId,        slideId, splitX, 0, 12000,       H, palette.primaryLighter),
+
+      // "THE SOLUTION" label in left panel
+      createTextBox(leftLblId, slideId, MARGIN_X, MARGIN_TOP, splitX - MARGIN_X * 2, 200000),
+      insertText(leftLblId, 'THE SOLUTION'),
+      styleText(leftLblId, { color: WHITE, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+      // Large headline in left panel
+      createTextBox(headId, slideId, MARGIN_X, 900000, splitX - MARGIN_X * 2, 2200000),
+      insertText(headId, 'The Solution'),
+      styleText(headId, { color: WHITE, fontSize: 44, fontFamily: 'Montserrat', bold: true }),
+
+      // Benefits list in right panel
+      createTextBox(bodyId, slideId, splitX + MARGIN_X, MARGIN_TOP, W - splitX - MARGIN_X * 2, 4500000),
+      ...(benefits.length ? [
+        insertText(bodyId, benefits.join('\n')),
+        styleText(bodyId, { color: WHITE, fontSize: 20, fontFamily: 'Inter' }),
+        {
+          createParagraphBullets: {
+            objectId: bodyId,
+            textRange: { type: 'ALL' },
+            bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+          },
+        },
+      ] : []),
+    ]
+  }
+
+  const reqs: object[] = [
     bgFill(slideId, palette.primary),
-    // Decorative ellipse bleeds off top-right corner for visual depth
-    ...createEllipse(ellipseId, slideId, W - 1800000, -300000, 2400000, 2400000, palette.primaryLighter),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.accent),
+  ]
 
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(
+      ...createEllipse(ellipseId, slideId, W - 1800000, -300000, 2400000, 2400000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.accent),
+    )
+  }
+
+  reqs.push(
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'The Solution'),
     styleText(headId, { color: palette.accent, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
@@ -479,26 +609,47 @@ function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalett
         },
       },
     ] : []),
-  ]
+  )
+
+  return reqs
 }
 
 /** Slide 9: Investment & Timeline */
-function investmentSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
-  const headId   = `${slideId}_head`
-  const totalId  = `${slideId}_total`
-  const timeId   = `${slideId}_time`
-  const m1Id     = `${slideId}_m1`
-  const m2Id     = `${slideId}_m2`
-  const m3Id     = `${slideId}_m3`
-  const barId    = `${slideId}_bar`
+function investmentSlide(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
+  const headId  = `${slideId}_head`
+  const totalId = `${slideId}_total`
+  const timeId  = `${slideId}_time`
+  const m1Id    = `${slideId}_m1`
+  const m2Id    = `${slideId}_m2`
+  const m3Id    = `${slideId}_m3`
+  const barId   = `${slideId}_bar`
 
-  return [
-    bgFill(slideId, LTGRAY),
-    ...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary),
+  // Minimal goes full dark; bold-agency keeps light LTGRAY background for visual relief
+  const isDark     = opts.minimal
+  const headColor  = isDark ? WHITE : palette.primary
+  const valueColor = isDark ? LTGRAY : palette.primary
 
+  const reqs: object[] = [
+    bgFill(slideId, isDark ? palette.primary : LTGRAY),
+  ]
+
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000, palette.primary))
+    if (opts.boldAgency) {
+      // Accent top strip for visual continuity with the dark slides around it
+      reqs.push(...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 60000, palette.accent))
+    }
+  }
+
+  reqs.push(
     createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 500000),
     insertText(headId, 'Investment & Timeline'),
-    styleText(headId, { color: palette.primary, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    styleText(headId, { color: headColor, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
 
     createTextBox(totalId, slideId, MARGIN_X, 1050000, FULL_W / 2, 400000),
     insertText(totalId, `Total Investment: ${data.project.totalValue}`),
@@ -506,50 +657,84 @@ function investmentSlide(slideId: string, data: ProposalData, palette: SlidePale
 
     createTextBox(timeId, slideId, MARGIN_X, 1550000, FULL_W / 2, 300000),
     insertText(timeId, `Timeline: ${data.project.duration}`),
-    styleText(timeId, { color: palette.primary, fontSize: 18, fontFamily: 'Inter' }),
+    styleText(timeId, { color: valueColor, fontSize: 18, fontFamily: 'Inter' }),
 
     createTextBox(m1Id, slideId, MARGIN_X, 2100000, FULL_W, 300000),
     insertText(m1Id, `Month 1: ${data.project.monthOneInvestment}`),
-    styleText(m1Id, { color: palette.primary, fontSize: 16, fontFamily: 'Inter' }),
+    styleText(m1Id, { color: valueColor, fontSize: 16, fontFamily: 'Inter' }),
 
     createTextBox(m2Id, slideId, MARGIN_X, 2500000, FULL_W, 300000),
     insertText(m2Id, `Month 2: ${data.project.monthTwoInvestment}`),
-    styleText(m2Id, { color: palette.primary, fontSize: 16, fontFamily: 'Inter' }),
+    styleText(m2Id, { color: valueColor, fontSize: 16, fontFamily: 'Inter' }),
 
     createTextBox(m3Id, slideId, MARGIN_X, 2900000, FULL_W, 300000),
     insertText(m3Id, `Month 3: ${data.project.monthThreeInvestment}`),
-    styleText(m3Id, { color: palette.primary, fontSize: 16, fontFamily: 'Inter' }),
-  ]
+    styleText(m3Id, { color: valueColor, fontSize: 16, fontFamily: 'Inter' }),
+  )
+
+  return reqs
 }
 
 /** Slide 10: Close / CTA */
-function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette): object[] {
+function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette, opts: SlideOpts): object[] {
   const headId   = `${slideId}_head`
   const footerId = `${slideId}_footer`
   const barId    = `${slideId}_bar`
   const rule1Id  = `${slideId}_rule1`
   const rule2Id  = `${slideId}_rule2`
 
-  return [
+  const reqs: object[] = [
     bgFill(slideId, palette.primary),
-    ...createRect(barId, slideId, 0, H - 80000, W, 80000, palette.primaryDarker),
+  ]
 
-    // Thin accent rules bracket the CTA text (logo sits above them, inserted in Phase 3)
+  if (opts.boldAgency) {
+    // Corner ellipses bleed off the edges for visual drama
+    reqs.push(
+      ...createEllipse(`${slideId}_el1`, slideId, -800000,      -800000,      2400000, 2400000, palette.primaryLighter),
+      ...createEllipse(`${slideId}_el2`, slideId, W - 1600000,  H - 1600000,  2400000, 2400000, palette.primaryLighter),
+    )
+  }
+
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(...createRect(barId, slideId, 0, H - 80000, W, 80000, palette.primaryDarker))
+  }
+
+  reqs.push(
+    // Thin accent rules bracket the CTA (logo inserted in Phase 3 sits above them)
     ...createRect(rule1Id, slideId, MARGIN_X, 1280000, FULL_W, 6000, palette.accent),
     ...createRect(rule2Id, slideId, MARGIN_X, 2300000, FULL_W, 6000, palette.accent),
 
     createTextBox(headId, slideId, MARGIN_X, 1400000, FULL_W, 800000),
     insertText(headId, `Let's build this together, ${data.client.firstName}.`),
-    styleText(headId, { color: palette.accent, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
+    styleText(headId, { color: palette.accent, fontSize: opts.boldAgency ? 44 : 40, fontFamily: 'Montserrat', bold: true }),
     paragraphAlign(headId, 'CENTER'),
+  )
 
+  // Bold-agency: client company name as accent sub-line below the CTA rules
+  if (opts.boldAgency && data.client.company) {
+    reqs.push(
+      createTextBox(`${slideId}_company`, slideId, MARGIN_X, 2420000, FULL_W, 350000),
+      insertText(`${slideId}_company`, data.client.company.toUpperCase()),
+      styleText(`${slideId}_company`, { color: palette.accent, fontSize: 18, fontFamily: 'Inter', bold: true }),
+      paragraphAlign(`${slideId}_company`, 'CENTER'),
+    )
+  }
+
+  reqs.push(
     createTextBox(footerId, slideId, MARGIN_X, H - 200000, FULL_W, 150000),
     ...(data.generated.slideFooter ? [
       insertText(footerId, data.generated.slideFooter),
       styleText(footerId, { color: GRAY, fontSize: 11, fontFamily: 'Inter' }),
       paragraphAlign(footerId, 'CENTER'),
     ] : []),
-  ]
+  )
+
+  return reqs
 }
 
 // ---------------------------------------------------------------------------
@@ -621,7 +806,20 @@ export async function createGoogleSlidesPresentation(
   accessToken: string,
   designConfig?: DesignConfig
 ): Promise<CreateSlidesResult> {
-  const palette = PALETTE_MAP[designConfig?.colorTheme ?? 'navy-gold'] ?? PALETTE_MAP['navy-gold']
+  // Option 1: Brand Color Intelligence — auto-detect palette from company name
+  const brandPalette = !designConfig?.disableBrandDetection
+    ? getBrandPalette(data.client.company)
+    : null
+  const palette = brandPalette
+    ?? PALETTE_MAP[designConfig?.colorTheme ?? 'navy-gold']
+    ?? PALETTE_MAP['navy-gold']
+
+  // Option 2 / 3: Layout variant
+  const designStyle = designConfig?.designStyle ?? 'standard'
+  const opts: SlideOpts = {
+    boldAgency: designStyle === 'bold-agency',
+    minimal:    designStyle === 'executive-minimal',
+  }
 
   const headers = {
     'Content-Type': 'application/json',
@@ -672,15 +870,15 @@ export async function createGoogleSlidesPresentation(
 
   const populationRequests: object[] = [
     ...titleSlide(slideIds[0], p, palette),
-    ...challengeSlide(slideIds[1], p, palette),
-    ...problemDeepDive(slideIds[2], 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || '', palette),
-    ...problemDeepDive(slideIds[3], 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || '', palette),
-    ...problemsCombined(slideIds[4], p, palette),
-    ...solutionSlide(slideIds[5], p, palette),
-    ...problemDeepDive(slideIds[6], 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', palette, false),
-    ...problemDeepDive(slideIds[7], 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', palette, false),
-    ...investmentSlide(slideIds[8], p, palette),
-    ...closingSlide(slideIds[9], p, palette),
+    ...challengeSlide(slideIds[1], p, palette, opts),
+    ...problemDeepDive(slideIds[2], 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || '', palette, true, opts, 0),
+    ...problemDeepDive(slideIds[3], 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || '', palette, true, opts, 1),
+    ...problemsCombined(slideIds[4], p, palette, opts),
+    ...solutionSlide(slideIds[5], p, palette, opts),
+    ...problemDeepDive(slideIds[6], 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', palette, false, opts, 0),
+    ...problemDeepDive(slideIds[7], 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', palette, false, opts, 1),
+    ...investmentSlide(slideIds[8], p, palette, opts),
+    ...closingSlide(slideIds[9], p, palette, opts),
   ]
 
   const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
