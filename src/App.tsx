@@ -14,7 +14,6 @@ import DevTools from './components/DevTools'
 import type { Step, ExpandedContent, DesignConfig, BrandVoiceProfile } from './types/proposal'
 import { DEFAULT_DESIGN_CONFIG } from './types/proposal'
 import { generateProposalContent } from './utils/llmService'
-import { derivePaletteFromHex } from './utils/brandColors'
 import { getAuthState } from './utils/googleAuth'
 
 type InputMode = 'pdf' | 'paste'
@@ -479,7 +478,7 @@ export default function App() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400">Refine Content</p>
                     </div>
 
-                    <div className="flex-1 min-h-0 bg-cream-50 rounded-xl p-4 overflow-hidden">
+                    <div className="flex-1 min-h-0 bg-cream-50 rounded-xl p-4 overflow-y-auto">
                       <ChatInterface
                         briefText={briefText}
                         parsedData={parsedData || {}}
@@ -490,60 +489,7 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
-                      {/* Custom brand color picker */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-navy-400">Brand Color</p>
-                          {designConfig.customBrandHex && (
-                            <button
-                              onClick={() => setDesignConfig(c => ({ ...c, customBrandHex: undefined }))}
-                              className="text-[10px] text-navy-500 hover:text-red-400 transition-colors"
-                            >
-                              Reset to auto
-                            </button>
-                          )}
-                        </div>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="color"
-                            value={designConfig.customBrandHex ?? '#0D1F40'}
-                            onChange={e => setDesignConfig(c => ({ ...c, customBrandHex: e.target.value }))}
-                            className="sr-only"
-                          />
-                          <div
-                            style={{ backgroundColor: designConfig.customBrandHex ?? 'transparent' }}
-                            className={`w-7 h-7 rounded-md flex-shrink-0 border-2 transition-all flex items-center justify-center ${
-                              designConfig.customBrandHex ? 'border-gold-400' : 'border-dashed border-white/20'
-                            }`}
-                          >
-                            {!designConfig.customBrandHex && (
-                              <svg className="w-3.5 h-3.5 text-navy-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
-                              </svg>
-                            )}
-                          </div>
-                          <span className="text-[11px] font-mono text-navy-300">
-                            {designConfig.customBrandHex ?? 'Auto-detected from company'}
-                          </span>
-                        </label>
-                        {/* Derived palette preview */}
-                        {designConfig.customBrandHex && (() => {
-                          const p = derivePaletteFromHex(designConfig.customBrandHex)
-                          return (
-                            <div className="flex gap-1 mt-1.5 rounded overflow-hidden">
-                              {([p.primaryDarker, p.primary, p.primaryLighter, p.accent] as const).map((c, i) => (
-                                <div
-                                  key={i}
-                                  style={{ backgroundColor: `rgb(${Math.round(c.red*255)},${Math.round(c.green*255)},${Math.round(c.blue*255)})` }}
-                                  className="h-2.5 flex-1"
-                                  title={i === 3 ? 'Accent' : 'Background tone'}
-                                />
-                              ))}
-                            </div>
-                          )
-                        })()}
-                      </div>
+                    <div className="mt-4 pt-4 border-t border-white/10">
                       <GoogleSlidesButton
                         data={parsedData}
                         briefText={briefText}
