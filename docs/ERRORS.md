@@ -15,6 +15,18 @@ When you encounter an error:
 
 ## Google Slides / OAuth Errors
 
+### `Unknown name "autoFitType"` / `Unknown name "auto_fit_type"` — wrong autofit field name
+**Error:** `Invalid JSON payload received. Unknown name "autoFitType" at 'requests[N].update_shape_properties.shape_properties.autofit': Cannot find field.`
+
+**Cause:** The Google Slides REST API serializes proto field `autofit_type` as `autofitType` (camelCase, lowercase `f`). Using `autoFitType` (capital F) or `auto_fit_type` (snake_case) both fail.
+
+**Solution:** Use `autofitType` (all lowercase except T):
+```ts
+autofit: { autofitType: 'TEXT_AUTOFIT' }
+```
+
+---
+
 ### `redirect_uri_mismatch` — wrong port
 **Error:** `Error 400: redirect_uri_mismatch` when OAuth popup attempts to authenticate.
 

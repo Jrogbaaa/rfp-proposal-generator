@@ -166,7 +166,7 @@ function autoFitRequest(objectId: string) {
       objectId,
       fields: 'autofit',
       shapeProperties: {
-        autofit: { auto_fit_type: 'TEXT_AUTOFIT' },
+        autofit: { autofitType: 'TEXT_AUTOFIT' },
       },
     },
   }
