@@ -28,6 +28,12 @@ After EVERY code change, the Documenter must:
    - Encountered a new error? Document the solution
    - Found a better fix? Update existing entry
 
+5. **Commit and push all changes to GitHub**
+   - Stage all modified source + doc files: `git add <files>`
+   - Commit with a descriptive message summarising the session changes
+   - Push to `origin main`: `git push origin main`
+   - This is mandatory — documentation that isn't pushed is useless
+
 ### Documenter Trigger Points
 
 Run Documenter review after:

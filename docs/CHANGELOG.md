@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-04] — Documenter Directive Update
+
+### Changed
+- **Documenter workflow now includes push step** — `CLAUDE.md`; step 5 added to Documenter Workflow requiring `git push origin main` after every commit; documentation that isn't pushed is treated as incomplete
+
+---
+
 ## [2026-03-04] — Refine Tab UX + Paramount Media Sales Deck + Build Fixes
 
 ### Changed
