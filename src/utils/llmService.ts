@@ -1,4 +1,4 @@
-import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile } from '../types/proposal';
+import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier } from '../types/proposal';
 import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -347,42 +347,96 @@ interface LLMResponse {
   benefitExpansions: [string, string, string, string];
   approachSteps: string[];
   nextSteps: string[];
+  paramountMedia: ParamountMediaContent;
 }
 
-const SYSTEM_PROMPT = `You are a senior proposal writer at a consulting/agency. Generate persuasive, specific, revenue-focused content based on the client brief.
+const SYSTEM_PROMPT = `You are a senior Paramount Advertising Solutions sales executive writing a custom media partnership proposal. Generate a full Paramount-style media sales deck based on the client brief.
 
 You MUST output valid JSON with this exact structure:
 {
   "problemExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
   "benefitExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
-  "approachSteps": ["step1", "step2", "step3", "step4"],
-  "nextSteps": ["action1", "action2", "action3", "action4", "action5"]
+  "approachSteps": ["step1", "step2", "step3"],
+  "nextSteps": ["action1", "action2", "action3", "action4"],
+  "paramountMedia": {
+    "opportunityStatement": "2-3 sentence 'why now' hook leading with what makes this partnership a first-ever or exclusive cultural moment",
+    "paramountIPAlignments": [
+      {
+        "propertyName": "Big Brother S28",
+        "description": "1-2 sentences on why this specific property fits the brand's target audience and brief goals",
+        "audienceStat": "Specific viewership/demographic stat e.g. 6.8M avg viewers, 61% female, 54% Gen Z",
+        "network": "CBS or Paramount+ or MTV etc."
+      }
+    ],
+    "audienceInsights": ["stat bullet 1", "stat bullet 2", "stat bullet 3", "stat bullet 4"],
+    "integrationConcepts": [
+      {
+        "conceptTitle": "Specific concept name e.g. Big Brother Breakfast Rewards Mechanic",
+        "property": "Named Paramount property",
+        "mechanic": "2-3 sentences describing the exact integration mechanic — what happens on screen, in-app, or in-store",
+        "outcome": "Measurable outcome: visits, installs, impressions, or conversion lift"
+      }
+    ],
+    "talentOpportunities": ["Named talent + mechanic e.g. Meg Stalter custom brand sketches during VMAs pre-show", "..."],
+    "programmingCalendar": [
+      {
+        "tentpole": "68th GRAMMY Awards",
+        "date": "February 2, 2026",
+        "reach": "20M+ viewers",
+        "opportunity": "One sentence on what the brand could own at this moment"
+      }
+    ],
+    "measurementFramework": ["iSpot deterministic sales lift measurement", "EDO search lift + conversion correlation", "Comscore cross-platform deduplicated reach", "Paramount first-party data targeting — 130M+ authenticated users"],
+    "investmentTiers": [
+      {
+        "tierName": "Core",
+        "budget": "$X–$YM",
+        "inclusions": ["inclusion 1", "inclusion 2", "inclusion 3"]
+      }
+    ],
+    "nextSteps": ["action 1", "action 2", "action 3", "action 4"],
+    "appendixItems": ["supporting data point or case study 1", "supporting data point 2", "supporting data point 3"]
+  }
 }
 
-PROBLEM EXPANSIONS (4 items):
-- 2-3 sentences each
-- Open with a specific business consequence: a cost, a risk, a missed opportunity, or a bottleneck
-- Name the consequence directly — don't hedge ("this could lead to..." → never; "this costs you..." → yes)
-- Reference specific details from the brief — no generic filler
-- Use direct "you" language
+PROBLEM EXPANSIONS (4 items — kept for content review UI):
+- 2-3 sentences each describing why this brand needs a Paramount partnership right now
+- These are "why now" business arguments, not generic problems
+- Reference specific audience gaps, competitive threats, or cultural moments the brand is missing
+- Use direct "you" language, name specific Paramount properties
 
-BENEFIT EXPANSIONS (4 items):
-- 2-3 sentences each
-- Lead with the concrete outcome the client will see (include a measurable estimate where possible: %, time saved, cost avoided)
-- Connect the outcome back to their specific context from the brief
-- Use direct "you" language
+BENEFIT EXPANSIONS (4 items — kept for content review UI):
+- 2-3 sentences each on what the brand gains from this Paramount partnership
+- Lead with a concrete outcome (reach, cultural credibility, Gen Z audience access, measurable lift)
+- Name specific Paramount properties/shows as the delivery vehicle
 
-APPROACH STEPS (3-4 items — how Paramount will deliver the solution):
-- Each step is 1-2 sentences: a clear phase name + what happens in it
-- Should feel like a logical, professional delivery methodology
-- Examples: "Discovery & Audit", "Strategy & Roadmap", "Build & Launch", "Optimise & Scale"
-- Make them specific to the type of project in the brief, not generic
+APPROACH STEPS (3 items — activation phases):
+- "Phase 1: Creative Development" — custom content production with Paramount Studios
+- "Phase 2: Launch & Activation" — tentpole launch with cross-platform amplification
+- "Phase 3: Measure & Optimize" — iSpot/EDO reporting, real-time campaign optimization
+- Adapt to the specific brief
 
-NEXT STEPS (4-5 items — post-agreement actions):
-- Short, action-oriented lines (15-25 words max each)
-- These are the concrete actions that happen once the client signs
-- Mix of client actions and Paramount actions (e.g. "Kick-off call within 48 hours", "Sign agreement and return")
-- Should feel energising and low-friction — make it easy to say yes
+PARAMOUNT MEDIA SALES CONTENT — these fields drive the 13-slide deck:
+
+opportunityStatement: Lead with scarcity ("first-ever"), exclusivity, or cultural timing. 2-3 sentences max. Reference the specific brand and a named Paramount property.
+
+paramountIPAlignments: EXACTLY 4 items. Select the 4 most relevant Paramount properties for this brand from the asset inventory provided. Match based on: audience demographic alignment, brand category fit (QSR→Big Brother/VMAs, sports→NFL/GRAMMYs, tech→F1/creators, fashion→VMAs/BET). Always name specific season numbers and years.
+
+audienceInsights: EXACTLY 4 bullet points with specific stats. Reference actual Paramount audience figures. Include: total monthly reach, Gen Z percentage, a specific property stat, and a brand-safety/measurement stat.
+
+integrationConcepts: EXACTLY 2 items. Each should be a specific, executable activation — not vague "sponsorship." Describe the exact mechanic (branded voting, AR look, shoppable QR, rewards unlock, talent sketch). Name the show/event and what happens on-screen.
+
+talentOpportunities: 3-4 items. Name specific real Paramount talent from the roster. Describe the exact mechanic (sketch, call-out, social post, in-person appearance). Write as if the talent is confirmed.
+
+programmingCalendar: EXACTLY 5 items. Select the 5 most relevant upcoming tentpoles for this brand. Include real dates from the 2026 programming calendar. Describe what the brand could own (first-ever presenting sponsor, category exclusive, branded segment, etc.).
+
+measurementFramework: EXACTLY 4 bullets. Always include iSpot, EDO, and Comscore. Add one brand-specific KPI (app installs for QSR, switcher conversion for telecom, in-store visits for retail, etc.).
+
+investmentTiers: EXACTLY 3 tiers named "Core," "Enhanced," and "Signature." Scale inclusions by tier — Core is single property, Enhanced adds a second tentpole, Signature adds talent and measurement suite. Derive budget ranges from the brief if given, otherwise use: Core $3M–$6M, Enhanced $7M–$12M, Signature $13M–$20M.
+
+nextSteps: EXACTLY 4 action items. Mix of client and Paramount actions. Start with the easiest action ("Confirm partnership letter of intent within 5 business days"). Feel low-friction and energizing.
+
+appendixItems: 3 items. Include one case study referencing a comparable Paramount partner (Dunkin', Under Armour, or Army depending on brief type), one Paramount audience data point, and one measurement case study.
 
 IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
@@ -474,15 +528,47 @@ Generate personalized expansions for each problem and benefit that reference spe
     throw new Error('Invalid benefitExpansions in LLM response');
   }
 
-  // approachSteps and nextSteps are new — pad gracefully if LLM returns fewer than expected
   const approachSteps: string[] = Array.isArray(parsed.approachSteps) ? parsed.approachSteps : [];
   const nextSteps: string[] = Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [];
+
+  // Parse and validate paramountMedia (Dunkin-style deck content)
+  let paramountMedia: ParamountMediaContent | undefined;
+  if (parsed.paramountMedia && typeof parsed.paramountMedia === 'object') {
+    const pm = parsed.paramountMedia as unknown as Record<string, unknown>;
+    paramountMedia = {
+      opportunityStatement: (pm.opportunityStatement as string) || '',
+      paramountIPAlignments: Array.isArray(pm.paramountIPAlignments)
+        ? (pm.paramountIPAlignments as IPAlignment[])
+        : [],
+      audienceInsights: Array.isArray(pm.audienceInsights)
+        ? (pm.audienceInsights as string[])
+        : [],
+      integrationConcepts: Array.isArray(pm.integrationConcepts)
+        ? (pm.integrationConcepts as IntegrationConcept[])
+        : [],
+      talentOpportunities: Array.isArray(pm.talentOpportunities)
+        ? (pm.talentOpportunities as string[])
+        : [],
+      programmingCalendar: Array.isArray(pm.programmingCalendar)
+        ? (pm.programmingCalendar as CalendarItem[])
+        : [],
+      measurementFramework: Array.isArray(pm.measurementFramework)
+        ? (pm.measurementFramework as string[])
+        : [],
+      investmentTiers: Array.isArray(pm.investmentTiers)
+        ? (pm.investmentTiers as InvestmentTier[])
+        : [],
+      nextSteps: Array.isArray(pm.nextSteps) ? (pm.nextSteps as string[]) : [],
+      appendixItems: Array.isArray(pm.appendixItems) ? (pm.appendixItems as string[]) : [],
+    };
+  }
 
   return {
     problemExpansions: parsed.problemExpansions as [string, string, string, string],
     benefitExpansions: parsed.benefitExpansions as [string, string, string, string],
     approachSteps,
     nextSteps,
+    paramountMedia,
   };
 }
 

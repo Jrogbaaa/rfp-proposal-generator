@@ -8,7 +8,7 @@
  * No Vite proxy needed — Google Slides API supports CORS with OAuth Bearer tokens.
  */
 
-import type { ProposalData, DesignConfig } from '../types/proposal'
+import type { ProposalData, DesignConfig, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier } from '../types/proposal'
 import { getBrandPalette, derivePaletteFromHex } from './brandColors'
 
 const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
@@ -67,6 +67,13 @@ const PALETTE_MAP: Record<string, SlidePalette> = {
     primaryLighter: { red: 0.12,  green: 0.12,  blue: 0.14  },  // dark charcoal (hairline rules)
     primaryDarker:  { red: 0.03,  green: 0.03,  blue: 0.04  },  // deepest tone
     accent:         { red: 0.85,  green: 0.82,  blue: 0.75  },  // warm platinum/champagne
+  },
+  // Paramount brand theme — official Paramount Advertising blue + gold
+  'paramount': {
+    primary:        { red: 0.0,   green: 0.188, blue: 0.529 },  // #003087 Paramount deep blue
+    primaryLighter: { red: 0.0,   green: 0.314, blue: 0.702 },  // #0050B3
+    primaryDarker:  { red: 0.0,   green: 0.122, blue: 0.357 },  // #001F5B
+    accent:         { red: 0.961, green: 0.773, blue: 0.094 },  // #F5C518 Paramount gold
   },
 }
 
@@ -164,7 +171,6 @@ function autoFitRequest(objectId: string) {
     },
   }
 }
-
 
 function createImageReq(
   id: string, slideId: string, url: string,
@@ -993,6 +999,480 @@ function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette
 }
 
 // ---------------------------------------------------------------------------
+// Paramount Media Sales slide builders (Dunkin-style deck)
+// ---------------------------------------------------------------------------
+
+/** Shared footer branding — adds "PARAMOUNT" in gold to the bottom of every slide */
+function paramountFooter(slideId: string, palette: SlidePalette): object[] {
+  const barId   = `${slideId}_pfooter_bar`
+  const lblId   = `${slideId}_pfooter_lbl`
+  return [
+    ...createRect(barId, slideId, 0, H - 60000, W, 60000, palette.primaryDarker),
+    createTextBox(lblId, slideId, MARGIN_X, H - 56000, FULL_W, 52000),
+    insertText(lblId, 'PARAMOUNT  ·  ADVERTISING SOLUTIONS'),
+    styleText(lblId, { color: palette.accent, fontSize: 8, fontFamily: 'Inter', bold: true }),
+  ]
+}
+
+/** Slide 2: The Opportunity */
+function opportunitySlide(slideId: string, pm: ParamountMediaContent, data: ProposalData, palette: SlidePalette): object[] {
+  const labelId = `${slideId}_label`
+  const headId  = `${slideId}_head`
+  const bodyId  = `${slideId}_body`
+  const ruleId  = `${slideId}_rule`
+  const barId   = `${slideId}_bar`
+
+  return [
+    bgFill(slideId, palette.primary),
+    ...createRect(barId, slideId, 0, 0, W, 8000, palette.accent),
+
+    createTextBox(labelId, slideId, MARGIN_X, 300000, FULL_W, 160000),
+    insertText(labelId, `${data.client.company.toUpperCase()}  ×  PARAMOUNT`),
+    styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 500000, FULL_W, 700000),
+    insertText(headId, 'The Opportunity'),
+    styleText(headId, { color: WHITE, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
+
+    ...createRect(ruleId, slideId, MARGIN_X, 1320000, FULL_W, 6000, palette.accent),
+
+    createTextBox(bodyId, slideId, MARGIN_X, 1400000, FULL_W, 2800000),
+    ...(pm.opportunityStatement ? [
+      insertText(bodyId, pm.opportunityStatement),
+      styleText(bodyId, { color: LTGRAY, fontSize: 20, fontFamily: 'Inter' }),
+    ] : []),
+    autoFitRequest(bodyId),
+
+    ...paramountFooter(slideId, palette),
+  ]
+}
+
+/** Slides 3 & 4: Paramount IP Alignment — split panel layout */
+function ipAlignmentSlide(slideId: string, ip: IPAlignment, index: number, palette: SlidePalette): object[] {
+  if (!ip) return []
+  const splitX     = Math.round(W * 0.38)
+  const leftLblId  = `${slideId}_llbl`
+  const leftNetId  = `${slideId}_lnet`
+  const leftShowId = `${slideId}_lshow`
+  const rightLblId = `${slideId}_rlbl`
+  const rightDescId= `${slideId}_rdesc`
+  const rightStatId= `${slideId}_rstat`
+  const divId      = `${slideId}_div`
+
+  const nums = ['01', '02', '03', '04']
+
+  return [
+    bgFill(slideId, palette.primary),
+    // Left dark accent panel
+    ...createRect(`${slideId}_lpanel`, slideId, 0, 0, splitX, H, palette.primaryDarker),
+    ...createRect(divId, slideId, splitX - 8000, 0, 8000, H, palette.accent),
+
+    // Left: property number + network + show name
+    createTextBox(leftLblId, slideId, MARGIN_X, 350000, splitX - MARGIN_X * 2, 200000),
+    insertText(leftLblId, `PROPERTY ${nums[index] ?? '01'}`),
+    styleText(leftLblId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(leftNetId, slideId, MARGIN_X, 600000, splitX - MARGIN_X * 2, 200000),
+    insertText(leftNetId, ip.network.toUpperCase()),
+    styleText(leftNetId, { color: LTGRAY, fontSize: 12, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(leftShowId, slideId, MARGIN_X, 850000, splitX - MARGIN_X * 2, 2000000),
+    insertText(leftShowId, ip.propertyName),
+    styleText(leftShowId, { color: WHITE, fontSize: 28, fontFamily: 'Montserrat', bold: true }),
+
+    // Right: why this fits + audience stat
+    createTextBox(rightLblId, slideId, splitX + MARGIN_X, 350000, W - splitX - MARGIN_X * 2, 200000),
+    insertText(rightLblId, 'WHY THIS FITS'),
+    styleText(rightLblId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(rightDescId, slideId, splitX + MARGIN_X, 600000, W - splitX - MARGIN_X * 2, 2400000),
+    ...(ip.description ? [
+      insertText(rightDescId, ip.description),
+      styleText(rightDescId, { color: LTGRAY, fontSize: 17, fontFamily: 'Inter' }),
+    ] : []),
+    autoFitRequest(rightDescId),
+
+    ...createRect(`${slideId}_statrule`, slideId, splitX + MARGIN_X, 3200000, W - splitX - MARGIN_X * 2, 4000, palette.accent),
+
+    createTextBox(rightStatId, slideId, splitX + MARGIN_X, 3270000, W - splitX - MARGIN_X * 2, 400000),
+    ...(ip.audienceStat ? [
+      insertText(rightStatId, ip.audienceStat),
+      styleText(rightStatId, { color: palette.accent, fontSize: 14, fontFamily: 'Inter', bold: true }),
+    ] : []),
+
+    ...paramountFooter(slideId, palette),
+  ]
+}
+
+/** Slide 5: Gen Z Audience Intelligence — stat grid */
+function audienceSlide(slideId: string, pm: ParamountMediaContent, data: ProposalData, palette: SlidePalette): object[] {
+  const insights = (pm.audienceInsights || []).slice(0, 4)
+  const labelId  = `${slideId}_label`
+  const headId   = `${slideId}_head`
+
+  const reqs: object[] = [
+    bgFill(slideId, palette.primary),
+    ...createRect(`${slideId}_bar`, slideId, 0, 0, W, 8000, palette.accent),
+
+    createTextBox(labelId, slideId, MARGIN_X, 280000, FULL_W, 160000),
+    insertText(labelId, `${data.client.company.toUpperCase()}  ·  AUDIENCE INTELLIGENCE`),
+    styleText(labelId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 480000, FULL_W, 500000),
+    insertText(headId, 'Why Your Audience Is Here'),
+    styleText(headId, { color: WHITE, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+  ]
+
+  // 2×2 stat card grid
+  const cardW  = FULL_W / 2 - 60000
+  const cardH  = 1300000
+  const startY = 1200000
+  const positions = [
+    { x: MARGIN_X, y: startY },
+    { x: MARGIN_X + cardW + 120000, y: startY },
+    { x: MARGIN_X, y: startY + cardH + 80000 },
+    { x: MARGIN_X + cardW + 120000, y: startY + cardH + 80000 },
+  ]
+
+  insights.forEach((stat, i) => {
+    const pos     = positions[i]
+    const cardId  = `${slideId}_card${i}`
+    const textId  = `${slideId}_ctext${i}`
+    const ruleId  = `${slideId}_crule${i}`
+
+    reqs.push(
+      ...createRect(cardId, slideId, pos.x, pos.y, cardW, cardH, palette.primaryLighter),
+      ...createRect(ruleId, slideId, pos.x, pos.y, cardW, 8000, palette.accent),
+      createTextBox(textId, slideId, pos.x + 80000, pos.y + 100000, cardW - 160000, cardH - 150000),
+      ...(stat ? [
+        insertText(textId, stat),
+        styleText(textId, { color: LTGRAY, fontSize: 14, fontFamily: 'Inter' }),
+      ] : []),
+      autoFitRequest(textId),
+    )
+  })
+
+  reqs.push(...paramountFooter(slideId, palette))
+  return reqs
+}
+
+/** Slides 6 & 7: Integration Concepts — split layout */
+function integrationConceptSlide(slideId: string, concept: IntegrationConcept, index: number, palette: SlidePalette): object[] {
+  if (!concept) return []
+  const splitX     = Math.round(W * 0.42)
+  const numId      = `${slideId}_num`
+  const leftTitleId= `${slideId}_ltitle`
+  const leftPropId = `${slideId}_lprop`
+  const rightLblId = `${slideId}_rlbl`
+  const rightMechId= `${slideId}_rmech`
+  const rightOutId = `${slideId}_rout`
+
+  const nums = ['01', '02', '03']
+
+  return [
+    bgFill(slideId, WHITE),
+    ...createRect(`${slideId}_lpanel`, slideId, 0, 0, splitX, H, palette.primary),
+    ...createRect(`${slideId}_div`, slideId, splitX, 0, 12000, H, palette.accent),
+
+    // Left: concept number + property
+    createTextBox(numId, slideId, MARGIN_X, 280000, splitX - MARGIN_X * 2, 300000),
+    insertText(numId, `INTEGRATION ${nums[index] ?? '01'}`),
+    styleText(numId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(leftPropId, slideId, MARGIN_X, 600000, splitX - MARGIN_X * 2, 250000),
+    insertText(leftPropId, concept.property.toUpperCase()),
+    styleText(leftPropId, { color: LTGRAY, fontSize: 12, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(leftTitleId, slideId, MARGIN_X, 900000, splitX - MARGIN_X * 2, 2000000),
+    insertText(leftTitleId, concept.conceptTitle),
+    styleText(leftTitleId, { color: WHITE, fontSize: 24, fontFamily: 'Montserrat', bold: true }),
+
+    // Right: mechanic + outcome
+    createTextBox(rightLblId, slideId, splitX + MARGIN_X + 12000, 280000, W - splitX - MARGIN_X * 2 - 12000, 160000),
+    insertText(rightLblId, 'THE ACTIVATION'),
+    styleText(rightLblId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(rightMechId, slideId, splitX + MARGIN_X + 12000, 500000, W - splitX - MARGIN_X * 2 - 12000, 2500000),
+    ...(concept.mechanic ? [
+      insertText(rightMechId, concept.mechanic),
+      styleText(rightMechId, { color: palette.primary, fontSize: 17, fontFamily: 'Inter' }),
+    ] : []),
+    autoFitRequest(rightMechId),
+
+    ...createRect(`${slideId}_outrule`, slideId, splitX + MARGIN_X + 12000, 3200000, W - splitX - MARGIN_X * 2 - 12000, 4000, palette.primary),
+
+    createTextBox(rightOutId, slideId, splitX + MARGIN_X + 12000, 3280000, W - splitX - MARGIN_X * 2 - 12000, 500000),
+    ...(concept.outcome ? [
+      insertText(rightOutId, `OUTCOME: ${concept.outcome}`),
+      styleText(rightOutId, { color: palette.primary, fontSize: 12, fontFamily: 'Inter', bold: true }),
+    ] : []),
+    autoFitRequest(rightOutId),
+
+    ...paramountFooter(slideId, palette),
+  ]
+}
+
+/** Slide 8: Talent Partnerships */
+function talentSlide(slideId: string, pm: ParamountMediaContent, palette: SlidePalette): object[] {
+  const talent  = (pm.talentOpportunities || []).slice(0, 4)
+  const labelId = `${slideId}_label`
+  const headId  = `${slideId}_head`
+
+  const reqs: object[] = [
+    bgFill(slideId, palette.primary),
+    ...createRect(`${slideId}_bar`, slideId, 0, 0, W, 8000, palette.accent),
+
+    createTextBox(labelId, slideId, MARGIN_X, 300000, FULL_W, 160000),
+    insertText(labelId, 'TALENT PARTNERSHIPS'),
+    styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 500000, FULL_W, 500000),
+    insertText(headId, 'Named Talent Opportunities'),
+    styleText(headId, { color: WHITE, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+  ]
+
+  // Individual talent items with accent number
+  talent.forEach((item, i) => {
+    const y      = 1250000 + i * 780000
+    const numId  = `${slideId}_tn${i}`
+    const ruleId = `${slideId}_tr${i}`
+    const txtId  = `${slideId}_tt${i}`
+
+    reqs.push(
+      createTextBox(numId, slideId, MARGIN_X, y, 350000, 600000),
+      insertText(numId, String(i + 1).padStart(2, '0')),
+      styleText(numId, { color: palette.accent, fontSize: 32, fontFamily: 'Montserrat', bold: true }),
+
+      createTextBox(txtId, slideId, MARGIN_X + 420000, y + 80000, FULL_W - 420000, 520000),
+      ...(item ? [
+        insertText(txtId, item),
+        styleText(txtId, { color: LTGRAY, fontSize: 16, fontFamily: 'Inter' }),
+      ] : []),
+      autoFitRequest(txtId),
+
+      ...createRect(ruleId, slideId, MARGIN_X + 420000, y + 620000, FULL_W - 420000, 2000, palette.primaryLighter),
+    )
+  })
+
+  reqs.push(...paramountFooter(slideId, palette))
+  return reqs
+}
+
+/** Slide 9: Programming Calendar */
+function programmingCalendarSlide(slideId: string, pm: ParamountMediaContent, palette: SlidePalette): object[] {
+  const items   = (pm.programmingCalendar || []).slice(0, 5)
+  const labelId = `${slideId}_label`
+  const headId  = `${slideId}_head`
+
+  const reqs: object[] = [
+    bgFill(slideId, palette.primary),
+    ...createRect(`${slideId}_bar`, slideId, 0, 0, W, 8000, palette.accent),
+
+    createTextBox(labelId, slideId, MARGIN_X, 280000, FULL_W, 160000),
+    insertText(labelId, 'PROGRAMMING CALENDAR 2026'),
+    styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 480000, FULL_W, 460000),
+    insertText(headId, 'Your Brand in the Cultural Moment'),
+    styleText(headId, { color: WHITE, fontSize: 34, fontFamily: 'Montserrat', bold: true }),
+  ]
+
+  // Column headers
+  const colXs   = [MARGIN_X, MARGIN_X + 2800000, MARGIN_X + 4200000, MARGIN_X + 5800000]
+  const headers = ['TENTPOLE', 'DATE', 'REACH', 'YOUR OPPORTUNITY']
+  const colWs   = [2600000, 1200000, 1400000, FULL_W - 5800000]
+
+  reqs.push(...createRect(`${slideId}_hdr_rule`, slideId, MARGIN_X, 1070000, FULL_W, 4000, palette.accent))
+  headers.forEach((h, i) => {
+    const hId = `${slideId}_hdr${i}`
+    reqs.push(
+      createTextBox(hId, slideId, colXs[i], 1090000, colWs[i], 180000),
+      insertText(hId, h),
+      styleText(hId, { color: palette.accent, fontSize: 9, fontFamily: 'Inter', bold: true }),
+    )
+  })
+  reqs.push(...createRect(`${slideId}_hdr_rule2`, slideId, MARGIN_X, 1280000, FULL_W, 2000, palette.primaryLighter))
+
+  items.forEach((item, i) => {
+    const rowY  = 1340000 + i * 640000
+    const rowBg = i % 2 === 0 ? palette.primaryLighter : palette.primary
+
+    reqs.push(...createRect(`${slideId}_rowbg${i}`, slideId, MARGIN_X - 60000, rowY - 40000, FULL_W + 120000, 600000, rowBg))
+
+    const rowData: (CalendarItem[keyof CalendarItem])[] = [item.tentpole, item.date, item.reach, item.opportunity]
+    rowData.forEach((val, j) => {
+      const cId = `${slideId}_c${i}${j}`
+      reqs.push(
+        createTextBox(cId, slideId, colXs[j], rowY, colWs[j], 560000),
+        ...(val ? [
+          insertText(cId, String(val)),
+          styleText(cId, { color: j === 0 ? WHITE : LTGRAY, fontSize: j === 0 ? 13 : 12, fontFamily: j === 0 ? 'Montserrat' : 'Inter', bold: j === 0 }),
+        ] : []),
+        autoFitRequest(cId),
+      )
+    })
+  })
+
+  reqs.push(...paramountFooter(slideId, palette))
+  return reqs
+}
+
+/** Slide 10: Measurement Framework */
+function measurementSlide(slideId: string, pm: ParamountMediaContent, palette: SlidePalette): object[] {
+  const items   = (pm.measurementFramework || []).slice(0, 4)
+  const labelId = `${slideId}_label`
+  const headId  = `${slideId}_head`
+
+  const reqs: object[] = [
+    bgFill(slideId, WHITE),
+    ...createRect(`${slideId}_bar`, slideId, 0, 0, 12000, H, palette.accent),
+    ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 8000, palette.primary),
+
+    createTextBox(labelId, slideId, MARGIN_X, 300000, FULL_W, 160000),
+    insertText(labelId, `ACCOUNTABILITY & MEASUREMENT`),
+    styleText(labelId, { color: palette.primary, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 500000, FULL_W, 500000),
+    insertText(headId, 'We Prove It Works'),
+    styleText(headId, { color: palette.primary, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+  ]
+
+  items.forEach((item, i) => {
+    const cardX   = MARGIN_X + (i % 2) * (FULL_W / 2 + 80000)
+    const cardY   = i < 2 ? 1250000 : 2700000
+    const cardW   = FULL_W / 2 - 80000
+    const cardH   = 1200000
+    const cardId  = `${slideId}_card${i}`
+    const textId  = `${slideId}_ctext${i}`
+
+    reqs.push(
+      ...createRect(cardId, slideId, cardX, cardY, cardW, cardH, palette.primary),
+      ...createRect(`${slideId}_crule${i}`, slideId, cardX, cardY, cardW, 8000, palette.accent),
+      createTextBox(textId, slideId, cardX + 80000, cardY + 120000, cardW - 160000, cardH - 160000),
+      ...(item ? [
+        insertText(textId, item),
+        styleText(textId, { color: WHITE, fontSize: 14, fontFamily: 'Inter' }),
+      ] : []),
+      autoFitRequest(textId),
+    )
+  })
+
+  reqs.push(...paramountFooter(slideId, palette))
+  return reqs
+}
+
+/** Slide 11: Investment Options — 3 tier cards */
+function tierInvestmentSlide(slideId: string, pm: ParamountMediaContent, palette: SlidePalette): object[] {
+  const tiers   = (pm.investmentTiers || []).slice(0, 3)
+  const labelId = `${slideId}_label`
+  const headId  = `${slideId}_head`
+
+  const reqs: object[] = [
+    bgFill(slideId, palette.primary),
+    ...createRect(`${slideId}_bar`, slideId, 0, 0, W, 8000, palette.accent),
+
+    createTextBox(labelId, slideId, MARGIN_X, 280000, FULL_W, 160000),
+    insertText(labelId, 'INVESTMENT OPTIONS'),
+    styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 480000, FULL_W, 500000),
+    insertText(headId, 'Choose Your Level of Commitment'),
+    styleText(headId, { color: WHITE, fontSize: 34, fontFamily: 'Montserrat', bold: true }),
+  ]
+
+  if (tiers.length > 0) {
+    const cardGap = 100000
+    const cardW   = Math.floor((FULL_W - cardGap * (tiers.length - 1)) / tiers.length)
+    const cardH   = 2800000
+    const cardY   = 1200000
+
+    tiers.forEach((tier: InvestmentTier, i) => {
+      const cardX     = MARGIN_X + i * (cardW + cardGap)
+      const isFeature = i === 1  // Enhanced tier highlighted
+      const cardBg    = isFeature ? palette.accent : palette.primaryLighter
+      const nameColor = isFeature ? palette.primary : WHITE
+      const budgColor = isFeature ? palette.primaryDarker : palette.accent
+      const textColor = isFeature ? palette.primaryDarker : LTGRAY
+
+      const cardId     = `${slideId}_card${i}`
+      const tierNameId = `${slideId}_tn${i}`
+      const budgetId   = `${slideId}_tb${i}`
+      const inclId     = `${slideId}_ti${i}`
+
+      reqs.push(
+        ...createRect(cardId, slideId, cardX, cardY, cardW, cardH, cardBg),
+
+        createTextBox(tierNameId, slideId, cardX + 80000, cardY + 120000, cardW - 160000, 280000),
+        insertText(tierNameId, tier.tierName.toUpperCase()),
+        styleText(tierNameId, { color: nameColor, fontSize: 14, fontFamily: 'Inter', bold: true }),
+        paragraphAlign(tierNameId, 'CENTER'),
+
+        createTextBox(budgetId, slideId, cardX + 60000, cardY + 440000, cardW - 120000, 400000),
+        insertText(budgetId, tier.budget),
+        styleText(budgetId, { color: budgColor, fontSize: 22, fontFamily: 'Montserrat', bold: true }),
+        paragraphAlign(budgetId, 'CENTER'),
+      )
+
+      if (tier.inclusions && tier.inclusions.length > 0) {
+        reqs.push(
+          createTextBox(inclId, slideId, cardX + 80000, cardY + 920000, cardW - 160000, cardH - 1000000),
+          insertText(inclId, tier.inclusions.join('\n')),
+          styleText(inclId, { color: textColor, fontSize: 12, fontFamily: 'Inter' }),
+          {
+            createParagraphBullets: {
+              objectId: inclId,
+              textRange: { type: 'ALL' },
+              bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+            },
+          },
+          autoFitRequest(inclId),
+        )
+      }
+    })
+  }
+
+  reqs.push(...paramountFooter(slideId, palette))
+  return reqs
+}
+
+/** Slide 13: Appendix */
+function appendixSlide(slideId: string, pm: ParamountMediaContent, palette: SlidePalette): object[] {
+  const items   = pm.appendixItems || []
+  const labelId = `${slideId}_label`
+  const headId  = `${slideId}_head`
+  const bodyId  = `${slideId}_body`
+
+  return [
+    bgFill(slideId, palette.primaryDarker),
+    ...createRect(`${slideId}_bar`, slideId, 0, 0, W, 8000, palette.accent),
+
+    createTextBox(labelId, slideId, MARGIN_X, 300000, FULL_W, 160000),
+    insertText(labelId, 'APPENDIX'),
+    styleText(labelId, { color: palette.accent, fontSize: 11, fontFamily: 'Inter', bold: true }),
+
+    createTextBox(headId, slideId, MARGIN_X, 500000, FULL_W, 500000),
+    insertText(headId, 'Supporting Data & Case Studies'),
+    styleText(headId, { color: WHITE, fontSize: 34, fontFamily: 'Montserrat', bold: true }),
+
+    createTextBox(bodyId, slideId, MARGIN_X + 80000, 1200000, FULL_W - 80000, 3400000),
+    ...(items.length ? [
+      insertText(bodyId, items.join('\n')),
+      styleText(bodyId, { color: LTGRAY, fontSize: 16, fontFamily: 'Inter' }),
+      {
+        createParagraphBullets: {
+          objectId: bodyId,
+          textRange: { type: 'ALL' },
+          bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+        },
+      },
+    ] : []),
+    autoFitRequest(bodyId),
+
+    ...paramountFooter(slideId, palette),
+  ]
+}
+
+// ---------------------------------------------------------------------------
 // Logo helpers
 // ---------------------------------------------------------------------------
 
@@ -1062,17 +1542,21 @@ export async function createGoogleSlidesPresentation(
   accessToken: string,
   designConfig?: DesignConfig
 ): Promise<CreateSlidesResult> {
-  // Option 1: Palette selection priority:
+  // Palette selection priority:
   //   1. Custom hex supplied by user (designConfig.customBrandHex)
   //   2. Auto-detect from company name (unless disableBrandDetection)
   //   3. Manual color theme preset
+  //   4. Default to 'paramount' when paramountMedia content is present
+  const hasParamountMedia = !!data.expanded?.paramountMedia?.opportunityStatement
+  const defaultTheme = hasParamountMedia ? 'paramount' : 'navy-gold'
+
   const palette = designConfig?.customBrandHex
     ? derivePaletteFromHex(designConfig.customBrandHex)
     : (!designConfig?.disableBrandDetection ? getBrandPalette(data.client.company) : null)
-      ?? PALETTE_MAP[designConfig?.colorTheme ?? 'navy-gold']
-      ?? PALETTE_MAP['navy-gold']
+      ?? PALETTE_MAP[designConfig?.colorTheme ?? defaultTheme]
+      ?? PALETTE_MAP[defaultTheme]
 
-  // Option 2 / 3: Layout variant
+  // Layout variant
   const designStyle = designConfig?.designStyle ?? 'standard'
   const opts: SlideOpts = {
     boldAgency: designStyle === 'bold-agency',
@@ -1100,44 +1584,59 @@ export async function createGoogleSlidesPresentation(
   const presentationId: string = presentation.presentationId
   const defaultSlideId: string = presentation.slides?.[0]?.objectId
 
-  // Phase 2: Build all slides via batchUpdate
-  // Base 13-slide deck:
-  //  1 Cover  2 Challenge  3 Prob1  4 Prob2  5 Prob3&4
-  //  6 Solution  7 Approach  8 Ben1  9 Ben2  10 Ben3&4
-  //  11 Investment  12 NextSteps  13 Close
-  const slideIds = [
-    's01_cover',    's02_challenge', 's03_prob1',  's04_prob2',
-    's05_prob34',   's06_solution',  's07_approach','s08_ben1',
-    's09_ben2',     's10_ben34',     's11_invest',  's12_next',
-    's13_close',
-  ]
+  const p  = data
+  const e  = data.expanded
+  const pm = e.paramountMedia
 
-  const p = data
-  const e = data.expanded
+  let orderedSlides: { id: string; reqs: () => object[] }[]
 
-  // Approach and NextSteps slides are optional — skip if LLM returned no content
-  const hasApproach  = (e.approachSteps?.length ?? 0) > 0
-  const hasNextSteps = (e.nextSteps?.length ?? 0) > 0
+  if (hasParamountMedia && pm) {
+    // ── Paramount Media Sales Deck (Dunkin-style) ──────────────────────────
+    const ip0  = pm.paramountIPAlignments?.[0]
+    const ip1  = pm.paramountIPAlignments?.[1]
+    const con0 = pm.integrationConcepts?.[0]
+    const con1 = pm.integrationConcepts?.[1]
 
-  // Build the final ordered list, filtering empty optional slides
-  const orderedSlides = [
-    { id: 's01_cover',    reqs: () => titleSlide(slideIds[0], p, palette) },
-    { id: 's02_challenge',reqs: () => challengeSlide(slideIds[1], p, palette, opts) },
-    { id: 's03_prob1',    reqs: () => problemDeepDive(slideIds[2], 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || '', palette, true, opts, 0) },
-    { id: 's04_prob2',    reqs: () => problemDeepDive(slideIds[3], 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || '', palette, true, opts, 1) },
-    { id: 's05_prob34',   reqs: () => problemsCombined(slideIds[4], p, palette, opts) },
-    { id: 's06_solution', reqs: () => solutionSlide(slideIds[5], p, palette, opts) },
-    ...(hasApproach ? [{ id: 's07_approach', reqs: () => approachSlide(slideIds[6], p, palette, opts) }] : []),
-    { id: 's08_ben1',     reqs: () => problemDeepDive(slideIds[7], 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', palette, false, opts, 0) },
-    { id: 's09_ben2',     reqs: () => problemDeepDive(slideIds[8], 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', palette, false, opts, 1) },
-    { id: 's10_ben34',    reqs: () => benefitsCombined(slideIds[9], p, palette, opts) },
-    { id: 's11_invest',   reqs: () => investmentSlide(slideIds[10], p, palette, opts) },
-    ...(hasNextSteps ? [{ id: 's12_next', reqs: () => nextStepsSlide(slideIds[11], p, palette, opts) }] : []),
-    { id: 's13_close',    reqs: () => closingSlide(slideIds[12], p, palette, opts) },
-  ].filter(s => {
-    const r = s.reqs()
-    return r.length > 0  // benefitsCombined / approachSlide / nextStepsSlide return [] when empty
-  })
+    orderedSlides = [
+      { id: 'pm01_cover',    reqs: () => titleSlide('pm01_cover', p, palette) },
+      { id: 'pm02_oppty',    reqs: () => opportunitySlide('pm02_oppty', pm, p, palette) },
+      ...(ip0 ? [{ id: 'pm03_ip1', reqs: () => ipAlignmentSlide('pm03_ip1', ip0, 0, palette) }] : []),
+      ...(ip1 ? [{ id: 'pm04_ip2', reqs: () => ipAlignmentSlide('pm04_ip2', ip1, 1, palette) }] : []),
+      { id: 'pm05_audience', reqs: () => audienceSlide('pm05_audience', pm, p, palette) },
+      ...(con0 ? [{ id: 'pm06_con1', reqs: () => integrationConceptSlide('pm06_con1', con0, 0, palette) }] : []),
+      ...(con1 ? [{ id: 'pm07_con2', reqs: () => integrationConceptSlide('pm07_con2', con1, 1, palette) }] : []),
+      { id: 'pm08_talent',   reqs: () => talentSlide('pm08_talent', pm, palette) },
+      { id: 'pm09_calendar', reqs: () => programmingCalendarSlide('pm09_calendar', pm, palette) },
+      { id: 'pm10_measure',  reqs: () => measurementSlide('pm10_measure', pm, palette) },
+      { id: 'pm11_invest',   reqs: () => tierInvestmentSlide('pm11_invest', pm, palette) },
+      { id: 'pm12_next',     reqs: () => nextStepsSlide('pm12_next', { ...p, expanded: { ...e, nextSteps: pm.nextSteps } }, palette, opts) },
+      { id: 'pm13_appendix', reqs: () => appendixSlide('pm13_appendix', pm, palette) },
+    ].filter(s => s.reqs().length > 0)
+
+  } else {
+    // ── Generic Consulting Deck ─────────────────────────────────────────────
+    const hasApproach  = (e.approachSteps?.length ?? 0) > 0
+    const hasNextSteps = (e.nextSteps?.length ?? 0) > 0
+
+    orderedSlides = [
+      { id: 's01_cover',    reqs: () => titleSlide('s01_cover', p, palette) },
+      { id: 's02_challenge',reqs: () => challengeSlide('s02_challenge', p, palette, opts) },
+      { id: 's03_prob1',    reqs: () => problemDeepDive('s03_prob1', 'CHALLENGE 01', p.content.problems[0] || '', e.problemExpansions[0] || '', palette, true, opts, 0) },
+      { id: 's04_prob2',    reqs: () => problemDeepDive('s04_prob2', 'CHALLENGE 02', p.content.problems[1] || '', e.problemExpansions[1] || '', palette, true, opts, 1) },
+      { id: 's05_prob34',   reqs: () => problemsCombined('s05_prob34', p, palette, opts) },
+      { id: 's06_solution', reqs: () => solutionSlide('s06_solution', p, palette, opts) },
+      ...(hasApproach ? [{ id: 's07_approach', reqs: () => approachSlide('s07_approach', p, palette, opts) }] : []),
+      { id: 's08_ben1',     reqs: () => problemDeepDive('s08_ben1', 'BENEFIT 01', p.content.benefits[0] || '', e.benefitExpansions[0] || '', palette, false, opts, 0) },
+      { id: 's09_ben2',     reqs: () => problemDeepDive('s09_ben2', 'BENEFIT 02', p.content.benefits[1] || '', e.benefitExpansions[1] || '', palette, false, opts, 1) },
+      { id: 's10_ben34',    reqs: () => benefitsCombined('s10_ben34', p, palette, opts) },
+      { id: 's11_invest',   reqs: () => investmentSlide('s11_invest', p, palette, opts) },
+      ...(hasNextSteps ? [{ id: 's12_next', reqs: () => nextStepsSlide('s12_next', p, palette, opts) }] : []),
+      { id: 's13_close',    reqs: () => closingSlide('s13_close', p, palette, opts) },
+    ].filter(s => {
+      const r = s.reqs()
+      return r.length > 0
+    })
+  }
 
   const slideRequests: object[] = []
 

@@ -26,6 +26,47 @@ export interface AdditionalSlide {
   bullets: string[];
 }
 
+// Paramount media sales types — used in the Dunkin-style deck output
+export interface IPAlignment {
+  propertyName: string;   // e.g. "Big Brother S28", "VMAs 2026"
+  description: string;    // 1-2 sentences on why this property fits the brand
+  audienceStat: string;   // e.g. "6.8M avg viewers, 61% female, 54% Gen Z"
+  network: string;        // e.g. "CBS", "Paramount+", "MTV"
+}
+
+export interface IntegrationConcept {
+  conceptTitle: string;   // e.g. "Big Brother Breakfast Rewards Mechanic"
+  property: string;       // named Paramount property
+  mechanic: string;       // 2-3 sentences describing the specific integration
+  outcome: string;        // measurable business outcome
+}
+
+export interface CalendarItem {
+  tentpole: string;       // e.g. "68th GRAMMY Awards"
+  date: string;           // e.g. "February 2, 2026"
+  reach: string;          // e.g. "20M+ viewers"
+  opportunity: string;    // 1 sentence on what the brand could own
+}
+
+export interface InvestmentTier {
+  tierName: string;       // e.g. "Core", "Enhanced", "Signature"
+  budget: string;         // e.g. "$5M–$8M"
+  inclusions: string[];   // 3-5 bullet points of what's included
+}
+
+export interface ParamountMediaContent {
+  opportunityStatement: string;
+  paramountIPAlignments: IPAlignment[];
+  audienceInsights: string[];
+  integrationConcepts: IntegrationConcept[];
+  talentOpportunities: string[];
+  programmingCalendar: CalendarItem[];
+  measurementFramework: string[];
+  investmentTiers: InvestmentTier[];
+  nextSteps: string[];
+  appendixItems: string[];
+}
+
 export interface ExpandedContent {
   problemExpansions: [string, string, string, string];
   benefitExpansions: [string, string, string, string];
@@ -37,6 +78,8 @@ export interface ExpandedContent {
   editedProjectTitle?: string;
   editedProblems?: [string, string, string, string];
   editedBenefits?: [string, string, string, string];
+  // Paramount media sales content (Dunkin-style deck)
+  paramountMedia?: ParamountMediaContent;
 }
 
 export interface GeneratedContent {
@@ -73,7 +116,7 @@ export const STEPS: { id: Step; label: string; number: number }[] = [
   { id: 'share', label: 'Export', number: 3 },
 ];
 
-export type ColorTheme = 'navy-gold' | 'slate-blue' | 'forest-green' | 'executive-dark';
+export type ColorTheme = 'navy-gold' | 'slate-blue' | 'forest-green' | 'executive-dark' | 'paramount';
 
 // Controls slide layout variant (Option 2 / Option 3)
 // 'standard'           — original layout (default)
