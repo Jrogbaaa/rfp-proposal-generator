@@ -9,6 +9,7 @@ interface SlidePreviewProps {
   data?: Partial<ProposalData> | null
   designConfig?: DesignConfig
   isUpdating?: boolean
+  chatUpdateVersion?: number
   onSlideEdit?: (slideNumber: number, bulletIndex: number, newText: string) => void
   onSlideTitleEdit?: (slideNumber: number, newTitle: string) => void
 }
@@ -64,12 +65,14 @@ function SlideCard({
   slide,
   index,
   theme = DEFAULT_THEME,
+  chatUpdateVersion = 0,
   onBulletEdit,
   onTitleEdit,
 }: {
   slide: SlideData
   index: number
   theme?: ThemeTokens
+  chatUpdateVersion?: number
   onBulletEdit?: (bulletIndex: number, newText: string) => void
   onTitleEdit?: (newTitle: string) => void
 }) {
@@ -99,7 +102,7 @@ function SlideCard({
 
   return (
     <motion.div
-      key={`${slide.slideNumber}-${slide.bullets[0]?.slice(0, 20)}`}
+      key={`${slide.slideNumber}-${chatUpdateVersion}-${slide.bullets.join('|').slice(0, 60)}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.06, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
