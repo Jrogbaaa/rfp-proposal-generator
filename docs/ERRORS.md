@@ -116,14 +116,14 @@ Returns a direct 128×128 PNG — no redirect, no auth required.
 
 ---
 
-### "Autofit types other than NONE are not supported" (updateShapeProperties)
-**Error:** `Invalid requests[N].updateShapeProperties: Autofit types other than NONE are not supported`
+### "field mask: * includes read-only fields" / "Autofit types other than NONE" (updateShapeProperties)
+**Error:** `Invalid requests[N].updateShapeProperties: Invalid field mask: * includes read-only fields` or `Autofit types other than NONE are not supported`
 
-**Cause:** Google Slides API deprecated `TEXT_AUTOFIT` as an autofit type. Any `updateShapeProperties` request that sets `autofitType: 'TEXT_AUTOFIT'` is now rejected with a 400.
+**Cause:** Google Slides API now treats `autofit` as a read-only field in `ShapeProperties`. Any `updateShapeProperties` request that includes `autofit` in the field mask (e.g. `fields: 'autofit'`) returns a 400.
 
 **Solution:** Remove all autofit requests entirely. Text boxes should be sized generously at creation time instead of relying on auto-shrink.
 
-**Fix applied:** Removed the `autofit()` helper function and all 23 call sites from `src/utils/googleSlides.ts`.
+**Fix applied:** Removed the `autoFitRequest()` helper function and all 20 call sites from `src/utils/googleSlides.ts`.
 
 ---
 
@@ -375,6 +375,7 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 | 2026-02-26 | TS2322 Step type mismatch after migration | useProposalState.ts (deleted) | Steps collapsed to draft/refine/export; state inlined in App.tsx | Fixed |
 | 2026-02-27 | 12 E2E failures in CI (missing VITE_* env vars) | .github/workflows/e2e.yml | Added dummy env vars to build step | Fixed |
 | 2026-03-04 | Empty response from gemini-2.5-flash (thinking tokens) | src/utils/llmService.ts | Disabled thinking via thinkingBudget: 0 + retry logic | Fixed |
+| 2026-03-04 | autofit read-only field mask error (Google Slides API) | src/utils/googleSlides.ts | Removed autoFitRequest() and all 20 call sites | Fixed |
 
 ---
 

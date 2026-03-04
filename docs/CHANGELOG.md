@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-04] — Fix Google Slides autofit Read-Only Field Error
+
+### Fixed
+- **Removed all `autoFitRequest` calls** — `src/utils/googleSlides.ts`; Google Slides API now treats `autofit` as a read-only field. Any `updateShapeProperties` with `fields: 'autofit'` returns 400 "field mask includes read-only fields." Removed the function and all 20 call sites. Text boxes are already sized generously at creation time.
+
+---
+
 ## [2026-03-04] — Fix Gemini 2.5 Flash Empty Response Failures
 
 ### Fixed
