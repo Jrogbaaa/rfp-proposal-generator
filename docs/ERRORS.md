@@ -242,6 +242,25 @@ npm install -D @types/<package-name>
 
 ### Gemini API Errors
 
+#### Empty response from Gemini 2.5 Flash (thinking model)
+**Error:** `No content returned from Gemini` — the API returns `finishReason: "STOP"` with zero `candidatesTokenCount` and an empty `parts` array.
+
+**Cause:** `gemini-2.5-flash` is a "thinking" model. Its internal reasoning tokens can intermittently consume the output-token budget when `responseMimeType: 'application/json'` is set, leaving no room for the actual JSON output. This is a known Google-side bug ([googleapis/nodejs-vertexai#516](https://github.com/googleapis/nodejs-vertexai/issues/516)).
+
+**Solution:** Disable thinking for structured-JSON calls by adding `thinkingConfig: { thinkingBudget: 0 }` inside `generationConfig`:
+```ts
+generationConfig: {
+  temperature: 0.7,
+  maxOutputTokens: 16384,
+  thinkingConfig: { thinkingBudget: 0 },
+  responseMimeType: 'application/json',
+}
+```
+
+**Fix applied:** Added `thinkingConfig: { thinkingBudget: 0 }` to all 5 Gemini call sites in `src/utils/llmService.ts`. Also added retry logic (up to 2 retries) and increased `maxOutputTokens` to prevent recurrence.
+
+---
+
 #### 429 - Resource Exhausted
 **Error:** `Gemini API error: 429` or `RESOURCE_EXHAUSTED`
 
@@ -355,6 +374,7 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 | 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Migrated to Gemini — no longer applicable | Obsolete |
 | 2026-02-26 | TS2322 Step type mismatch after migration | useProposalState.ts (deleted) | Steps collapsed to draft/refine/export; state inlined in App.tsx | Fixed |
 | 2026-02-27 | 12 E2E failures in CI (missing VITE_* env vars) | .github/workflows/e2e.yml | Added dummy env vars to build step | Fixed |
+| 2026-03-04 | Empty response from gemini-2.5-flash (thinking tokens) | src/utils/llmService.ts | Disabled thinking via thinkingBudget: 0 + retry logic | Fixed |
 
 ---
 

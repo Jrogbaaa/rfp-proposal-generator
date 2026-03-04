@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-04] — Fix Gemini 2.5 Flash Empty Response Failures
+
+### Fixed
+- **Disabled thinking tokens for structured-JSON calls** — `src/utils/llmService.ts`; added `thinkingConfig: { thinkingBudget: 0 }` to all 5 Gemini API call sites (`analyzeBriefPdf`, `extractBrandVoice`, `generateProposalContent`, `iterateProposalContent`, `iterateDesign`). Gemini 2.5 Flash's thinking mode intermittently consumed the output-token budget, producing empty responses that surfaced as "No content returned from Gemini" errors.
+- **Added retry logic for empty LLM responses** — `src/utils/llmService.ts`; all JSON-generation calls now retry up to 2 times on empty responses before throwing, eliminating transient failures.
+- **Increased `maxOutputTokens` for proposal generation** — `src/utils/llmService.ts`; bumped from 8192 → 16384 for `generateProposalContent` and 4096 → 8192 for `iterateProposalContent` to prevent truncated JSON on large proposals.
+
+---
+
 ## [2026-03-04] — Refine Chatbot Visual Feedback Fix
 
 ### Fixed

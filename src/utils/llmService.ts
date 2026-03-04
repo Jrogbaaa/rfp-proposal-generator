@@ -7,6 +7,12 @@ const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models
 const FILES_API_UPLOAD = `https://generativelanguage.googleapis.com/upload/v1beta/files`;
 const FILES_API_BASE = `https://generativelanguage.googleapis.com/v1beta`;
 
+// gemini-2.5-flash is a "thinking" model whose internal reasoning tokens can
+// intermittently consume the output-token budget, producing empty responses.
+// Disabling thinking for structured-JSON calls eliminates this failure mode.
+const NO_THINKING = { thinkingConfig: { thinkingBudget: 0 } } as const;
+const MAX_RETRIES = 2;
+
 // PDFs ≤ 15MB use inline_data; larger files upload via Files API first
 const LARGE_PDF_THRESHOLD = 15 * 1024 * 1024;
 // Gemini hard limit: 50MB / 1000 pages
@@ -173,6 +179,7 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 8192,
+          ...NO_THINKING,
           ...(withResponseMimeType ? { responseMimeType: 'application/json' } : {}),
         },
       }),
@@ -276,30 +283,39 @@ export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfil
       }));
     }
 
-    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [...fileParts, { text: BRAND_VOICE_PROMPT }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048,
-          responseMimeType: 'application/json',
-        },
-      }),
-    });
+    let content: string | undefined;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [...fileParts, { text: BRAND_VOICE_PROMPT }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 2048,
+            ...NO_THINKING,
+            responseMimeType: 'application/json',
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[LLM Service] Brand voice extraction error:', errorText);
-      throw new Error(`Gemini brand voice extraction failed: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[LLM Service] Brand voice extraction error:', errorText);
+        throw new Error(`Gemini brand voice extraction failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      content = result.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (content) break;
+
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[LLM Service] Empty brand voice response, retrying (${attempt + 1}/${MAX_RETRIES})…`);
+      }
     }
 
-    const result = await response.json();
-    const content: string | undefined = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
     if (!content) {
-      throw new Error('No content returned from brand voice extraction');
+      throw new Error('No content returned from brand voice extraction after retries');
     }
 
     let profile: BrandVoiceProfile;
@@ -482,35 +498,44 @@ Generate personalized expansions for each problem and benefit that reference spe
     SYSTEM_PROMPT,
   ].filter(Boolean).join('\n\n');
 
-  const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      contents: [
-        { role: 'user', parts: [{ text: userPrompt }] },
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
+  let content: string | undefined;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }],
+        },
+        contents: [
+          { role: 'user', parts: [{ text: userPrompt }] },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 16384,
+          ...NO_THINKING,
+          responseMimeType: 'application/json',
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[LLM Service] Gemini API Error:', errorText);
-    throw new Error(`Gemini API error: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[LLM Service] Gemini API Error:', errorText);
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    content = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (content) break;
+
+    if (attempt < MAX_RETRIES) {
+      console.warn(`[LLM Service] Empty proposal response, retrying (${attempt + 1}/${MAX_RETRIES})…`);
+    }
   }
 
-  const result = await response.json();
-  const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
   if (!content) {
-    throw new Error('No content returned from Gemini');
+    throw new Error('No content returned from Gemini after retries');
   }
 
   let parsed: LLMResponse;
@@ -670,31 +695,40 @@ User request: ${userInstruction}`;
     ITERATE_SYSTEM_PROMPT,
   ].filter(Boolean).join('\n\n');
 
-  const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: iterateSystemPrompt }] },
-      contents,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 4096,
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
+  let content: string | undefined;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: iterateSystemPrompt }] },
+        contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8192,
+          ...NO_THINKING,
+          responseMimeType: 'application/json',
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[LLM Service] Iterate error:', errorText);
-    throw new Error(`Gemini iterate error: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[LLM Service] Iterate error:', errorText);
+      throw new Error(`Gemini iterate error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    content = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (content) break;
+
+    if (attempt < MAX_RETRIES) {
+      console.warn(`[LLM Service] Empty iterate response, retrying (${attempt + 1}/${MAX_RETRIES})…`);
+    }
   }
 
-  const result = await response.json();
-  const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
   if (!content) {
-    throw new Error('No content returned from Gemini iterate');
+    throw new Error('No content returned from Gemini iterate after retries');
   }
 
   let parsed: {
@@ -816,31 +850,40 @@ User request: ${userInstruction}`;
     { role: 'user', parts: [{ text: contextPrompt }] },
   ];
 
-  const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: DESIGN_ITERATE_SYSTEM_PROMPT }] },
-      contents,
-      generationConfig: {
-        temperature: 0.5,
-        maxOutputTokens: 1024,
-        responseMimeType: 'application/json',
-      },
-    }),
-  });
+  let content: string | undefined;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: DESIGN_ITERATE_SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 1024,
+          ...NO_THINKING,
+          responseMimeType: 'application/json',
+        },
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[LLM Service] Design iterate error:', errorText);
-    throw new Error(`Gemini design iterate error: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[LLM Service] Design iterate error:', errorText);
+      throw new Error(`Gemini design iterate error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    content = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (content) break;
+
+    if (attempt < MAX_RETRIES) {
+      console.warn(`[LLM Service] Empty design iterate response, retrying (${attempt + 1}/${MAX_RETRIES})…`);
+    }
   }
 
-  const result = await response.json();
-  const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
   if (!content) {
-    throw new Error('No content returned from Gemini design iterate');
+    throw new Error('No content returned from Gemini design iterate after retries');
   }
 
   let parsed: { reply: string; designConfig: DesignConfig | null };
