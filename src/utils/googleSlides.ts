@@ -153,6 +153,18 @@ function paragraphAlign(id: string, alignment: 'START' | 'CENTER' | 'END' = 'STA
   }
 }
 
+function autoFitRequest(objectId: string) {
+  return {
+    updateShapeProperties: {
+      objectId,
+      fields: 'autofit',
+      shapeProperties: {
+        autofit: { autoFitType: 'TEXT_AUTOFIT' },
+      },
+    },
+  }
+}
+
 
 function createImageReq(
   id: string, slideId: string, url: string,
@@ -407,6 +419,7 @@ function challengeSlide(slideId: string, data: ProposalData, palette: SlidePalet
         },
       },
     ] : []),
+    autoFitRequest(bodyId),
   )
 
   return reqs
@@ -472,6 +485,7 @@ function problemDeepDive(
 
     createTextBox(bodyId, slideId, MARGIN_X + xOff, 1750000, FULL_W - xOff, 3000000),
     ...(body ? [insertText(bodyId, body), styleText(bodyId, { color: bodyColor, fontSize: 16, fontFamily: 'Inter' })] : []),
+    autoFitRequest(bodyId),
   )
 
   return reqs
@@ -518,12 +532,14 @@ function problemsCombined(slideId: string, data: ProposalData, palette: SlidePal
 
     createTextBox(body1Id, slideId, MARGIN_X, 1300000, colW, 3300000),
     ...(e3 ? [insertText(body1Id, e3), styleText(body1Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
+    autoFitRequest(body1Id),
 
     createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP, colW, 700000),
     ...(p4 ? [insertText(head2Id, p4), styleText(head2Id, { color: headColor, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
     createTextBox(body2Id, slideId, W / 2 + 80000, 1300000, colW, 3300000),
     ...(e4 ? [insertText(body2Id, e4), styleText(body2Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
+    autoFitRequest(body2Id),
   )
 
   return reqs
@@ -573,6 +589,7 @@ function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalett
           },
         },
       ] : []),
+      autoFitRequest(bodyId),
     ]
   }
 
@@ -609,6 +626,7 @@ function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalett
         },
       },
     ] : []),
+    autoFitRequest(bodyId),
   )
 
   return reqs
@@ -681,6 +699,7 @@ function approachSlide(slideId: string, data: ProposalData, palette: SlidePalett
         insertText(textId, step),
         styleText(textId, { color: textColor, fontSize: 14, fontFamily: 'Inter' }),
       ] : []),
+      autoFitRequest(textId),
     )
   })
 
@@ -737,12 +756,14 @@ function benefitsCombined(slideId: string, data: ProposalData, palette: SlidePal
 
     createTextBox(body1Id, slideId, MARGIN_X, 1400000, colW, 3200000),
     ...(e3 ? [insertText(body1Id, e3), styleText(body1Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
+    autoFitRequest(body1Id),
 
     createTextBox(head2Id, slideId, W / 2 + 80000, MARGIN_TOP + 120000, colW, 700000),
     ...(b4 ? [insertText(head2Id, b4), styleText(head2Id, { color: headColor, fontSize: 20, fontFamily: 'Montserrat', bold: true })] : []),
 
     createTextBox(body2Id, slideId, W / 2 + 80000, 1400000, colW, 3200000),
     ...(e4 ? [insertText(body2Id, e4), styleText(body2Id, { color: bodyColor, fontSize: 14, fontFamily: 'Inter' })] : []),
+    autoFitRequest(body2Id),
   )
 
   return reqs
@@ -813,6 +834,7 @@ function nextStepsSlide(slideId: string, data: ProposalData, palette: SlidePalet
           insertText(txtId, step),
           styleText(txtId, { color: textClr, fontSize: 14, fontFamily: 'Inter' }),
         ] : []),
+        autoFitRequest(txtId),
 
         ...createRect(ruleId, slideId, xOffset, y + stepH - 30000, colW, 2000, { red: 0.85, green: 0.86, blue: 0.88 }),
       )

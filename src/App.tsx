@@ -491,64 +491,6 @@ export default function App() {
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
-                      {/* Design style picker — with mini slide thumbnails */}
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-2">Slide Style</p>
-                        <div className="flex gap-1.5">
-                          {([
-                            { value: 'standard',         label: 'Professional' },
-                            { value: 'bold-agency',       label: 'Agency' },
-                            { value: 'executive-minimal', label: 'Executive' },
-                          ] as const).map(({ value, label }) => {
-                            const isActive = (designConfig.designStyle ?? 'standard') === value
-                            const accent = designConfig.customBrandHex ?? '#F27321'
-                            return (
-                              <button
-                                key={value}
-                                onClick={() => setDesignConfig(c => ({ ...c, designStyle: value }))}
-                                className={`flex-1 flex flex-col items-center gap-1.5 pt-2 pb-1.5 rounded-md transition-all ${
-                                  isActive ? 'bg-gold-500 ring-1 ring-gold-400' : 'bg-white/10 hover:bg-white/20'
-                                }`}
-                              >
-                                {/* Mini slide thumbnail */}
-                                {value === 'standard' && (
-                                  <svg viewBox="0 0 40 25" className="w-10 rounded-sm overflow-hidden flex-shrink-0">
-                                    <rect width="40" height="25" fill="#F5F5F0"/>
-                                    <rect x="4" y="5" width="14" height="1.5" rx="0.5" fill="#1e293b"/>
-                                    <rect x="4" y="9" width="22" height="1" rx="0.5" fill="#94a3b8"/>
-                                    <rect x="4" y="12" width="18" height="1" rx="0.5" fill="#94a3b8"/>
-                                    <rect x="0" y="20" width="40" height="5" fill={accent}/>
-                                  </svg>
-                                )}
-                                {value === 'bold-agency' && (
-                                  <svg viewBox="0 0 40 25" className="w-10 rounded-sm overflow-hidden flex-shrink-0">
-                                    <rect width="40" height="25" fill="#0D1F40"/>
-                                    <text x="22" y="21" fontSize="16" fill="rgba(255,255,255,0.07)" fontWeight="bold">01</text>
-                                    <rect x="4" y="5" width="14" height="1.5" rx="0.5" fill="white"/>
-                                    <rect x="4" y="9" width="22" height="1" rx="0.5" fill="rgba(255,255,255,0.3)"/>
-                                    <rect x="0" y="19" width="17" height="6" fill={accent}/>
-                                    <rect x="17" y="19" width="23" height="6" fill="rgba(255,255,255,0.06)"/>
-                                  </svg>
-                                )}
-                                {value === 'executive-minimal' && (
-                                  <svg viewBox="0 0 40 25" className="w-10 rounded-sm overflow-hidden flex-shrink-0">
-                                    <rect width="40" height="25" fill="#0E0E10"/>
-                                    <rect x="0" y="1.5" width="40" height="0.5" fill="rgba(255,255,255,0.2)"/>
-                                    <rect x="0" y="23" width="40" height="0.5" fill="rgba(255,255,255,0.2)"/>
-                                    <rect x="4" y="6" width="14" height="1.5" rx="0.5" fill="white"/>
-                                    <rect x="4" y="10" width="22" height="1" rx="0.5" fill="rgba(255,255,255,0.3)"/>
-                                    <rect x="4" y="13" width="16" height="1" rx="0.5" fill="rgba(255,255,255,0.3)"/>
-                                  </svg>
-                                )}
-                                <span className={`text-[10px] font-semibold ${isActive ? 'text-navy-900' : 'text-navy-300'}`}>
-                                  {label}
-                                </span>
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-
                       {/* Custom brand color picker */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">

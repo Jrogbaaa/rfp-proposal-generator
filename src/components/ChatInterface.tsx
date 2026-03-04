@@ -94,7 +94,7 @@ export default function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-4">
+      <div className="flex-1 overflow-y-auto space-y-4 pr-2 pb-4" style={{ scrollbarWidth: 'thin', scrollbarColor: '#94a3b8 transparent' }}>
         <AnimatePresence initial={false}>
           {messages.map((msg, i) => (
             <motion.div
@@ -180,7 +180,7 @@ export default function ChatInterface({
           onKeyDown={handleKeyDown}
           placeholder="Ask for changes… (e.g. 'make it more concise')"
           disabled={isLoading}
-          rows={2}
+          rows={3}
           className="flex-1 resize-none rounded-xl border border-cream-400 bg-white px-4 py-3 text-sm text-navy-800 placeholder-navy-400 focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-transparent disabled:opacity-50 transition"
         />
         <button
