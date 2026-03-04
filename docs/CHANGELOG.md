@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-04] — Refine Tab UX + Paramount Media Sales Deck + Build Fixes
+
+### Changed
+- **Removed Slide Style picker from Refine tab** — `src/App.tsx`; the three-button Professional/Agency/Executive toggle is removed; `designStyle` always defaults to `'standard'`; brand color auto-detection from company name remains the primary theming mechanism
+- **Prompt box enlarged** — `src/components/ChatInterface.tsx`; textarea `rows={2}` → `rows={3}`; messages scroll area now has a visible thin scrollbar (`scrollbarWidth: 'thin'`)
+- **LLM generation upgraded to Paramount media sales output** — `src/utils/llmService.ts`; `SYSTEM_PROMPT` rewritten as a Paramount Advertising Solutions sales executive persona; returns full `paramountMedia` object alongside standard `problemExpansions`/`benefitExpansions`; schema includes IP alignments, integration concepts, talent opportunities, programming calendar, measurement framework, and 3-tier investment structure
+- **`PARAMOUNT_TRAINING_CONTEXT` expanded** — `src/utils/trainingContext.ts`; richer Paramount asset inventory and brief-archetype playbook
+
+### Added
+- **`ParamountMediaContent` and related types** — `src/types/proposal.ts`; `IPAlignment`, `IntegrationConcept`, `CalendarItem`, `InvestmentTier`, `ParamountMediaContent` interfaces; `paramountMedia?: ParamountMediaContent` field on `ExpandedContent`
+- **`'paramount'` color theme** — `src/types/proposal.ts`; added to `ColorTheme` union
+- **Paramount-specific slide builders** — `src/utils/googleSlides.ts`; `opportunitySlide`, `ipAlignmentSlide`, `audienceSlide`, `integrationConceptSlide`, `talentSlide`, `programmingCalendarSlide`, `measurementSlide`, `tierInvestmentSlide`; full 13-slide Paramount media deck rendered when `paramountMedia` content is present
+
+### Fixed
+- **TypeScript build errors** — `src/utils/googleSlides.ts` (unused `data` param on `measurementSlide`), `src/utils/llmService.ts` (`ParamountMediaContent` cast via `unknown` intermediate)
+
+---
+
 ## [2026-03-03] — Structured Brand Voice Profile + Custom Hex Color Picker
 
 ### Added

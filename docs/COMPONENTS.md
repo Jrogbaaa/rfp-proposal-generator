@@ -32,11 +32,9 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Workflow Steps:**
 1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content chat, sticky sidebar, slide preview with inline editing, export) → 3. Export (success screen with Google Slides link and mailto)
 
-**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, a **Slide Style picker** (Professional / Agency / Executive), and `GoogleSlidesButton`. Does not scroll with the slide preview.
+**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, a **Brand Color** picker, and `GoogleSlidesButton`. Does not scroll with the slide preview.
 
-**Slide Style Picker:** Three-button toggle above the export button with inline SVG thumbnails; updates `designConfig.designStyle` in state. Options: `standard` (Professional — white slides, accent bars), `bold-agency` (Agency — dark slides, watermark numbers, split panels), `executive-minimal` (Executive — near-black slides, hairline rules, premium consulting feel).
-
-**Custom Brand Color:** Hex color input below the style picker; stores to `designConfig.customBrandHex`. On input, calls `derivePaletteFromHex()` to show a live 4-swatch palette preview (primary, primaryLighter, primaryDarker, accent). Takes priority over company auto-detection in `googleSlides.ts`.
+**Brand Color:** Hex color input; stores to `designConfig.customBrandHex`. On input, calls `derivePaletteFromHex()` to show a live 4-swatch palette preview. Takes priority over company auto-detection in `googleSlides.ts`. `designStyle` is always `'standard'` — the Slide Style picker was removed in favour of automatic brand colour detection.
 
 ---
 
@@ -74,6 +72,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - Suggested prompt chips for common requests (tone changes, language adjustments, focus shifts)
 - Calls `iterateProposalContent()` from `llmService.ts`
 - Displays Gemini reply text; silently updates expansions in the background via callback
+- **Textarea** `rows={3}` with visible thin scrollbar on the messages area
 
 **LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history, brandVoice?: BrandVoiceProfile)` → `{reply, updatedExpansions?}`
 
@@ -238,5 +237,5 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 ---
 
 ## Last Updated
-- Date: 2026-03-03
-- Changes: Structured `BrandVoiceProfile` (typed JSON replacing prose), `formatBrandVoiceConstraints()` for explicit prompt injection, custom hex color picker in App.tsx with live palette preview, `derivePaletteFromHex()` exported from brandColors.ts, priority palette chain in googleSlides.ts, SVG thumbnails in style picker, Professional/Agency/Executive labels
+- Date: 2026-03-04
+- Changes: Slide Style picker removed (always `standard`); `ChatInterface` prompt box enlarged to 3 rows with visible scrollbar; Paramount media sales types added (`ParamountMediaContent`, `IPAlignment`, `IntegrationConcept`, `CalendarItem`, `InvestmentTier`); new Paramount-specific slide builders in `googleSlides.ts`; `SYSTEM_PROMPT` rewritten as Paramount sales persona; `'paramount'` added to `ColorTheme`
