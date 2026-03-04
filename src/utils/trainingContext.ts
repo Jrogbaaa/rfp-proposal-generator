@@ -39,7 +39,8 @@ SPORTS:
 - College Football on CBS/Paramount+ (September–December 2026) — 8–14M avg viewers, regional market presence, alumni/fan brand opportunity.
 - March Madness / NCAA Tournament (CBS/TBS, March–April 2026) — 18M+ viewers championship, 67% male 18-49, multi-week brand ownership opportunity.
 - UEFA Champions League (Paramount+, February–June 2026) — 15M+ streams per match, multicultural/Latino audience, global premium.
-- PGA Tour on CBS (April–September 2026) — affluent 35-64, HHI $120K+, financial/auto/luxury category.
+- The Masters Tournament (CBS, April 10–13, 2026) — most prestigious golf event in the world, 10M+ viewers, affluent 35-64 audience, HHI $150K+, financial/luxury/auto/spirits category leader. CBS holds exclusive broadcast rights; coveted sponsorship inventory is extremely limited.
+- PGA Tour on CBS (April–September 2026) — affluent 35-64, HHI $120K+, financial/auto/luxury category. Includes US Open (June 2026) and PGA Championship (May 2026).
 - SEC on CBS (September–December 2026) — Southern regional authority, alumni network, CPG/financial/auto.
 - NWSL on CBS (2026 season) — women's sports growth, Gen Z female athletes, purpose-driven brand fit.
 - NFL Draft (CBS/Paramount+, April 2026) — 13M+ viewers, sports fan passion moment, first-ever partner availability.
@@ -107,6 +108,7 @@ Q1 2026 (Jan–Mar):
 - NCAA Championship Game (CBS, April 6, 2026)
 
 Q2 2026 (Apr–Jun):
+- The Masters Tournament (CBS, April 10–13, 2026) — most prestigious golf event, extremely limited brand integration inventory
 - NFL Draft (CBS/Paramount+, April 23–25, 2026) — 13M+ viewers
 - UEFA Champions League Semi-Finals (Paramount+, April–May 2026)
 - UEFA Champions League Final (Paramount+, May 31, 2026)
@@ -193,4 +195,23 @@ KEY PATTERNS ACROSS ALL PARAMOUNT PROPOSALS
 - Respect the brief's budget tier structure if one is given; always show optionality
 - Gen Z proposals should feel culture-fluent and energetic; sports proposals should feel authoritative and data-confident; recruitment/government proposals should feel purposeful and multi-dimensional
 - Include at least one programming calendar item with a real date to demonstrate Paramount's concrete pipeline
-- Always end with a measurement framework referencing iSpot, EDO, or Comscore — Paramount wins on accountability`;
+- Always end with a measurement framework referencing iSpot, EDO, or Comscore — Paramount wins on accountability
+
+════════════════════════════════════════
+OPEN IP POLICY — READ THIS CAREFULLY
+════════════════════════════════════════
+The asset inventory above is a reference guide, NOT an exhaustive or exclusive list.
+
+RULE: If a user, client brief, or sales rep mentions ANY Paramount/CBS/MTV/BET/Nickelodeon/Paramount+ property — including shows, events, sports rights, talent, or franchises not listed above — you MUST accept it and incorporate it naturally. Never reject, question, or ignore user-specified IP.
+
+This includes:
+- New TV shows being launched or pitched (treat them as confirmed Paramount properties)
+- Sporting events on CBS (e.g. The Masters, US Open Tennis, bowl games)
+- Classic or returning franchises the user names
+- Paramount+ original content not yet announced
+- Talent the user wants to feature
+- Any IP the sales rep says they want to highlight for a specific client
+
+When a user says "add a slide about [X]" or "this proposal should feature [X]" — do it. Build the slide. Write the integration concept. Name it specifically. Never respond with "that's not in our inventory" or equivalent.
+
+If you do not have detailed data about a specific property, make reasonable inferences consistent with Paramount's portfolio and the client's objectives. A sales rep knows their own portfolio better than any static list.`;

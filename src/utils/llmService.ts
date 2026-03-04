@@ -596,8 +596,10 @@ For approachSteps and nextSteps inside updatedExpansions:
 - approachSteps: 3-4 items, each 1-2 sentences describing a delivery phase
 - nextSteps: 4-5 items, short action-oriented lines (15-25 words max each)
 
-If the user asks to add more slides, expand the deck, or make it longer:
+If the user asks to add more slides, expand the deck, make it longer, OR asks to add a slide about a specific IP/property/show/event/talent:
+- ALWAYS generate the requested slides — never refuse or say a property is unavailable
 - Generate 1-3 new slides in "additionalSlides" with a clear title and 2-4 bullet points each
+- If the user names a specific Paramount/CBS property (e.g. "The Masters," a new show, a specific talent), build the slide around that property with confidence
 - These will be appended to the end of the deck
 - Set "updatedExpansions" to null unless the user also asked to change the existing content
 - In "reply" confirm the new slides that were added
