@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-03-04] — Refine Chatbot Visual Feedback Fix
+
+### Fixed
+- **Animation key now covers all bullet content** — `src/components/SlidePreview.tsx`; `chatUpdateVersion` prop forwarded from `SlidePreview` to `SlideCard` so the existing content-hash key (`bullets.join('|').slice(0, 60)`) plus timestamp actually triggers re-animation on chat updates
+- **Chat updates now set a timestamp** — `src/App.tsx`; `lastChatUpdate` state added; `onExpansionsUpdated` callback wrapped to call `setLastChatUpdate(Date.now())` alongside `setExpansions`; value passed as `chatUpdateVersion` to `SlidePreview`
+
+### Added
+- **"Slides updated" flash banner** — `src/App.tsx`; emerald-colored `AnimatePresence` banner appears for 3 seconds after every chat-driven content update in the Refine step
+
+---
+
 ## [2026-03-04] — Documenter Directive Update
 
 ### Changed

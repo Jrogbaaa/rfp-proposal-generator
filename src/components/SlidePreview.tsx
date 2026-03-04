@@ -211,7 +211,7 @@ function SlideCard({
 const EDITABLE_SLIDES = new Set([1, 2, 3, 4, 7, 8])
 const isEditableSlide = (n: number) => EDITABLE_SLIDES.has(n) || n >= 11
 
-export default function SlidePreview({ fileName, data, designConfig, isUpdating, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
+export default function SlidePreview({ fileName, data, designConfig, isUpdating, chatUpdateVersion, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
   const hasRealData = !!(data && (data.client?.company || data.project?.title || data.content?.problems?.[0]))
   const slides = hasRealData ? buildSlidesFromData(data!) : null
   const theme = THEME_MAP[designConfig?.colorTheme ?? 'navy-gold'] ?? DEFAULT_THEME
@@ -255,6 +255,7 @@ export default function SlidePreview({ fileName, data, designConfig, isUpdating,
                 slide={slide}
                 index={index}
                 theme={theme}
+                chatUpdateVersion={chatUpdateVersion}
                 onBulletEdit={onSlideEdit && isEditableSlide(slide.slideNumber)
                   ? (bulletIndex, newText) => onSlideEdit(slide.slideNumber, bulletIndex, newText)
                   : undefined

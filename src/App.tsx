@@ -53,12 +53,24 @@ export default function App() {
   const [isSlideUpdating, setIsSlideUpdating] = useState(false)
   const [generationError, setGenerationError] = useState<string | null>(null)
 
+  // Chat update feedback
+  const [lastChatUpdate, setLastChatUpdate] = useState<number>(0)
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false)
+
   // Google auth state — poll periodically so badge updates after OAuth
   const [isGoogleConnected, setIsGoogleConnected] = useState(() => getAuthState().isSignedIn)
   useEffect(() => {
     const id = setInterval(() => setIsGoogleConnected(getAuthState().isSignedIn), 3000)
     return () => clearInterval(id)
   }, [])
+
+  useEffect(() => {
+    if (lastChatUpdate > 0) {
+      setShowUpdateBanner(true)
+      const t = setTimeout(() => setShowUpdateBanner(false), 3000)
+      return () => clearTimeout(t)
+    }
+  }, [lastChatUpdate])
 
   const parsedData = useBriefParser(briefText)
   const hasContent = briefText.trim().length > 0
@@ -405,6 +417,19 @@ export default function App() {
                       </div>
                     </div>
 
+                    <AnimatePresence>
+                      {showUpdateBanner && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-3"
+                        >
+                          &#x2713; Slides updated based on your feedback
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     {isGenerating ? (
                       <div className="flex-1 overflow-auto space-y-4 pr-1">
                         {[1, 2, 3, 4].map((i) => (
@@ -462,6 +487,7 @@ export default function App() {
                           data={expansions ? { ...parsedData, expanded: expansions } : parsedData}
                           designConfig={designConfig}
                           isUpdating={isSlideUpdating}
+                          chatUpdateVersion={lastChatUpdate}
                           onSlideEdit={expansions ? handleSlideEdit : undefined}
                           onSlideTitleEdit={expansions ? handleSlideTitleEdit : undefined}
                         />
@@ -483,7 +509,10 @@ export default function App() {
                         briefText={briefText}
                         parsedData={parsedData || {}}
                         currentExpansions={expansions}
-                        onExpansionsUpdated={setExpansions}
+                        onExpansionsUpdated={(e) => {
+                          setExpansions(e)
+                          setLastChatUpdate(Date.now())
+                        }}
                         onLoadingChange={setIsSlideUpdating}
                         brandVoice={brandVoice ?? undefined}
                       />
