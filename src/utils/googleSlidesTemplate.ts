@@ -1,11 +1,12 @@
 /**
  * Template-based Google Slides builder
  *
- * Three-phase approach:
+ * Approach:
  *   1. POST drive.googleapis.com/v3/files/{TEMPLATE_ID}/copy — duplicate the template
  *   2. GET  slides.googleapis.com/v1/presentations/{id}      — read slide objectIds
- *   3. POST slides.googleapis.com/v1/presentations/{id}:batchUpdate — delete/reorder/populate
+ *   3. POST slides.googleapis.com/v1/presentations/{id}:batchUpdate — clean up + populate
  *
+ * ALL template slides are kept in their original order.
  * Typography and visual design are inherited from the template.
  * Content is injected via replaceAllText using {{PLACEHOLDER}} markers baked into the template.
  */
@@ -16,13 +17,6 @@ import type { CreateSlidesResult } from './googleSlides'
 const TEMPLATE_ID = '1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo'
 const DRIVE_API   = 'https://www.googleapis.com/drive/v3/files'
 const SLIDES_API  = 'https://slides.googleapis.com/v1/presentations'
-
-// Template slide indices (0-based) to KEEP, in desired proposal order:
-// Cover → Opportunity → Approach → Benefits → Investment → Metrics → Next Steps
-const KEEP_INDICES_IN_ORDER = [0, 5, 3, 11, 12, 9, 17] as const
-
-// All other 18 template slides are deleted
-const DELETE_INDICES = [1, 2, 4, 6, 7, 8, 10, 13, 14, 15, 16]
 
 // Logo constants (EMU — 1 inch = 914,400 EMU)
 const W = 9_144_000
@@ -94,11 +88,9 @@ const STATIC_TEXT_PATTERNS = [
 
 function buildStaticTextCleanupRequests(
   allSlides: Array<{ objectId: string; pageElements: PageElement[] }>,
-  keepEntries: Array<{ origIdx: number; id: string }>,
 ): object[] {
   const reqs: object[] = []
-  for (const entry of keepEntries) {
-    const slide = allSlides[entry.origIdx]
+  for (const slide of allSlides) {
     if (!slide?.pageElements) continue
     for (const el of slide.pageElements) {
       const text = getAllText(el)
