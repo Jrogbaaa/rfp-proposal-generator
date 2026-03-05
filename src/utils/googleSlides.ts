@@ -164,6 +164,19 @@ function paragraphAlign(id: string, alignment: 'START' | 'CENTER' | 'END' = 'STA
 // any updateShapeProperties with fields: 'autofit' returns a 400.
 // Text boxes are sized generously at creation time instead.
 
+/** Truncate a string to maxChars at a word boundary. */
+function truncate(text: string, maxChars: number, suffix = '…'): string {
+  if (!text || text.length <= maxChars) return text
+  const cut = text.slice(0, maxChars - suffix.length)
+  const lastSpace = cut.lastIndexOf(' ')
+  return (lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut) + suffix
+}
+
+/** Limit bullet list length and truncate each bullet to avoid text box overflow. */
+function truncateBullets(bullets: string[], maxBullets = 5, maxBulletChars = 120): string[] {
+  return bullets.slice(0, maxBullets).map(b => truncate(b, maxBulletChars))
+}
+
 function createImageReq(
   id: string, slideId: string, url: string,
   x: number, y: number, w: number, h: number,
@@ -407,8 +420,8 @@ function challengeSlide(slideId: string, data: ProposalData, palette: SlidePalet
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1100000, FULL_W - 80000, 3500000),
     ...(problems.length ? [
-      insertText(bodyId, problems.join('\n')),
-      styleText(bodyId, { color: isDark ? LTGRAY : palette.primary, fontSize: 20, fontFamily: 'Inter' }),
+      insertText(bodyId, truncateBullets(problems, 5, 100).join('\n')),
+      styleText(bodyId, { color: isDark ? LTGRAY : palette.primary, fontSize: 18, fontFamily: 'Inter' }),
       {
         createParagraphBullets: {
           objectId: bodyId,
@@ -480,8 +493,8 @@ function problemDeepDive(
     createTextBox(headId, slideId, MARGIN_X + xOff, 520000, FULL_W - xOff, 1100000),
     ...(headline ? [insertText(headId, headline), styleText(headId, { color: headColor, fontSize: 24, fontFamily: 'Montserrat', bold: true })] : []),
 
-    createTextBox(bodyId, slideId, MARGIN_X + xOff, 1750000, FULL_W - xOff, 3000000),
-    ...(body ? [insertText(bodyId, body), styleText(bodyId, { color: bodyColor, fontSize: 16, fontFamily: 'Inter' })] : []),
+    createTextBox(bodyId, slideId, MARGIN_X + xOff, 1750000, FULL_W - xOff, 3200000),
+    ...(body ? [insertText(bodyId, truncate(body, 600)), styleText(bodyId, { color: bodyColor, fontSize: 16, fontFamily: 'Inter' })] : []),
   )
 
   return reqs
@@ -573,8 +586,8 @@ function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalett
       // Benefits list in right panel
       createTextBox(bodyId, slideId, splitX + MARGIN_X, MARGIN_TOP, W - splitX - MARGIN_X * 2, 4500000),
       ...(benefits.length ? [
-        insertText(bodyId, benefits.join('\n')),
-        styleText(bodyId, { color: WHITE, fontSize: 20, fontFamily: 'Inter' }),
+        insertText(bodyId, truncateBullets(benefits, 5, 100).join('\n')),
+        styleText(bodyId, { color: WHITE, fontSize: 18, fontFamily: 'Inter' }),
         {
           createParagraphBullets: {
             objectId: bodyId,
@@ -609,8 +622,8 @@ function solutionSlide(slideId: string, data: ProposalData, palette: SlidePalett
 
     createTextBox(bodyId, slideId, MARGIN_X, 1050000, FULL_W, 3500000),
     ...(benefits.length ? [
-      insertText(bodyId, benefits.join('\n')),
-      styleText(bodyId, { color: WHITE, fontSize: 20, fontFamily: 'Inter' }),
+      insertText(bodyId, truncateBullets(benefits, 5, 100).join('\n')),
+      styleText(bodyId, { color: WHITE, fontSize: 18, fontFamily: 'Inter' }),
       {
         createParagraphBullets: {
           objectId: bodyId,
@@ -953,7 +966,7 @@ function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette
     ...createRect(rule2Id, slideId, MARGIN_X, 2300000, FULL_W, 6000, palette.accent),
 
     createTextBox(headId, slideId, MARGIN_X, 1400000, FULL_W, 800000),
-    insertText(headId, `Let's build this together, ${data.client.firstName}.`),
+    insertText(headId, `Let's build this together.`),
     styleText(headId, { color: palette.accent, fontSize: opts.boldAgency ? 44 : 40, fontFamily: 'Montserrat', bold: true }),
     paragraphAlign(headId, 'CENTER'),
   )
@@ -1020,7 +1033,7 @@ function opportunitySlide(slideId: string, pm: ParamountMediaContent, data: Prop
 
     createTextBox(bodyId, slideId, MARGIN_X, 1400000, FULL_W, 2800000),
     ...(pm.opportunityStatement ? [
-      insertText(bodyId, pm.opportunityStatement),
+      insertText(bodyId, truncate(pm.opportunityStatement, 500)),
       styleText(bodyId, { color: LTGRAY, fontSize: 20, fontFamily: 'Inter' }),
     ] : []),
 
@@ -1173,7 +1186,7 @@ function integrationConceptSlide(slideId: string, concept: IntegrationConcept, i
 
     createTextBox(rightMechId, slideId, splitX + MARGIN_X + 12000, 500000, W - splitX - MARGIN_X * 2 - 12000, 2500000),
     ...(concept.mechanic ? [
-      insertText(rightMechId, concept.mechanic),
+      insertText(rightMechId, truncate(concept.mechanic, 450)),
       styleText(rightMechId, { color: palette.primary, fontSize: 17, fontFamily: 'Inter' }),
     ] : []),
 
@@ -1390,7 +1403,7 @@ function tierInvestmentSlide(slideId: string, pm: ParamountMediaContent, palette
       if (tier.inclusions && tier.inclusions.length > 0) {
         reqs.push(
           createTextBox(inclId, slideId, cardX + 80000, cardY + 920000, cardW - 160000, cardH - 1000000),
-          insertText(inclId, tier.inclusions.join('\n')),
+          insertText(inclId, truncateBullets(tier.inclusions, 5, 80).join('\n')),
           styleText(inclId, { color: textColor, fontSize: 12, fontFamily: 'Inter' }),
           {
             createParagraphBullets: {
@@ -1429,7 +1442,7 @@ function appendixSlide(slideId: string, pm: ParamountMediaContent, palette: Slid
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1200000, FULL_W - 80000, 3400000),
     ...(items.length ? [
-      insertText(bodyId, items.join('\n')),
+      insertText(bodyId, truncateBullets(items, 6, 140).join('\n')),
       styleText(bodyId, { color: LTGRAY, fontSize: 16, fontFamily: 'Inter' }),
       {
         createParagraphBullets: {

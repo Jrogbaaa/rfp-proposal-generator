@@ -126,11 +126,7 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
               </svg>
               Trained on {trainedCount} doc{trainedCount !== 1 ? 's' : ''}
             </span>
-          ) : (
-            <span className="px-2 py-0.5 rounded-full bg-navy-100 text-navy-500 text-xs font-medium">
-              Not configured
-            </span>
-          )}
+          ) : null}
           {/* Tone chips — shown in header when trained + collapsed */}
           {brandVoice && !isExpanded && brandVoice.tone.slice(0, 2).map(t => (
             <span key={t} className="px-2 py-0.5 rounded-full bg-navy-50 text-navy-600 text-[10px] font-medium border border-navy-200 hidden sm:inline-flex">

@@ -119,7 +119,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       title: `Let's Build This Together`,
       subtitle: company !== '—' ? company : undefined,
       bullets: [
-        client?.firstName ? `Ready to move forward, ${client.firstName}?` : '',
+        `We look forward to building this together.`,
         client?.email ? `Reach us at ${client.email}` : '',
       ].filter(Boolean),
     },
