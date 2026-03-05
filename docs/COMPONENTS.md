@@ -249,12 +249,10 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 **Template ID:** `1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`
 
-**4-phase build process:**
+**3-phase build process (all template slides are kept in original order):**
 1. **Copy** — `POST /drive/v3/files/{templateId}/copy` duplicates the master template into the user's Drive, returning a new `presentationId`
 2. **Read** — `GET /v1/presentations/{id}` fetches all slides and shape objectIds from the copy
-3. **Prune** — `POST /v1/presentations/{id}:batchUpdate` with `deleteObject` requests removes 11 unwanted slides (original indices 1, 2, 4, 6, 7, 8, 10, 13, 14, 15, 16), leaving 7 slides in order [0, 5, 3, 11, 12, 9, 17] (re-indexed after deletion)
-4. **Clean** — same batchUpdate also deletes static text elements (e.g. "Lorem ipsum", "Feedback Date") on kept slides via `buildStaticTextCleanupRequests()`, preventing template sample text from overlapping real content
-5. **Populate** — `replaceAllText` requests replace `{{PLACEHOLDER}}` markers with proposal content, preserving all template typography; a follow-up batchUpdate inserts the client logo image on the cover slide and the next-steps closing slide (replacing the "LOGO HERE" text placeholder)
+3. **Clean + Populate** — `POST /v1/presentations/{id}:batchUpdate` first deletes static text elements (e.g. "Lorem ipsum") via `buildStaticTextCleanupRequests()`, then replaces `{{PLACEHOLDER}}` markers with proposal content via `replaceAllText`, preserving all template typography; a follow-up batchUpdate inserts logos (Paramount + client)
 
 **Returns:** `{ presentationId, presentationUrl, title }`
 
@@ -262,4 +260,4 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 ## Last Updated
 - Date: 2026-03-05
-- Changes: All decks now route through `createTemplatePresentation` (template `1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`); removed `designConfig` prop from `GoogleSlidesButton`; removed old `hasParamountMedia` conditional routing
+- Changes: All 18 template slides kept in original order (no deletion/reordering); static text cleanup runs across all slides; all decks route through `createTemplatePresentation`; template edits are the primary way to control slide layout and content

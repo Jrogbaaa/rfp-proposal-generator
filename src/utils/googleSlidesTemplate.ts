@@ -304,14 +304,7 @@ export async function createTemplatePresentation(
 
   const presentation = await getResp.json() as { slides?: Array<{ objectId: string; pageElements: PageElement[] }> }
   const allSlides = presentation.slides ?? []
-
-  // Build keep entries retaining the mapping from desired-order position → original index
-  const keepEntries = (KEEP_INDICES_IN_ORDER as readonly number[])
-    .map(origIdx => ({ origIdx, id: allSlides[origIdx]?.objectId }))
-    .filter((e): e is { origIdx: number; id: string } => Boolean(e.id))
-
-  const keepSlideIds   = keepEntries.map(e => e.id)          // desired final order
-  const deleteSlideIds = DELETE_INDICES.map(i => allSlides[i]?.objectId).filter((id): id is string => Boolean(id))
+  const allSlideIds = allSlides.map(s => s.objectId).filter(Boolean)
 
   const coverSlideId  = allSlides[0]?.objectId ?? ''
   const coverElements = allSlides[0]?.pageElements ?? []
@@ -319,38 +312,13 @@ export async function createTemplatePresentation(
   // ── Phase 3: Build batchUpdate ───────────────────────────────────────────
   const requests: object[] = []
 
-  // 3a: Delete unwanted slides
-  for (const objectId of deleteSlideIds) {
-    requests.push({ deleteObject: { objectId } })
-  }
+  // 3a: Delete static text elements (e.g. "Lorem ipsum") that overlap placeholders
+  requests.push(...buildStaticTextCleanupRequests(allSlides))
 
-  // 3b: Reorder remaining slides into proposal order via individual single-slide moves.
-  // Google Slides API requires slideObjectIds to be in current presentation order, so
-  // a single bulk updateSlidesPosition fails when the desired order isn't ascending.
-  // Instead: track current slide order and emit one move per out-of-place slide.
-  const current = [...keepEntries].sort((a, b) => a.origIdx - b.origIdx).map(e => e.id)
-  for (let i = 0; i < keepSlideIds.length; i++) {
-    const desiredId = keepSlideIds[i]
-    const currentPos = current.indexOf(desiredId)
-    if (currentPos !== i) {
-      requests.push({
-        updateSlidesPosition: {
-          slideObjectIds: [desiredId],
-          insertionIndex: i,
-        },
-      })
-      current.splice(currentPos, 1)
-      current.splice(i, 0, desiredId)
-    }
-  }
-
-  // 3c: Delete static text elements (e.g. "Lorem ipsum") that overlap placeholders
-  requests.push(...buildStaticTextCleanupRequests(allSlides, keepEntries))
-
-  // 3d: Replace all {{PLACEHOLDER}} tokens across the presentation
+  // 3b: Replace all {{PLACEHOLDER}} tokens across the presentation
   requests.push(...buildReplaceRequests(data))
 
-  // 3e: Execute main batchUpdate
+  // 3c: Execute main batchUpdate
   const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
     method: 'POST',
     headers,
@@ -364,7 +332,7 @@ export async function createTemplatePresentation(
 
   // ── Phase 4: Logo insertion (best-effort, non-fatal) ─────────────────────
   try {
-    const logoReqs = buildTemplateLogoRequests(coverElements, coverSlideId, keepSlideIds, data)
+    const logoReqs = buildTemplateLogoRequests(coverElements, coverSlideId, allSlideIds, data)
     if (logoReqs.length > 0) {
       const logoResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
         method: 'POST',

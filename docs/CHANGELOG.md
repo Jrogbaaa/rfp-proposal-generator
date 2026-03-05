@@ -1,9 +1,16 @@
 # Changelog
 
+## [2026-03-05] — Keep All Template Slides
+
+### Changed
+- **`googleSlidesTemplate.ts` — keep all 18 slides** — Removed `KEEP_INDICES_IN_ORDER`, `DELETE_INDICES`, and all slide deletion/reordering logic. The template is now copied as-is with all slides in their original order. Only static text cleanup and `{{PLACEHOLDER}}` replacement are applied. This means any slide arrangement should be done directly in the Google Slides template.
+
+---
+
 ## [2026-03-05] — Static Text Cleanup in Template Builder
 
 ### Fixed
-- **`googleSlidesTemplate.ts` overlap fix** — Added `buildStaticTextCleanupRequests()` that scans kept slides for text elements containing "Lorem ipsum" or "Feedback Date" and deletes them before placeholder replacement. Prevents template sample text from overlapping real content in the output.
+- **`googleSlidesTemplate.ts` overlap fix** — Added `buildStaticTextCleanupRequests()` that scans all slides for text elements containing "Lorem ipsum" or "Feedback Date" and deletes them before placeholder replacement. Prevents template sample text from overlapping real content in the output.
 
 ---
 
