@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-03-05] — Static Text Cleanup in Template Builder
+
+### Fixed
+- **`googleSlidesTemplate.ts` overlap fix** — Added `buildStaticTextCleanupRequests()` that scans kept slides for text elements containing "Lorem ipsum" or "Feedback Date" and deletes them before placeholder replacement. Prevents template sample text from overlapping real content in the output.
+
+---
+
 ## [2026-03-05] — Always Route Through Template Builder
 
 ### Fixed

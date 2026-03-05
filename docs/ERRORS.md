@@ -15,6 +15,15 @@ When you encounter an error:
 
 ## Google Slides / OAuth Errors
 
+### Template output has overlapping text — static "Lorem ipsum" text boxes
+**Error:** Generated Google Slides presentations show overlapping text on Benefits, Investment, and other slides. Template sample text ("Lorem ipsum dolor sit amet...") renders on top of the replaced placeholder content.
+
+**Cause:** The template contains two layers of text boxes on many slides: `{{PLACEHOLDER}}` marker boxes (used by code) and static sample text boxes (design mockup content). The code replaces the placeholder text but leaves static elements untouched.
+
+**Solution:** Added `buildStaticTextCleanupRequests()` in `googleSlidesTemplate.ts` that scans kept slides for text elements matching patterns in `STATIC_TEXT_PATTERNS` (e.g. "lorem ipsum", "feedback date") and deletes them via `deleteObject` before running `replaceAllText`. For any additional static text that overlaps, either add the pattern to `STATIC_TEXT_PATTERNS` or remove the element directly in the Google Slides template.
+
+---
+
 ### `Unknown name "autoFitType"` / `Unknown name "auto_fit_type"` — wrong autofit field name
 **Error:** `Invalid JSON payload received. Unknown name "autoFitType" at 'requests[N].update_shape_properties.shape_properties.autofit': Cannot find field.`
 

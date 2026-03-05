@@ -84,6 +84,36 @@ function getClientDomain(data: ProposalData): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Static text cleanup — remove template sample text that overlaps placeholders
+// ---------------------------------------------------------------------------
+
+const STATIC_TEXT_PATTERNS = [
+  'lorem ipsum',
+  'feedback date',
+]
+
+function buildStaticTextCleanupRequests(
+  allSlides: Array<{ objectId: string; pageElements: PageElement[] }>,
+  keepEntries: Array<{ origIdx: number; id: string }>,
+): object[] {
+  const reqs: object[] = []
+  for (const entry of keepEntries) {
+    const slide = allSlides[entry.origIdx]
+    if (!slide?.pageElements) continue
+    for (const el of slide.pageElements) {
+      const text = getAllText(el)
+      if (!text) continue
+      if (text.includes('{{')) continue
+      const lower = text.toLowerCase()
+      if (STATIC_TEXT_PATTERNS.some(p => lower.includes(p))) {
+        reqs.push({ deleteObject: { objectId: el.objectId } })
+      }
+    }
+  }
+  return reqs
+}
+
+// ---------------------------------------------------------------------------
 // Content replacement — replaceAllText for every {{PLACEHOLDER}} in template
 // ---------------------------------------------------------------------------
 
@@ -322,10 +352,13 @@ export async function createTemplatePresentation(
     }
   }
 
-  // 3c: Replace all {{PLACEHOLDER}} tokens across the presentation
+  // 3c: Delete static text elements (e.g. "Lorem ipsum") that overlap placeholders
+  requests.push(...buildStaticTextCleanupRequests(allSlides, keepEntries))
+
+  // 3d: Replace all {{PLACEHOLDER}} tokens across the presentation
   requests.push(...buildReplaceRequests(data))
 
-  // 3d: Execute main batchUpdate
+  // 3e: Execute main batchUpdate
   const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
     method: 'POST',
     headers,
