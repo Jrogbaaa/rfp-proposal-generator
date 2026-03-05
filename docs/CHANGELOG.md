@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-03-05] — Refine Panel Layout, Paramount IP Expansion, autofit Fix
+
+### Fixed
+- **`autofitType` field name corrected** — `src/utils/googleSlides.ts`; Google Slides REST API expects `autofitType` (camelCase, lowercase `f`). Previous attempts of `autoFitType` (capital F) and `auto_fit_type` (snake_case) both returned 400. Entry added to `docs/ERRORS.md`.
+
+### Changed
+- **Refine step right panel decluttered** — `src/App.tsx`; removed brand color picker from the Refine sidebar entirely. `ChatInterface` wrapper changed from `overflow-hidden` to `overflow-y-auto` so the send button is no longer clipped. `GoogleSlidesButton` now sits directly below the chat with a thin border separator. Removed unused `derivePaletteFromHex` import.
+
+### Added
+- **The Masters Tournament added to Paramount IP inventory** — `src/utils/trainingContext.ts`; added to SPORTS section (CBS, April 10–13, 2026, 10M+ viewers, HHI $150K+) and Q2 2026 programming calendar.
+- **Open IP Policy directive** — `src/utils/trainingContext.ts`; new section instructs the AI to accept and build with ANY user-specified Paramount/CBS property, show, event, or talent — never reject user-requested IP additions.
+- **Iterate prompt accepts any IP** — `src/utils/llmService.ts`; `ITERATE_SYSTEM_PROMPT` updated to always generate slides when a user requests IP-specific slides, never refuse.
+
+---
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).

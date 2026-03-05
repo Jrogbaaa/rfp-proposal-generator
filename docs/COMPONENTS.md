@@ -32,9 +32,9 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Workflow Steps:**
 1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content chat, sticky sidebar, slide preview with inline editing, export) → 3. Export (success screen with Google Slides link and mailto)
 
-**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface`, a **Brand Color** picker, and `GoogleSlidesButton`. Does not scroll with the slide preview.
+**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface` (flex-1, overflow-y-auto wrapper), and `GoogleSlidesButton` pinned at the bottom. Brand color picker was removed from this panel. Does not scroll with the slide preview.
 
-**Brand Color:** Hex color input; stores to `designConfig.customBrandHex`. On input, calls `derivePaletteFromHex()` to show a live 4-swatch palette preview. Takes priority over company auto-detection in `googleSlides.ts`. `designStyle` is always `'standard'` — the Slide Style picker was removed in favour of automatic brand colour detection.
+**Brand Color / Design Config:** `designConfig.customBrandHex` is still respected by `googleSlides.ts` (palette priority: custom hex → company auto-detect → preset theme), but the hex input UI was removed from the Refine sidebar to reduce crowding.
 
 ---
 
