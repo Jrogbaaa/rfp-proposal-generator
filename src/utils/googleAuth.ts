@@ -18,7 +18,7 @@ const SCOPES = [
 const TOKEN_STORAGE_KEY = 'gis_access_token'
 const TOKEN_EXPIRY_KEY = 'gis_token_expires_at'
 // Bump this when scopes change to force re-auth
-const SCOPE_VERSION = 'v2'
+const SCOPE_VERSION = 'v3'
 const SCOPE_VERSION_KEY = 'gis_scope_version'
 
 // If scope version changed, clear cached token to force re-auth with new scopes
@@ -88,8 +88,8 @@ export function requestGoogleToken(): Promise<string> {
       },
     })
 
-    // prompt: '' = show consent only if not already granted (silent re-auth when possible)
-    tokenClient.requestAccessToken({ prompt: '' })
+    // prompt: 'consent' = always show the Google consent screen so new scopes are explicitly granted
+    tokenClient.requestAccessToken({ prompt: 'consent' })
   })
 }
 

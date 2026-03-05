@@ -283,7 +283,12 @@ export async function createTemplatePresentation(
   const presentation = await getResp.json() as { slides?: Array<{ objectId: string; pageElements: PageElement[] }> }
   const allSlides = presentation.slides ?? []
 
-  const keepSlideIds  = KEEP_INDICES_IN_ORDER.map(i => allSlides[i]?.objectId).filter(Boolean) as string[]
+  // Build keep entries retaining the mapping from desired-order position → original index
+  const keepEntries = (KEEP_INDICES_IN_ORDER as readonly number[])
+    .map(origIdx => ({ origIdx, id: allSlides[origIdx]?.objectId }))
+    .filter((e): e is { origIdx: number; id: string } => Boolean(e.id))
+
+  const keepSlideIds   = keepEntries.map(e => e.id)          // desired final order
   const deleteSlideIds = DELETE_INDICES.map(i => allSlides[i]?.objectId).filter((id): id is string => Boolean(id))
 
   const coverSlideId  = allSlides[0]?.objectId ?? ''
@@ -297,14 +302,24 @@ export async function createTemplatePresentation(
     requests.push({ deleteObject: { objectId } })
   }
 
-  // 3b: Reorder remaining slides into proposal order
-  if (keepSlideIds.length > 0) {
-    requests.push({
-      updateSlidesPosition: {
-        slideObjectIds: keepSlideIds,
-        insertionIndex: 0,
-      },
-    })
+  // 3b: Reorder remaining slides into proposal order via individual single-slide moves.
+  // Google Slides API requires slideObjectIds to be in current presentation order, so
+  // a single bulk updateSlidesPosition fails when the desired order isn't ascending.
+  // Instead: track current slide order and emit one move per out-of-place slide.
+  const current = [...keepEntries].sort((a, b) => a.origIdx - b.origIdx).map(e => e.id)
+  for (let i = 0; i < keepSlideIds.length; i++) {
+    const desiredId = keepSlideIds[i]
+    const currentPos = current.indexOf(desiredId)
+    if (currentPos !== i) {
+      requests.push({
+        updateSlidesPosition: {
+          slideObjectIds: [desiredId],
+          insertionIndex: i,
+        },
+      })
+      current.splice(currentPos, 1)
+      current.splice(i, 0, desiredId)
+    }
   }
 
   // 3c: Replace all {{PLACEHOLDER}} tokens across the presentation

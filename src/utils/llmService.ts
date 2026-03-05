@@ -498,7 +498,9 @@ Generate personalized expansions for each problem and benefit that reference spe
     SYSTEM_PROMPT,
   ].filter(Boolean).join('\n\n');
 
-  let content: string | undefined;
+  let parsed: LLMResponse | undefined;
+  let lastError: Error | undefined;
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -526,31 +528,38 @@ Generate personalized expansions for each problem and benefit that reference spe
     }
 
     const result = await response.json();
-    content = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (content) break;
+    const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (attempt < MAX_RETRIES) {
-      console.warn(`[LLM Service] Empty proposal response, retrying (${attempt + 1}/${MAX_RETRIES})…`);
+    if (!content) {
+      lastError = new Error('No content returned from Gemini');
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[LLM Service] Empty proposal response, retrying (${attempt + 1}/${MAX_RETRIES})…`);
+      }
+      continue;
+    }
+
+    try {
+      const candidate = JSON.parse(content) as LLMResponse;
+      if (!Array.isArray(candidate.problemExpansions) || candidate.problemExpansions.length !== 4) {
+        throw new Error('Invalid problemExpansions in LLM response');
+      }
+      if (!Array.isArray(candidate.benefitExpansions) || candidate.benefitExpansions.length !== 4) {
+        throw new Error('Invalid benefitExpansions in LLM response');
+      }
+      parsed = candidate;
+      break;
+    } catch (parseErr) {
+      lastError = parseErr instanceof Error ? parseErr : new Error(String(parseErr));
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[LLM Service] Invalid response (${lastError.message}), retrying (${attempt + 1}/${MAX_RETRIES})…`);
+      } else {
+        console.error('[LLM Service] All retries exhausted. Last content:', content);
+      }
     }
   }
 
-  if (!content) {
-    throw new Error('No content returned from Gemini after retries');
-  }
-
-  let parsed: LLMResponse;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    console.error('[LLM Service] Failed to parse response:', content);
-    throw new Error('Failed to parse LLM response as JSON');
-  }
-
-  if (!Array.isArray(parsed.problemExpansions) || parsed.problemExpansions.length !== 4) {
-    throw new Error('Invalid problemExpansions in LLM response');
-  }
-  if (!Array.isArray(parsed.benefitExpansions) || parsed.benefitExpansions.length !== 4) {
-    throw new Error('Invalid benefitExpansions in LLM response');
+  if (!parsed) {
+    throw lastError ?? new Error('No valid content returned from Gemini after retries');
   }
 
   const approachSteps: string[] = Array.isArray(parsed.approachSteps) ? parsed.approachSteps : [];
