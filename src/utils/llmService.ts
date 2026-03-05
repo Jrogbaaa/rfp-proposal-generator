@@ -751,19 +751,19 @@ User request: ${userInstruction}`;
 
   if (parsed.updatedExpansions) {
     const e = parsed.updatedExpansions;
-    if (!Array.isArray(e.problemExpansions) || e.problemExpansions.length < 1) {
-      throw new Error('Invalid problemExpansions in iterate response');
-    }
-    if (!Array.isArray(e.benefitExpansions) || e.benefitExpansions.length < 1) {
-      throw new Error('Invalid benefitExpansions in iterate response');
-    }
-    // Pad to 4 if Gemini returned fewer than expected
-    while (e.problemExpansions.length < 4) e.problemExpansions.push('Additional challenge to be identified.');
-    while (e.benefitExpansions.length < 4) e.benefitExpansions.push('Additional benefit to be identified.');
-    // Use LLM-returned values when present; fall back to current values for untouched fields
+    // Fall back to current expansions if LLM omitted a section rather than throwing
+    const problems = Array.isArray(e.problemExpansions) && e.problemExpansions.length > 0
+      ? e.problemExpansions
+      : currentExpansions?.problemExpansions ?? [];
+    const benefits = Array.isArray(e.benefitExpansions) && e.benefitExpansions.length > 0
+      ? e.benefitExpansions
+      : currentExpansions?.benefitExpansions ?? [];
+    // Pad to 4 if needed
+    while (problems.length < 4) problems.push('Additional challenge to be identified.');
+    while (benefits.length < 4) benefits.push('Additional benefit to be identified.');
     output.updatedExpansions = {
-      problemExpansions: e.problemExpansions as [string, string, string, string],
-      benefitExpansions: e.benefitExpansions as [string, string, string, string],
+      problemExpansions: problems as [string, string, string, string],
+      benefitExpansions: benefits as [string, string, string, string],
       approachSteps: e.approachSteps ?? currentExpansions?.approachSteps,
       nextSteps: e.nextSteps ?? currentExpansions?.nextSteps,
       customTitles: currentExpansions?.customTitles,

@@ -97,11 +97,20 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
       setStage('creating')
       setProgressStep(3)
 
-      // Step 4: Create presentation (Paramount deck uses old builder; all others use template)
+      // Step 4: Create presentation (Paramount deck uses dynamic builder; others use template)
       const hasParamountMedia = !!llmContent?.paramountMedia?.opportunityStatement
-      const result = hasParamountMedia
-        ? await createGoogleSlidesPresentation(proposalData, token, designConfig)
-        : await createTemplatePresentation(proposalData, token)
+      let result
+      if (hasParamountMedia) {
+        result = await createGoogleSlidesPresentation(proposalData, token, designConfig)
+      } else {
+        try {
+          result = await createTemplatePresentation(proposalData, token)
+        } catch (templateErr) {
+          // Drive API not enabled or insufficient permissions — fall back to dynamic builder
+          console.warn('[GoogleSlidesButton] Template copy failed, falling back to dynamic builder:', templateErr)
+          result = await createGoogleSlidesPresentation(proposalData, token, designConfig)
+        }
+      }
       setProgressStep(4)
 
       setSlidesUrl(result.presentationUrl)

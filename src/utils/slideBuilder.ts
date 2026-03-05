@@ -26,9 +26,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       slideNumber: 1,
       type: 'title',
       title: projectTitle,
-      subtitle: client?.firstName
-        ? `Presented to ${client.firstName} ${client.lastName}`.trim()
-        : company !== '—' ? `Presented to ${company}` : '',
+      subtitle: company !== '—' ? `A Proposal for ${company}` : '',
       bullets: [
         company !== '—' ? `${company}${project?.duration ? ` · ${project.duration}` : ''}` : '',
         project?.totalValue ? `Investment: ${project.totalValue}` : '',
