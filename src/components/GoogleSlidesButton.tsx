@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { ProposalData, ExpandedContent, DesignConfig } from '../types/proposal'
+import type { ProposalData, ExpandedContent } from '../types/proposal'
 import { getValidToken } from '../utils/googleAuth'
 import { createTemplatePresentation } from '../utils/googleSlidesTemplate'
 import { generateProposalContent } from '../utils/llmService'
@@ -11,7 +11,6 @@ interface GoogleSlidesButtonProps {
   briefText: string
   isEmpty: boolean
   preGeneratedContent?: ExpandedContent | null
-  designConfig?: DesignConfig
   onSuccess?: (url: string) => void
 }
 
@@ -65,7 +64,7 @@ function buildProposalData(parsedData: Partial<ProposalData>, llmContent?: Expan
   }
 }
 
-export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, designConfig, onSuccess }: GoogleSlidesButtonProps) {
+export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, onSuccess }: GoogleSlidesButtonProps) {
   const [stage, setStage] = useState<Stage>('idle')
   const [progressStep, setProgressStep] = useState(0)
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
@@ -96,14 +95,8 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
       setStage('creating')
       setProgressStep(3)
 
-      // Step 4: Create presentation (Paramount deck uses dynamic builder; others use template)
-      const hasParamountMedia = !!llmContent?.paramountMedia?.opportunityStatement
-      let result
-      if (hasParamountMedia) {
-        result = await createGoogleSlidesPresentation(proposalData, token, designConfig)
-      } else {
-        result = await createTemplatePresentation(proposalData, token)
-      }
+      // Step 4: Create presentation from template
+      const result = await createTemplatePresentation(proposalData, token)
       setProgressStep(4)
 
       setSlidesUrl(result.presentationUrl)

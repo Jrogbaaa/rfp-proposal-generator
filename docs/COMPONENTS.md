@@ -15,7 +15,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
 | ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides |
 | SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (10 base + any additional); inline title editing on slides 1–4, 7–8, 11+; inline bullet editing on slides 2–4, 7–8, 11+ |
-| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → Google Slides; accepts `preGeneratedContent`, `designConfig`, `onSuccess` |
+| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → template copy → populate; accepts `preGeneratedContent`, `onSuccess` |
 | ProgressStepper | `src/components/ProgressStepper.tsx` | 3-step stepper (Draft/Refine/Export); only backward navigation to completed steps |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
 | DevTools | `src/components/DevTools.tsx` | Floating dev panel for error viewing (dev only) |
@@ -86,7 +86,6 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `briefText: string` — Raw brief text (passed to LLM for content generation)
 - `isEmpty: boolean` — Disables button when no brief is entered
 - `preGeneratedContent` — Pre-generated expansions from `ChatInterface`; skips the LLM call inside this component when already iterated in Step 2
-- `designConfig` — Color theme configuration (navy-gold, slate-blue, forest-green) from `DesignChatInterface`
 - `onSuccess` — Callback fired after successful slide creation; used by `App.tsx` to advance to the Export step
 
 **State machine:** `idle → authenticating → generating → creating → done | error`
@@ -141,7 +140,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - 6 suggested prompts for theme requests
 - Current theme badge shows active selection (Navy & Gold / Slate & Blue / Forest Green)
 - Calls `iterateDesign()` from `llmService.ts`; extracts `designConfig` from JSON response when present
-- Embeds `GoogleSlidesButton` at bottom for one-click export with active theme applied
+- Embeds `GoogleSlidesButton` at bottom for one-click export
 
 ---
 
@@ -262,4 +261,4 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 ## Last Updated
 - Date: 2026-03-05
-- Changes: Added `googleSlidesTemplate.ts` — template-copy slide builder via Drive API; `GoogleSlidesButton` now routes standard decks through the template path and Paramount decks through the original builder; E2E mocks updated with Drive API intercept and 18-slide GET response
+- Changes: All decks now route through `createTemplatePresentation` (template `1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`); removed `designConfig` prop from `GoogleSlidesButton`; removed old `hasParamountMedia` conditional routing

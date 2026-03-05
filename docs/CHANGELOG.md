@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-03-05] — Always Route Through Template Builder
+
+### Fixed
+- **`GoogleSlidesButton.tsx` routing** — Removed `hasParamountMedia` conditional that routed Paramount proposals to the old dynamic builder (`createGoogleSlidesPresentation` from `googleSlides.ts`), which was not even imported. All presentations now always use `createTemplatePresentation` with template `1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`.
+
+### Removed
+- **`designConfig` prop from `GoogleSlidesButton`** — Only used by the old dynamic builder. Removed from props interface, component destructuring, and call sites in `App.tsx` and `DesignChatInterface.tsx`.
+
+---
+
 ## [2026-03-05] — Template-Based Google Slides Builder via Drive API Copy
 
 ### Added

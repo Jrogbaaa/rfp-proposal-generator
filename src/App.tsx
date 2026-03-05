@@ -549,7 +549,6 @@ export default function App() {
                         briefText={briefText}
                         isEmpty={!briefText.trim()}
                         preGeneratedContent={expansions}
-                        designConfig={designConfig}
                         onSuccess={handleSlidesSuccess}
                       />
                     </div>

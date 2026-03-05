@@ -215,7 +215,6 @@ export default function DesignChatInterface({
           briefText={briefText}
           isEmpty={!briefText.trim()}
           preGeneratedContent={expansions}
-          designConfig={currentDesignConfig}
           onSuccess={onSlidesSuccess}
         />
       </div>
