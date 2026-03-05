@@ -3,10 +3,11 @@
  *
  * Three-phase approach:
  *   1. POST drive.googleapis.com/v3/files/{TEMPLATE_ID}/copy — duplicate the template
- *   2. GET  slides.googleapis.com/v1/presentations/{id}      — read shape objectIds
+ *   2. GET  slides.googleapis.com/v1/presentations/{id}      — read slide objectIds
  *   3. POST slides.googleapis.com/v1/presentations/{id}:batchUpdate — delete/reorder/populate
  *
- * Typography and visual design are inherited from the template — no style manipulation needed.
+ * Typography and visual design are inherited from the template.
+ * Content is injected via replaceAllText using {{PLACEHOLDER}} markers baked into the template.
  */
 
 import type { ProposalData } from '../types/proposal'
@@ -30,7 +31,7 @@ const FAVICON_V2 = 'https://t1.gstatic.com/faviconV2'
 const PARAMOUNT_DOMAIN = 'paramount.com'
 
 // ---------------------------------------------------------------------------
-// Shape utilities
+// Shape utilities (kept for logo placement)
 // ---------------------------------------------------------------------------
 
 interface PageElement {
@@ -51,7 +52,6 @@ function getAllText(el: PageElement): string {
     .trim()
 }
 
-/** Normalise text for comparison: lowercase + collapse all whitespace (including \n). */
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '')
 
 function findShape(elements: PageElement[], ...candidates: string[]): PageElement | undefined {
@@ -62,23 +62,9 @@ function findShape(elements: PageElement[], ...candidates: string[]): PageElemen
   return undefined
 }
 
-/** Find all shapes whose normalised text includes the given needle. */
-function findAllShapes(elements: PageElement[], candidate: string): PageElement[] {
-  return elements.filter(el => norm(getAllText(el)).includes(norm(candidate)))
-}
-
 // ---------------------------------------------------------------------------
-// batchUpdate request builders
+// Utilities
 // ---------------------------------------------------------------------------
-
-/** Replace all text in a shape while inheriting the template's existing typography. */
-function replaceText(objectId: string, newText: string): object[] {
-  if (!newText?.trim()) return []
-  return [
-    { deleteText: { objectId, textRange: { type: 'ALL' } } },
-    { insertText: { objectId, insertionIndex: 0, text: newText } },
-  ]
-}
 
 function truncate(text: string, max: number): string {
   if (!text || text.length <= max) return text
@@ -98,243 +84,81 @@ function getClientDomain(data: ProposalData): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Per-slide content mappers
+// Content replacement — replaceAllText for every {{PLACEHOLDER}} in template
 // ---------------------------------------------------------------------------
 
-function mapCoverSlide(elements: PageElement[], data: ProposalData): object[] {
-  const ops: object[] = []
-
-  const companyEl = findShape(elements, 'COMPANY NAME', 'company name')
-  if (companyEl) {
-    ops.push(...replaceText(companyEl.objectId, data.client.company.toUpperCase()))
-  } else {
-    console.warn('[TemplateSlides] Cover: could not find COMPANY NAME shape')
-  }
-
-  // "Investor Pitch Deck" headline — replace with project title
-  const headlineEl = findShape(elements, 'Investor', 'Investor Pitch')
-  if (headlineEl) {
-    ops.push(...replaceText(headlineEl.objectId, data.project.title || 'Media Proposal'))
-  } else {
-    console.warn('[TemplateSlides] Cover: could not find headline shape')
-  }
-
-  // "Subtitle" line — tagline
-  const subtitleEl = findShape(elements, 'Subtitle')
-  if (subtitleEl) {
-    ops.push(...replaceText(subtitleEl.objectId, `A Proposal for ${data.client.company}`))
-  }
-
-  // "Date" line
-  const dateEl = findShape(elements, 'Date')
-  if (dateEl) {
-    ops.push(...replaceText(dateEl.objectId, data.generated.createdDate))
-  }
-
-  return ops
-}
-
-function mapChallengeSlide(elements: PageElement[], data: ProposalData): object[] {
-  const ops: object[] = []
-
-  const titleEl = findShape(elements, 'Growth', 'Growth Strategy')
-  if (titleEl) {
-    ops.push(...replaceText(titleEl.objectId, 'The\nOpportunity'))
-  } else {
-    console.warn('[TemplateSlides] Challenge: could not find title shape')
-  }
-
-  // Find the long Lorem ipsum body — look for the largest text block
-  const bodyEls = elements
-    .filter(el => getAllText(el).toLowerCase().includes('lorem ipsum'))
-    .sort((a, b) => getAllText(b).length - getAllText(a).length)
-  const bodyEl = bodyEls[0]
-  if (bodyEl) {
-    const text = data.expanded.problemExpansions[0] || data.content.problems[0] || ''
-    ops.push(...replaceText(bodyEl.objectId, truncate(text, 450)))
-  }
-
-  return ops
-}
-
-function mapApproachSlide(elements: PageElement[], data: ProposalData): object[] {
-  const ops: object[] = []
-
-  const titleEl = findShape(elements, 'What Makes', 'Us Unique')
-  if (titleEl) {
-    ops.push(...replaceText(titleEl.objectId, 'Our\nApproach'))
-  } else {
-    console.warn('[TemplateSlides] Approach: could not find title shape')
-  }
-
-  // Bullet text box — template uses paragraph-level bullets (no "●" text chars).
-  // Find the lorem ipsum shape that is NOT the title.
-  const titleNorm = norm(titleEl ? getAllText(titleEl) : 'whatmakesusunique')
-  const bulletEl = elements.find(el => {
-    const t = norm(getAllText(el))
-    return t.includes('loremipsum') && t !== titleNorm
-  })
-  if (bulletEl) {
-    const steps = (data.expanded.approachSteps ?? []).slice(0, 3)
-    if (steps.length > 0) {
-      ops.push(...replaceText(bulletEl.objectId, steps.join('\n')))
-    }
-  } else {
-    console.warn('[TemplateSlides] Approach: could not find bullet shape')
-  }
-
-  return ops
-}
-
-function mapBenefitsSlide(elements: PageElement[], data: ProposalData): object[] {
-  const ops: object[] = []
-
-  const titleEl = findShape(elements, 'Business Model')
-  if (titleEl) {
-    ops.push(...replaceText(titleEl.objectId, 'What You Get'))
-  }
-
-  // 3 "Lorem Ipsum Title" heading shapes — benefit titles (use norm to handle \n between words)
-  const loremTitleEls = elements
-    .filter(el => {
-      const t = norm(getAllText(el))
-      return t.includes('loremipsumtitle') && !t.includes('businessmodel')
-    })
-    .slice(0, 3)
-
-  loremTitleEls.forEach((el, i) => {
-    const benefit = data.content.benefits[i] || ''
-    if (benefit) ops.push(...replaceText(el.objectId, benefit))
-  })
-
-  // 3 lorem ipsum body shapes — benefit descriptions (longer text, not a title)
-  const loremBodyEls = elements
-    .filter(el => {
-      const t = norm(getAllText(el))
-      return t.includes('loremipsum') && !t.includes('loremipsumtitle') && !t.includes('businessmodel') && t.length > 20
-    })
-    .sort((a, b) => getAllText(a).length - getAllText(b).length)
-    .slice(0, 3)
-
-  loremBodyEls.forEach((el, i) => {
-    const expansion = data.expanded.benefitExpansions[i] || ''
-    if (expansion) ops.push(...replaceText(el.objectId, truncate(expansion, 200)))
-  })
-
-  // "Text Here Title" inside circles — replace with benefit names
-  const textHereEls = findAllShapes(elements, 'Text Here').slice(0, 3)
-  textHereEls.forEach((el, i) => {
-    const benefit = data.content.benefits[i] || ''
-    if (benefit) ops.push(...replaceText(el.objectId, truncate(benefit, 20)))
-  })
-
-  return ops
-}
-
-function mapInvestmentSlide(elements: PageElement[], data: ProposalData): object[] {
-  const ops: object[] = []
-
-  const titleEl = findShape(elements, 'Headline', 'Headline Title Here')
-  if (titleEl) {
-    ops.push(...replaceText(titleEl.objectId, 'Investment\n& Scope'))
-  }
-
-  // 6 Lorem ipsum items — use approach steps + investment details
-  const steps = data.expanded.approachSteps ?? []
+function buildReplaceRequests(data: ProposalData): object[] {
+  const { client, project, content, expanded, generated } = data
+  const steps     = expanded.approachSteps ?? []
+  const nextSteps = expanded.nextSteps ?? []
   const investmentItems = [
-    data.project.duration ? `Timeline: ${data.project.duration}` : 'Phased delivery',
-    data.project.totalValue ? `Total: ${data.project.totalValue}` : 'Flexible scope',
+    ...steps,
+    project.duration   ? `Timeline: ${project.duration}`   : 'Phased delivery',
+    project.totalValue ? `Total: ${project.totalValue}`     : 'Flexible scope',
     'Ongoing support & optimization',
-  ]
-  const allItems = [...steps, ...investmentItems].slice(0, 6)
+  ].slice(0, 6)
 
-  // Target "Lorem Ipsum Title" heading cells first, then body cells
-  const loremTitleEls = elements.filter(el => norm(getAllText(el)).includes('loremipsumtitle'))
-  const loremBodyEls  = elements.filter(el => {
-    const t = norm(getAllText(el))
-    return t.includes('loremipsum') && !t.includes('loremipsumtitle')
-  })
-  const loremEls = [...loremTitleEls, ...loremBodyEls].slice(0, 6)
-
-  loremEls.forEach((el, i) => {
-    const item = allItems[i] || ''
-    if (item) ops.push(...replaceText(el.objectId, truncate(item, 100)))
+  const r = (text: string, replacement: string) => ({
+    replaceAllText: {
+      containsText: { text, matchCase: true },
+      replaceText: replacement,
+    },
   })
 
-  return ops
-}
-
-function mapMetricsSlide(elements: PageElement[], data: ProposalData): object[] {
-  const ops: object[] = []
-
-  const inventoryEl = findShape(elements, 'INVENTORY')
-  if (inventoryEl) ops.push(...replaceText(inventoryEl.objectId, 'REACH'))
-
-  const researchEl = findShape(elements, 'RESEARCH')
-  if (researchEl) ops.push(...replaceText(researchEl.objectId, 'ENGAGE'))
-
-  const marketingEl = findShape(elements, 'MARKETING')
-  if (marketingEl) ops.push(...replaceText(marketingEl.objectId, 'CONVERT'))
-
-  const headlineEl = findShape(elements, 'Headline Title')
-  if (headlineEl) ops.push(...replaceText(headlineEl.objectId, 'Measuring\nSuccess'))
-
-  const bodyEls = elements
-    .filter(el => getAllText(el).toLowerCase().includes('lorem ipsum'))
-    .sort((a, b) => getAllText(b).length - getAllText(a).length)
-  if (bodyEls[0]) {
-    ops.push(...replaceText(
-      bodyEls[0].objectId,
-      'Track what matters at every stage: reach, engagement, and conversion.',
-    ))
-  }
-
-  const moneyEl = findShape(elements, '$000', '000.000')
-  if (moneyEl) {
-    ops.push(...replaceText(moneyEl.objectId, data.project.totalValue || 'TBD'))
-  }
-
-  return ops
-}
-
-function mapNextStepsSlide(elements: PageElement[], data: ProposalData): object[] {
-  const ops: object[] = []
-
-  const titleEl = findShape(elements, 'Headline', 'Title Here')
-  if (titleEl) ops.push(...replaceText(titleEl.objectId, 'Next\nSteps'))
-
-  const subtitleEl = findShape(elements, 'Lorem Ipsum SubTitle', 'SubTitle')
-  if (subtitleEl) {
-    ops.push(...replaceText(subtitleEl.objectId, data.project.title || "Let's get started"))
-  }
-
-  // Body paragraphs — nextSteps[0] and [1]
-  const bodyEls = elements
-    .filter(el => {
-      const t = norm(getAllText(el))
-      return t.includes('loremipsum') && t.length > 30 && !t.includes('subtitle') && !t.includes('loremipsumtitlehere')
-    })
-    .sort((a, b) => getAllText(b).length - getAllText(a).length)
-    .slice(0, 2)
-
-  const nextSteps = data.expanded.nextSteps ?? []
-  bodyEls.forEach((el, i) => {
-    const step = nextSteps[i]
-    if (step) ops.push(...replaceText(el.objectId, truncate(step, 200)))
-  })
-
-  // 6 "LOREM IPSUM TITLE HERE" pill/tag shapes — action items (use norm for \n tolerance)
-  const pillEls = elements
-    .filter(el => norm(getAllText(el)).includes('loremipsumtitlehere'))
-    .slice(0, 6)
-
-  const pillItems = nextSteps.slice(2, 8)
-  pillEls.forEach((el, i) => {
-    const item = pillItems[i]
-    if (item) ops.push(...replaceText(el.objectId, truncate(item, 40)))
-  })
-
-  return ops
+  return [
+    // Cover
+    r('{{COMPANY_NAME}}', client.company.toUpperCase()),
+    r('{{HEADLINE}}',     project.title || 'Media Proposal'),
+    r('{{SUBTITLE}}',     `A Proposal for ${client.company}`),
+    r('{{DATE}}',         generated.createdDate),
+    // Opportunity
+    r('{{OPPORTUNITY_TITLE}}', 'The\nOpportunity'),
+    r('{{OPPORTUNITY_BODY}}',  truncate(expanded.problemExpansions[0] || content.problems[0] || '', 450)),
+    // Approach
+    r('{{APPROACH_TITLE}}',   'Our\nApproach'),
+    r('{{APPROACH_STEP_1}}',  truncate(steps[0] ?? '', 120)),
+    r('{{APPROACH_STEP_2}}',  truncate(steps[1] ?? '', 120)),
+    r('{{APPROACH_STEP_3}}',  truncate(steps[2] ?? '', 120)),
+    // Benefits
+    r('{{BENEFITS_TITLE}}',  'What You Get'),
+    r('{{BENEFIT_TITLE_1}}', truncate(content.benefits[0] ?? '', 60)),
+    r('{{BENEFIT_TITLE_2}}', truncate(content.benefits[1] ?? '', 60)),
+    r('{{BENEFIT_TITLE_3}}', truncate(content.benefits[2] ?? '', 60)),
+    r('{{BENEFIT_BODY_1}}',  truncate(expanded.benefitExpansions[0] ?? '', 200)),
+    r('{{BENEFIT_BODY_2}}',  truncate(expanded.benefitExpansions[1] ?? '', 200)),
+    r('{{BENEFIT_BODY_3}}',  truncate(expanded.benefitExpansions[2] ?? '', 200)),
+    r('{{METRIC_LABEL_1}}',  'REACH'),
+    r('{{METRIC_LABEL_2}}',  'ENGAGE'),
+    r('{{METRIC_LABEL_3}}',  'CONVERT'),
+    // Investment
+    r('{{INVESTMENT_TITLE}}',  'Investment\n& Scope'),
+    r('{{INVESTMENT_ITEM_1}}', truncate(investmentItems[0] ?? '', 100)),
+    r('{{INVESTMENT_ITEM_2}}', truncate(investmentItems[1] ?? '', 100)),
+    r('{{INVESTMENT_ITEM_3}}', truncate(investmentItems[2] ?? '', 100)),
+    r('{{INVESTMENT_ITEM_4}}', truncate(investmentItems[3] ?? '', 100)),
+    r('{{INVESTMENT_ITEM_5}}', truncate(investmentItems[4] ?? '', 100)),
+    r('{{INVESTMENT_ITEM_6}}', truncate(investmentItems[5] ?? '', 100)),
+    // Metrics
+    r('{{METRICS_TITLE}}',  'Measuring\nSuccess'),
+    r('{{METRICS_BODY}}',   'Track what matters at every stage: reach, engagement, and conversion.'),
+    r('{{METRIC_VALUE}}',   project.totalValue || 'TBD'),
+    r('{{METRIC_COL_1}}',   'REACH'),
+    r('{{METRIC_COL_2}}',   'ENGAGE'),
+    r('{{METRIC_COL_3}}',   'CONVERT'),
+    r('{{METRIC_BODY_1}}',  'Impressions, reach, and brand awareness'),
+    r('{{METRIC_BODY_2}}',  'Click-through, engagement rate, time on site'),
+    r('{{METRIC_BODY_3}}',  'Conversions, pipeline, and revenue impact'),
+    // Next Steps
+    r('{{NEXT_STEPS_TITLE}}',    'Next\nSteps'),
+    r('{{NEXT_STEPS_SUBTITLE}}', project.title || "Let's get started"),
+    r('{{NEXT_STEPS_BODY_1}}',   truncate(nextSteps[0] ?? '', 200)),
+    r('{{PILL_1}}', truncate(nextSteps[1] ?? '', 40)),
+    r('{{PILL_2}}', truncate(nextSteps[2] ?? '', 40)),
+    r('{{PILL_3}}', truncate(nextSteps[3] ?? '', 40)),
+    r('{{PILL_4}}', truncate(nextSteps[4] ?? '', 40)),
+    r('{{PILL_5}}', truncate(nextSteps[5] ?? '', 40)),
+    r('{{PILL_6}}', truncate(nextSteps[6] ?? '', 40)),
+  ].filter(req => (req as any).replaceAllText.replaceText !== '')
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +168,7 @@ function mapNextStepsSlide(elements: PageElement[], data: ProposalData): object[
 /**
  * Build logo batchUpdate requests:
  * - Paramount logo: bottom-right corner of EVERY slide
- * - Client logo: replaces "LOGO HERE" placeholder on cover slide
+ * - Client logo: replaces "LOGO HERE" placeholder on cover slide (if present)
  */
 function buildTemplateLogoRequests(
   coverElements: PageElement[],
@@ -459,8 +283,7 @@ export async function createTemplatePresentation(
   const presentation = await getResp.json() as { slides?: Array<{ objectId: string; pageElements: PageElement[] }> }
   const allSlides = presentation.slides ?? []
 
-  // Extract objectIds for the slides we care about
-  const keepSlideIds = KEEP_INDICES_IN_ORDER.map(i => allSlides[i]?.objectId).filter(Boolean) as string[]
+  const keepSlideIds  = KEEP_INDICES_IN_ORDER.map(i => allSlides[i]?.objectId).filter(Boolean) as string[]
   const deleteSlideIds = DELETE_INDICES.map(i => allSlides[i]?.objectId).filter((id): id is string => Boolean(id))
 
   const coverSlideId  = allSlides[0]?.objectId ?? ''
@@ -484,23 +307,8 @@ export async function createTemplatePresentation(
     })
   }
 
-  // 3c: Text replacements per slide (mappers indexed same as KEEP_INDICES_IN_ORDER)
-  const mappers = [
-    mapCoverSlide,
-    mapChallengeSlide,
-    mapApproachSlide,
-    mapBenefitsSlide,
-    mapInvestmentSlide,
-    mapMetricsSlide,
-    mapNextStepsSlide,
-  ]
-
-  KEEP_INDICES_IN_ORDER.forEach((templateIndex, proposalOrder) => {
-    const slide = allSlides[templateIndex]
-    if (!slide) return
-    const mapper = mappers[proposalOrder]
-    if (mapper) requests.push(...mapper(slide.pageElements, data))
-  })
+  // 3c: Replace all {{PLACEHOLDER}} tokens across the presentation
+  requests.push(...buildReplaceRequests(data))
 
   // 3d: Execute main batchUpdate
   const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
