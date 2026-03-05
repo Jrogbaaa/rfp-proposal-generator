@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { ProposalData, ExpandedContent, DesignConfig } from '../types/proposal'
 import { getValidToken } from '../utils/googleAuth'
 import { createGoogleSlidesPresentation } from '../utils/googleSlides'
+import { createTemplatePresentation } from '../utils/googleSlidesTemplate'
 import { generateProposalContent } from '../utils/llmService'
 import { logError } from '../utils/errorHandler'
 
@@ -20,8 +21,8 @@ type Stage = 'idle' | 'authenticating' | 'generating' | 'creating' | 'done' | 'e
 const PROGRESS_STEPS = [
   'Connecting to Google...',
   'Generating slide content...',
-  'Creating presentation...',
-  'Adding slides...',
+  'Copying template...',
+  'Populating slides...',
   'Finalising...',
 ]
 
@@ -96,8 +97,11 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
       setStage('creating')
       setProgressStep(3)
 
-      // Step 4: Create presentation
-      const result = await createGoogleSlidesPresentation(proposalData, token, designConfig)
+      // Step 4: Create presentation (Paramount deck uses old builder; all others use template)
+      const hasParamountMedia = !!llmContent?.paramountMedia?.opportunityStatement
+      const result = hasParamountMedia
+        ? await createGoogleSlidesPresentation(proposalData, token, designConfig)
+        : await createTemplatePresentation(proposalData, token)
       setProgressStep(4)
 
       setSlidesUrl(result.presentationUrl)

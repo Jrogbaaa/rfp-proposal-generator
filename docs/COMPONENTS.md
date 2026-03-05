@@ -94,14 +94,17 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Flow:**
 1. User clicks button → `getValidToken()` triggers Google OAuth popup
 2. LLM generates personalized problem/benefit expansions via Gemini (skipped if `preGeneratedContent` provided)
-3. `createGoogleSlidesPresentation()` creates presentation via Google Slides REST API
+3. **Routing:** If `paramountMedia` data is present → `createGoogleSlidesPresentation()` (original builder); otherwise → `createTemplatePresentation()` (template-copy path)
 4. "Open in Google Slides" link appears; `onSuccess` callback fires to advance to Export step
 
-**Slide structure (up to 13):** Title, Challenge, Prob Deep Dive ×2, Prob3&4 Combined, Solution, **Approach** (optional), Ben Deep Dive ×2, **Ben3&4 Combined**, Investment, **Next Steps** (optional), Closing CTA. Approach and Next Steps slides are skipped when the LLM returns empty arrays for those fields.
+**Progress steps:** "Connecting to Google..." → "Generating content..." → "Copying template..." → "Populating slides..." → done
+
+**Slide structure — standard path (template):** 7 slides derived from the master template (cover, opportunity, two concept slides, audience, calendar/measurement, next steps). Paramount path retains the original 13-slide deck.
 
 **Utilities used:**
 - `src/utils/googleAuth.ts` — OAuth token management
-- `src/utils/googleSlides.ts` — Slides API calls
+- `src/utils/googleSlides.ts` — Paramount deck creation (legacy path)
+- `src/utils/googleSlidesTemplate.ts` — Template-copy deck creation (default path)
 - `src/utils/llmService.ts` — Gemini content generation
 - `src/utils/errorHandler.ts` — `logError`
 
@@ -212,6 +215,7 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 | llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()` (returns 4 content arrays incl. `approachSteps`/`nextSteps`), `iterateProposalContent()` (preserves/updates all 4 arrays), `iterateDesign()`, `extractBrandVoice()` |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system |
+| googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies master template via Drive API, deletes unwanted slides, replaces placeholder text, inserts logos |
 | brandColors | `src/utils/brandColors.ts` | Brand palette derivation: `getBrandPalette(company)` for ~50 known brands; `derivePaletteFromHex(hex)` derives a full 4-stop `SlidePalette` from any hex color |
 
 ---
@@ -236,6 +240,26 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 ---
 
+### googleSlidesTemplate.ts
+**Location:** `src/utils/googleSlidesTemplate.ts`
+
+**Purpose:** Template-based Google Slides builder. Instead of constructing a presentation from scratch, it copies a pre-designed master template via the Drive API and populates it with proposal content, inheriting the template's typography, layout, and styling.
+
+**Exports:**
+- `createTemplatePresentation(data: ProposalData, accessToken: string): Promise<CreateSlidesResult>`
+
+**Template ID:** `1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`
+
+**4-phase build process:**
+1. **Copy** — `POST /drive/v3/files/{templateId}/copy` duplicates the master template into the user's Drive, returning a new `presentationId`
+2. **Read** — `GET /v1/presentations/{id}` fetches all slides and shape objectIds from the copy
+3. **Prune** — `POST /v1/presentations/{id}:batchUpdate` with `deleteObject` requests removes 11 unwanted slides (original indices 1, 2, 4, 6, 7, 8, 10, 13, 14, 15, 16), leaving 7 slides in order [0, 5, 3, 11, 12, 9, 17] (re-indexed after deletion)
+4. **Populate** — second batchUpdate replaces placeholder text in each remaining shape via `replaceAllText` requests, preserving all template typography; a third batchUpdate inserts the client logo image on the cover slide and the next-steps closing slide (replacing the "LOGO HERE" text placeholder)
+
+**Returns:** `{ presentationId, presentationUrl, title }`
+
+---
+
 ## Last Updated
-- Date: 2026-03-04
-- Changes: Slide Style picker removed (always `standard`); `ChatInterface` prompt box enlarged to 3 rows with visible scrollbar; Paramount media sales types added (`ParamountMediaContent`, `IPAlignment`, `IntegrationConcept`, `CalendarItem`, `InvestmentTier`); new Paramount-specific slide builders in `googleSlides.ts`; `SYSTEM_PROMPT` rewritten as Paramount sales persona; `'paramount'` added to `ColorTheme`
+- Date: 2026-03-05
+- Changes: Added `googleSlidesTemplate.ts` — template-copy slide builder via Drive API; `GoogleSlidesButton` now routes standard decks through the template path and Paramount decks through the original builder; E2E mocks updated with Drive API intercept and 18-slide GET response

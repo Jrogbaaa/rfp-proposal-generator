@@ -111,11 +111,36 @@ async function mockGoogleOAuth(page: Page) {
 }
 
 async function mockGoogleSlidesApi(page: Page) {
+  // Mock Drive API (template copy — POST .../files/{id}/copy → { id })
+  await page.route('**/drive.googleapis.com/**', (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 'fake-presentation-id' }),
+    })
+  })
+
   await page.route('**/slides.googleapis.com/**', (route) => {
-    if (route.request().url().includes(':batchUpdate')) {
+    const url = route.request().url()
+    const method = route.request().method()
+    if (url.includes(':batchUpdate')) {
+      // batchUpdate (both template path and Paramount path)
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
+    } else if (method === 'GET') {
+      // Template path: GET presentation → return 18 slides with objectIds
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          presentationId: 'fake-presentation-id',
+          slides: Array.from({ length: 18 }, (_, i) => ({
+            objectId: 'slide_' + i,
+            pageElements: [],
+          })),
+        }),
+      })
     } else {
-      // Create presentation — return a fake presentationId
+      // Paramount path: POST create presentation
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -123,6 +148,7 @@ async function mockGoogleSlidesApi(page: Page) {
       })
     }
   })
+
   // Block logo fetch requests (fault-tolerant in the app, but we suppress noise)
   await page.route('**/*favicon*', (route) => {
     route.fulfill({ status: 200, contentType: 'image/png', body: '' })

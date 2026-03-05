@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-03-05] — Template-Based Google Slides Builder via Drive API Copy
+
+### Added
+- **`googleSlidesTemplate.ts`** — `src/utils/googleSlidesTemplate.ts`; new slide builder that copies a master template presentation (`1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`) via the Drive API, then populates it with proposal content. Flow: (1) `POST /drive/v3/files/{id}/copy` to duplicate the template, (2) `GET /v1/presentations/{id}` to read all shape objectIds, (3) `POST /v1/presentations/{id}:batchUpdate` to delete 11 unwanted slides (indices 1,2,4,6,7,8,10,13,14,15,16) keeping 7 in order [0,5,3,11,12,9,17], (4) second batchUpdate to replace placeholder text in each shape (inheriting template typography), (5) third batchUpdate to insert client logo on the cover and next-steps closing slides (replacing "LOGO HERE" placeholder). Exports `createTemplatePresentation(data, accessToken): Promise<CreateSlidesResult>`.
+
+### Changed
+- **`GoogleSlidesButton.tsx` routing logic** — `src/components/GoogleSlidesButton.tsx`; added import for `createTemplatePresentation`; Paramount deck path (`paramountMedia` present) continues using the original `createGoogleSlidesPresentation` builder; all other decks now route to `createTemplatePresentation`; PROGRESS_STEPS[2] updated to "Copying template...", PROGRESS_STEPS[3] to "Populating slides..."
+- **E2E tests updated for template path** — `e2e/app.spec.ts`; added Drive API mock (`**/drive.googleapis.com/**` → `{ id: 'fake-presentation-id' }`); Slides GET mock updated to return 18-slide array matching the template; Slides mocks split by HTTP method: GET → slides array, POST batchUpdate → `{}`, POST create → `{ presentationId }`
+
+---
+
 ## [2026-03-05] — Refine Panel Layout, Paramount IP Expansion, autofit Fix
 
 ### Fixed
