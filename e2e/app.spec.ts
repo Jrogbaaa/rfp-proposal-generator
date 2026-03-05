@@ -111,8 +111,8 @@ async function mockGoogleOAuth(page: Page) {
 }
 
 async function mockGoogleSlidesApi(page: Page) {
-  // Mock Drive API (template copy — POST .../files/{id}/copy → { id })
-  await page.route('**/drive.googleapis.com/**', (route) => {
+  // Mock Drive API (template copy — POST www.googleapis.com/drive/v3/files/{id}/copy → { id })
+  await page.route('https://www.googleapis.com/drive/**', (route) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',

@@ -53,6 +53,18 @@ export default function App() {
   const [isSlideUpdating, setIsSlideUpdating] = useState(false)
   const [generationError, setGenerationError] = useState<string | null>(null)
 
+  // Generation progress bar
+  const [genProgress, setGenProgress] = useState(0)
+  const [genPhase, setGenPhase] = useState(0)
+
+  useEffect(() => {
+    if (!isGenerating) { setGenProgress(0); setGenPhase(0); return }
+    const t1 = setTimeout(() => setGenPhase(1), 8000)
+    const t2 = setTimeout(() => setGenPhase(2), 18000)
+    const interval = setInterval(() => setGenProgress(p => Math.min(p + 1.5, 95)), 400)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearInterval(interval) }
+  }, [isGenerating])
+
   // Chat update feedback
   const [lastChatUpdate, setLastChatUpdate] = useState<number>(0)
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
@@ -426,6 +438,28 @@ export default function App() {
 
                     {isGenerating ? (
                       <div className="flex-1 overflow-auto space-y-4 pr-1">
+                        {/* Progress bar + phase labels */}
+                        <div className="preview-paper rounded-lg px-6 py-5">
+                          <p className="text-sm font-semibold text-navy-700 mb-3">
+                            Gemini is writing your proposal…
+                          </p>
+                          <div className="h-1.5 bg-cream-200 rounded-full overflow-hidden mb-3">
+                            <div
+                              className="h-full bg-gold-400 rounded-full transition-all duration-500"
+                              style={{ width: `${genProgress}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between">
+                            {['Analysing brief', 'Writing content', 'Building slides'].map((label, i) => (
+                              <span
+                                key={i}
+                                className={`text-xs transition-colors duration-300 ${i <= genPhase ? 'text-navy-700 font-medium' : 'text-navy-300'}`}
+                              >
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
                         {[1, 2, 3, 4].map((i) => (
                           <div key={i} className="preview-paper rounded-lg overflow-hidden animate-pulse">
                             <div className="flex items-center gap-3 px-6 pt-5 pb-3">
@@ -441,9 +475,6 @@ export default function App() {
                             <div className="h-1 bg-cream-300" />
                           </div>
                         ))}
-                        <p className="text-center text-sm text-navy-400 py-4 animate-pulse">
-                          Gemini is writing your proposal…
-                        </p>
                       </div>
                     ) : generationError ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
