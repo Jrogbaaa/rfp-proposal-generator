@@ -51,15 +51,20 @@ function getAllText(el: PageElement): string {
     .trim()
 }
 
+/** Normalise text for comparison: lowercase + collapse all whitespace (including \n). */
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, '')
+
 function findShape(elements: PageElement[], ...candidates: string[]): PageElement | undefined {
-  const needle = (s: string) => s.toLowerCase().replace(/\s+/g, '')
   for (const candidate of candidates) {
-    const found = elements.find(el =>
-      needle(getAllText(el)).includes(needle(candidate))
-    )
+    const found = elements.find(el => norm(getAllText(el)).includes(norm(candidate)))
     if (found) return found
   }
   return undefined
+}
+
+/** Find all shapes whose normalised text includes the given needle. */
+function findAllShapes(elements: PageElement[], candidate: string): PageElement[] {
+  return elements.filter(el => norm(getAllText(el)).includes(norm(candidate)))
 }
 
 // ---------------------------------------------------------------------------
@@ -162,8 +167,13 @@ function mapApproachSlide(elements: PageElement[], data: ProposalData): object[]
     console.warn('[TemplateSlides] Approach: could not find title shape')
   }
 
-  // Bullet point text box (contains "●" characters)
-  const bulletEl = findShape(elements, '●', '•')
+  // Bullet text box — template uses paragraph-level bullets (no "●" text chars).
+  // Find the lorem ipsum shape that is NOT the title.
+  const titleNorm = norm(titleEl ? getAllText(titleEl) : 'whatmakesusunique')
+  const bulletEl = elements.find(el => {
+    const t = norm(getAllText(el))
+    return t.includes('loremipsum') && t !== titleNorm
+  })
   if (bulletEl) {
     const steps = (data.expanded.approachSteps ?? []).slice(0, 3)
     if (steps.length > 0) {
@@ -184,11 +194,11 @@ function mapBenefitsSlide(elements: PageElement[], data: ProposalData): object[]
     ops.push(...replaceText(titleEl.objectId, 'What You Get'))
   }
 
-  // 3 "Lorem Ipsum Title" heading shapes — benefit titles
+  // 3 "Lorem Ipsum Title" heading shapes — benefit titles (use norm to handle \n between words)
   const loremTitleEls = elements
     .filter(el => {
-      const t = getAllText(el).toLowerCase()
-      return t.includes('lorem ipsum title') || (t.startsWith('lorem ipsum') && t.length < 30)
+      const t = norm(getAllText(el))
+      return t.includes('loremipsumtitle') && !t.includes('businessmodel')
     })
     .slice(0, 3)
 
@@ -197,11 +207,11 @@ function mapBenefitsSlide(elements: PageElement[], data: ProposalData): object[]
     if (benefit) ops.push(...replaceText(el.objectId, benefit))
   })
 
-  // 3 Lorem ipsum body shapes — benefit descriptions
+  // 3 lorem ipsum body shapes — benefit descriptions (longer text, not a title)
   const loremBodyEls = elements
     .filter(el => {
-      const t = getAllText(el).toLowerCase()
-      return t.includes('lorem ipsum') && t.length > 30 && !t.includes('title') && !t.includes('business model')
+      const t = norm(getAllText(el))
+      return t.includes('loremipsum') && !t.includes('loremipsumtitle') && !t.includes('businessmodel') && t.length > 20
     })
     .sort((a, b) => getAllText(a).length - getAllText(b).length)
     .slice(0, 3)
@@ -211,14 +221,11 @@ function mapBenefitsSlide(elements: PageElement[], data: ProposalData): object[]
     if (expansion) ops.push(...replaceText(el.objectId, truncate(expansion, 200)))
   })
 
-  // 3 "Text Here Title" metric label cells
-  const metricLabels = ['REACH', 'ENGAGE', 'CONVERT']
-  const textHereEls = elements
-    .filter(el => getAllText(el).toLowerCase().includes('text here'))
-    .slice(0, 3)
-
+  // "Text Here Title" inside circles — replace with benefit names
+  const textHereEls = findAllShapes(elements, 'Text Here').slice(0, 3)
   textHereEls.forEach((el, i) => {
-    ops.push(...replaceText(el.objectId, metricLabels[i]))
+    const benefit = data.content.benefits[i] || ''
+    if (benefit) ops.push(...replaceText(el.objectId, truncate(benefit, 20)))
   })
 
   return ops
@@ -241,9 +248,13 @@ function mapInvestmentSlide(elements: PageElement[], data: ProposalData): object
   ]
   const allItems = [...steps, ...investmentItems].slice(0, 6)
 
-  const loremEls = elements
-    .filter(el => getAllText(el).toLowerCase().includes('lorem ipsum'))
-    .slice(0, 6)
+  // Target "Lorem Ipsum Title" heading cells first, then body cells
+  const loremTitleEls = elements.filter(el => norm(getAllText(el)).includes('loremipsumtitle'))
+  const loremBodyEls  = elements.filter(el => {
+    const t = norm(getAllText(el))
+    return t.includes('loremipsum') && !t.includes('loremipsumtitle')
+  })
+  const loremEls = [...loremTitleEls, ...loremBodyEls].slice(0, 6)
 
   loremEls.forEach((el, i) => {
     const item = allItems[i] || ''
@@ -300,8 +311,8 @@ function mapNextStepsSlide(elements: PageElement[], data: ProposalData): object[
   // Body paragraphs — nextSteps[0] and [1]
   const bodyEls = elements
     .filter(el => {
-      const t = getAllText(el).toLowerCase()
-      return t.includes('lorem ipsum') && t.length > 40 && !t.includes('subtitle')
+      const t = norm(getAllText(el))
+      return t.includes('loremipsum') && t.length > 30 && !t.includes('subtitle') && !t.includes('loremipsumtitlehere')
     })
     .sort((a, b) => getAllText(b).length - getAllText(a).length)
     .slice(0, 2)
@@ -312,9 +323,9 @@ function mapNextStepsSlide(elements: PageElement[], data: ProposalData): object[
     if (step) ops.push(...replaceText(el.objectId, truncate(step, 200)))
   })
 
-  // 6 "LOREM IPSUM TITLE HERE" pill/tag shapes — action items
+  // 6 "LOREM IPSUM TITLE HERE" pill/tag shapes — action items (use norm for \n tolerance)
   const pillEls = elements
-    .filter(el => getAllText(el).toLowerCase().includes('lorem ipsum title here'))
+    .filter(el => norm(getAllText(el)).includes('loremipsumtitlehere'))
     .slice(0, 6)
 
   const pillItems = nextSteps.slice(2, 8)
