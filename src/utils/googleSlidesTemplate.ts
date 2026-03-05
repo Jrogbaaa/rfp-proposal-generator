@@ -25,7 +25,9 @@ const DELETE_INDICES = [1, 2, 4, 6, 7, 8, 10, 13, 14, 15, 16]
 
 // Logo constants (EMU — 1 inch = 914,400 EMU)
 const W = 9_144_000
+const H = 6_858_000
 const FAVICON_V2 = 'https://t1.gstatic.com/faviconV2'
+const PARAMOUNT_DOMAIN = 'paramount.com'
 
 // ---------------------------------------------------------------------------
 // Shape utilities
@@ -328,20 +330,50 @@ function mapNextStepsSlide(elements: PageElement[], data: ProposalData): object[
 // Logo requests
 // ---------------------------------------------------------------------------
 
-/** Build logo batchUpdate requests: client logo on cover + closing slide. */
+/**
+ * Build logo batchUpdate requests:
+ * - Paramount logo: bottom-right corner of EVERY slide
+ * - Client logo: replaces "LOGO HERE" placeholder on cover slide
+ */
 function buildTemplateLogoRequests(
   coverElements: PageElement[],
   coverSlideId: string,
-  nextStepsSlideId: string,
+  allSlideIds: string[],
   data: ProposalData,
 ): object[] {
   const reqs: object[] = []
+
+  const paramountUrl = logoUrl(PARAMOUNT_DOMAIN)
+  const PARAM_SIZE   = 457_200   // 0.5" — small enough not to crowd content
+  const MARGIN       = 200_000   // 0.22" from edges
+
+  // ── Paramount logo — bottom-right of every slide ─────────────────────────
+  for (const pageObjectId of allSlideIds) {
+    reqs.push({
+      createImage: {
+        url: paramountUrl,
+        elementProperties: {
+          pageObjectId,
+          size: {
+            width:  { magnitude: PARAM_SIZE, unit: 'EMU' },
+            height: { magnitude: PARAM_SIZE, unit: 'EMU' },
+          },
+          transform: {
+            scaleX: 1, scaleY: 1,
+            translateX: W - PARAM_SIZE - MARGIN,
+            translateY: H - PARAM_SIZE - MARGIN,
+            unit: 'EMU',
+          },
+        },
+      },
+    })
+  }
+
+  // ── Client logo — replace "LOGO HERE" placeholder on cover ───────────────
   const domain = getClientDomain(data)
   if (!domain) return reqs
 
-  const url = logoUrl(domain)
-
-  // Cover: delete "LOGO HERE" text box and replace with client logo image at same position
+  const clientUrl = logoUrl(domain)
   const logoEl = findShape(coverElements, 'LOGO HERE', 'logo here')
   if (logoEl) {
     const x = logoEl.transform?.translateX ?? 6_400_000
@@ -352,7 +384,7 @@ function buildTemplateLogoRequests(
       { deleteObject: { objectId: logoEl.objectId } },
       {
         createImage: {
-          url,
+          url: clientUrl,
           elementProperties: {
             pageObjectId: coverSlideId,
             size: {
@@ -369,27 +401,6 @@ function buildTemplateLogoRequests(
       },
     )
   }
-
-  // Next Steps / closing slide: client logo centered near top (same pattern as Paramount closing)
-  const closeLogoSize = 686_000
-  reqs.push({
-    createImage: {
-      url,
-      elementProperties: {
-        pageObjectId: nextStepsSlideId,
-        size: {
-          width:  { magnitude: closeLogoSize, unit: 'EMU' },
-          height: { magnitude: closeLogoSize, unit: 'EMU' },
-        },
-        transform: {
-          scaleX: 1, scaleY: 1,
-          translateX: Math.round(W / 2 - closeLogoSize / 2),
-          translateY: 300_000,
-          unit: 'EMU',
-        },
-      },
-    },
-  })
 
   return reqs
 }
@@ -441,9 +452,8 @@ export async function createTemplatePresentation(
   const keepSlideIds = KEEP_INDICES_IN_ORDER.map(i => allSlides[i]?.objectId).filter(Boolean) as string[]
   const deleteSlideIds = DELETE_INDICES.map(i => allSlides[i]?.objectId).filter((id): id is string => Boolean(id))
 
-  const coverSlideId     = allSlides[0]?.objectId ?? ''
-  const nextStepsSlideId = allSlides[17]?.objectId ?? ''
-  const coverElements    = allSlides[0]?.pageElements ?? []
+  const coverSlideId  = allSlides[0]?.objectId ?? ''
+  const coverElements = allSlides[0]?.pageElements ?? []
 
   // ── Phase 3: Build batchUpdate ───────────────────────────────────────────
   const requests: object[] = []
@@ -495,7 +505,7 @@ export async function createTemplatePresentation(
 
   // ── Phase 4: Logo insertion (best-effort, non-fatal) ─────────────────────
   try {
-    const logoReqs = buildTemplateLogoRequests(coverElements, coverSlideId, nextStepsSlideId, data)
+    const logoReqs = buildTemplateLogoRequests(coverElements, coverSlideId, keepSlideIds, data)
     if (logoReqs.length > 0) {
       const logoResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
         method: 'POST',
