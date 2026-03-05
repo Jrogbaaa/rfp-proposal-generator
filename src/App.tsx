@@ -330,12 +330,6 @@ export default function App() {
                         >
                           <div className="rounded-xl bg-white border border-cream-300 p-5 space-y-3">
                             <ParsedField label="Company" value={parsedData?.client?.company} />
-                            <ParsedField label="Contact" value={
-                              parsedData?.client?.firstName
-                                ? `${parsedData.client.firstName} ${parsedData.client.lastName}`.trim()
-                                : undefined
-                            } />
-                            <ParsedField label="Email" value={parsedData?.client?.email} />
                             <ParsedField label="Project" value={parsedData?.project?.title} />
                             <ParsedField label="Timeline" value={parsedData?.project?.duration} />
                             <ParsedField label="Budget" value={parsedData?.project?.totalValue} />

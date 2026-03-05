@@ -512,7 +512,7 @@ Generate personalized expansions for each problem and benefit that reference spe
         ],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 16384,
+          maxOutputTokens: 32768,
           ...NO_THINKING,
           responseMimeType: 'application/json',
         },
