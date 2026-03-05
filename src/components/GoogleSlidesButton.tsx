@@ -18,6 +18,46 @@ interface GoogleSlidesButtonProps {
 
 type Stage = 'idle' | 'authenticating' | 'generating' | 'creating' | 'done' | 'error'
 
+const DRIVE_API = 'https://www.googleapis.com/drive/v3/files'
+const PROPOSALS_FOLDER_KEY = 'rfp_proposals_folder_id'
+
+async function getOrCreateProposalsFolder(token: string): Promise<string> {
+  const headers = { 'Authorization': `Bearer ${token}` }
+
+  // Check localStorage cache first
+  const cached = localStorage.getItem(PROPOSALS_FOLDER_KEY)
+  if (cached) return cached
+
+  // Search Drive for existing folder
+  const q = encodeURIComponent(`name='RFP Proposals' and mimeType='application/vnd.google-apps.folder' and trashed=false`)
+  const searchResp = await fetch(`${DRIVE_API}?q=${q}&fields=files(id)`, { headers })
+  if (searchResp.ok) {
+    const { files } = await searchResp.json() as { files?: Array<{ id: string }> }
+    if (files && files.length > 0) {
+      localStorage.setItem(PROPOSALS_FOLDER_KEY, files[0].id)
+      return files[0].id
+    }
+  }
+
+  // Create the folder
+  const createResp = await fetch(DRIVE_API, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'RFP Proposals', mimeType: 'application/vnd.google-apps.folder' }),
+  })
+  const folder = await createResp.json() as { id: string }
+  localStorage.setItem(PROPOSALS_FOLDER_KEY, folder.id)
+  return folder.id
+}
+
+async function moveToProposalsFolder(presentationId: string, token: string): Promise<void> {
+  const folderId = await getOrCreateProposalsFolder(token)
+  await fetch(`${DRIVE_API}/${presentationId}?addParents=${folderId}&removeParents=root&fields=id`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}` },
+  })
+}
+
 const PROGRESS_STEPS = [
   'Connecting to Google...',
   'Generating slide content...',
@@ -112,6 +152,13 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
         }
       }
       setProgressStep(4)
+
+      // Move presentation into "RFP Proposals" folder (best-effort, non-fatal)
+      try {
+        await moveToProposalsFolder(result.presentationId, token)
+      } catch (folderErr) {
+        console.warn('[GoogleSlidesButton] Could not move to RFP Proposals folder:', folderErr)
+      }
 
       setSlidesUrl(result.presentationUrl)
       setStage('done')

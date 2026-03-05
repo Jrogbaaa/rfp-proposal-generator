@@ -7,16 +7,26 @@
  *
  * Scopes requested:
  *   - presentations: create & write Google Slides presentations
- *   - drive.file: least-privilege Drive access (only files this app creates)
+ *   - drive: full Drive access (required to copy shared templates)
  */
 
 const SCOPES = [
   'https://www.googleapis.com/auth/presentations',
-  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive',
 ].join(' ')
 
 const TOKEN_STORAGE_KEY = 'gis_access_token'
 const TOKEN_EXPIRY_KEY = 'gis_token_expires_at'
+// Bump this when scopes change to force re-auth
+const SCOPE_VERSION = 'v2'
+const SCOPE_VERSION_KEY = 'gis_scope_version'
+
+// If scope version changed, clear cached token to force re-auth with new scopes
+if (localStorage.getItem(SCOPE_VERSION_KEY) !== SCOPE_VERSION) {
+  localStorage.removeItem(TOKEN_STORAGE_KEY)
+  localStorage.removeItem(TOKEN_EXPIRY_KEY)
+  localStorage.setItem(SCOPE_VERSION_KEY, SCOPE_VERSION)
+}
 
 // In-memory token store — pre-populated from localStorage on module load
 let cachedToken: string | null = null

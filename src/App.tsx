@@ -32,7 +32,7 @@ export default function App() {
   const [expansions, setExpansions] = useState<ExpandedContent | null>(null)
 
   // Design config
-  const [designConfig, setDesignConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
+  const [designConfig, _setDesignConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
 
   // Brand voice training
   const [brandVoice, setBrandVoice] = useState<BrandVoiceProfile | null>(() => {
