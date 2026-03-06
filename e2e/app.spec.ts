@@ -183,6 +183,42 @@ async function goToShareStep(page: Page) {
   await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
 }
 
+function geminiContentWithApproachBody() {
+  return JSON.stringify({
+    candidates: [{
+      content: {
+        parts: [{
+          text: JSON.stringify({
+            problemExpansions: [
+              'Mobile engagement has declined sharply, directly impacting revenue and customer lifetime value.',
+              'Siloed data systems prevent Starbucks from delivering the personalised experience customers expect.',
+              'Slow resolution times are eroding brand trust and driving customer churn at scale.',
+              'Mobile checkout friction is costing significant conversion revenue every quarter.',
+            ],
+            benefitExpansions: [
+              'A unified customer view enables hyper-personalised experiences that drive loyalty and repeat purchases.',
+              'A 15-20% engagement lift translates to measurable revenue growth within the first quarter.',
+              'Faster resolution dramatically improves NPS and reduces costly repeat contacts.',
+              'Eliminating checkout friction directly increases completed transactions and revenue per visit.',
+            ],
+            approachSteps: [
+              'Discovery & audit of existing digital touchpoints and data silos.',
+              'Architecture design and unified data platform build-out.',
+              'Pilot rollout with mobile app integration and live testing.',
+              'Full deployment, measurement framework, and optimization loop.',
+            ],
+            nextSteps: [
+              'Sign engagement letter within 5 business days.',
+              'Kick-off discovery session with Starbucks digital team.',
+              'Deliver technical audit report by end of week 2.',
+            ],
+          }),
+        }],
+      },
+    }],
+  })
+}
+
 // ─── App Shell ────────────────────────────────────────────────────────────────
 
 test.describe('App Shell', () => {
@@ -463,5 +499,91 @@ test.describe('Step 3 – Share Screen', () => {
     await page.getByRole('button', { name: 'Start new proposal' }).click()
     await expect(page.getByRole('heading', { name: 'Upload your brief here' })).toBeVisible()
     await expect(page.getByText('Step 1 · Draft')).toBeVisible()
+  })
+})
+
+// ─── Step 2: Slide Preview Structure ─────────────────────────────────────────
+
+test.describe('Step 2 – Slide Preview Structure', () => {
+  test('shows The Challenge and Our Solution slides in preview', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('The Challenge')).toBeVisible()
+    await expect(page.getByText('Our Solution')).toBeVisible()
+  })
+
+  test('does NOT show approach or next steps slides when Gemini omits them', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('Our Approach')).not.toBeVisible()
+    await expect(page.getByText('Next Steps')).not.toBeVisible()
+  })
+
+  test('shows benefit 1 expansion text in preview', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('A unified customer view enables hyper-personalised', { exact: false })).toBeVisible()
+  })
+
+  test('slide count in preview toolbar matches export slide count', async ({ page }) => {
+    // Standard mock: 4 problems + 4 benefits, no approach/nextSteps
+    // Expected: cover, challenge, prob1, prob2, prob34, solution, ben1, ben2, ben34, investment, closing = 11
+    await goToIterateStep(page)
+    // Wait for expansions to be applied (benefit expansion text visible in preview)
+    await expect(
+      page.getByText('A unified customer view enables hyper-personalised', { exact: false })
+    ).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/\d+ slides/)).toBeVisible()
+    const slidesText = await page.getByText(/\d+ slides/).innerText()
+    const count = parseInt(slidesText)
+    expect(count).toBe(11)
+  })
+
+  test('shows approach and next steps slides when Gemini returns them', async ({ page }) => {
+    let callCount = 0
+    await page.route('**/generativelanguage.googleapis.com/**', (route) => {
+      callCount++
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: callCount === 1 ? geminiContentWithApproachBody() : geminiIterationBody(),
+      })
+    })
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    // Wait for expansions to be applied before checking approach slide
+    await expect(page.getByText('Our Approach')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Next Steps')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Discovery & audit of existing digital touchpoints', { exact: false })).toBeVisible()
+  })
+
+  test('slide count increases by 2 when approach and next steps are present', async ({ page }) => {
+    let callCount = 0
+    await page.route('**/generativelanguage.googleapis.com/**', (route) => {
+      callCount++
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: callCount === 1 ? geminiContentWithApproachBody() : geminiIterationBody(),
+      })
+    })
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    // Wait for expansions (and approach slide) to be applied before reading count
+    await expect(page.getByText('Our Approach')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/\d+ slides/)).toBeVisible()
+    const slidesText = await page.getByText(/\d+ slides/).innerText()
+    const count = parseInt(slidesText)
+    // 11 base + 1 approach + 1 next steps = 13
+    expect(count).toBe(13)
   })
 })

@@ -214,7 +214,7 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 | llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()` (returns 4 content arrays incl. `approachSteps`/`nextSteps`), `iterateProposalContent()` (preserves/updates all 4 arrays), `iterateDesign()`, `extractBrandVoice()` |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system |
-| googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies master template via Drive API, deletes unwanted slides, replaces placeholder text, inserts logos |
+| googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies template via Drive API, auto-discovers roles, clear-and-fill from SlideData[], duplicates for extra slides, inserts logos |
 | brandColors | `src/utils/brandColors.ts` | Brand palette derivation: `getBrandPalette(company)` for ~50 known brands; `derivePaletteFromHex(hex)` derives a full 4-stop `SlidePalette` from any hex color |
 
 ---
@@ -242,22 +242,32 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 ### googleSlidesTemplate.ts
 **Location:** `src/utils/googleSlidesTemplate.ts`
 
-**Purpose:** Template-based Google Slides builder. Instead of constructing a presentation from scratch, it copies a pre-designed master template via the Drive API and populates it with proposal content, inheriting the template's typography, layout, and styling.
+**Purpose:** Template-based Google Slides builder using a clear-and-fill approach. Copies a pre-designed master template via the Drive API, auto-discovers slide roles from `{{PLACEHOLDER}}` patterns, then clears text and injects content from the same `SlideData[]` array that powers the preview — ensuring 1:1 parity between what the user sees and what gets exported.
 
 **Exports:**
 - `createTemplatePresentation(data: ProposalData, accessToken: string): Promise<CreateSlidesResult>`
 
 **Template ID:** `1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`
 
-**3-phase build process (all template slides are kept in original order):**
-1. **Copy** — `POST /drive/v3/files/{templateId}/copy` duplicates the master template into the user's Drive, returning a new `presentationId`
-2. **Read** — `GET /v1/presentations/{id}` fetches all slides and shape objectIds from the copy
-3. **Clean + Populate** — `POST /v1/presentations/{id}:batchUpdate` first deletes static text elements (e.g. "Lorem ipsum") via `buildStaticTextCleanupRequests()`, then replaces `{{PLACEHOLDER}}` markers with proposal content via `replaceAllText`, preserving all template typography; a follow-up batchUpdate inserts logos (Paramount + client)
+**7-phase build process:**
+1. **Copy** — `POST /drive/v3/files/{templateId}/copy` duplicates the master template
+2. **Read** — `GET /v1/presentations/{id}` fetches all slides and shape objectIds
+3. **Build SlideData[]** — calls `buildSlidesFromData(data)` (same source as preview)
+4. **Auto-discover** — `discoverRole()` scans template slides for placeholder patterns to identify roles
+5. **Map** — each app slide is matched to a template slide (direct match) or a duplicate (cloned via `duplicateObject`)
+6. **Clear + Fill** — `deleteText` + `insertText` + `updateTextStyle` on content shapes; unused slides deleted via `deleteObject`; final order set via `updateSlidesPosition`
+7. **Logos** — re-reads presentation, inserts Paramount + client logos
+
+**Key functions:**
+- `discoverRole(slide)` — maps placeholder patterns to slideKeys
+- `getContentShapes(slide)` — finds fillable text shapes (primary: `{{` detection; fallback: largest shapes by area)
+- `fillSlideRequests(shapes, appSlide)` — clears and inserts title/subtitle/bullets
+- `duplicateAndFillRequests(source, shapes, appSlide, newId)` — clones a template slide and populates it
 
 **Returns:** `{ presentationId, presentationUrl, title }`
 
 ---
 
 ## Last Updated
-- Date: 2026-03-05
-- Changes: All 18 template slides kept in original order (no deletion/reordering); static text cleanup runs across all slides; all decks route through `createTemplatePresentation`; template edits are the primary way to control slide layout and content
+- Date: 2026-03-06
+- Changes: Replaced `replaceAllText` placeholder approach with clear-and-fill; content now sourced from `buildSlidesFromData()` for preview-export parity; user edits, conditional slides, and additional slides all flow through to the exported deck

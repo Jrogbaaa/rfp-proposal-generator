@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-03-06] — Template Design + Direct Population (Clear-and-Fill)
+
+### Changed
+- **`googleSlidesTemplate.ts` — replaced placeholder-based content injection with clear-and-fill approach** — Removed `buildReplaceRequests()` (which used `replaceAllText` with `{{PLACEHOLDER}}` markers) and `buildStaticTextCleanupRequests()`. Replaced with auto-discovery of slide roles from placeholder patterns, then direct `deleteText` + `insertText` into content shapes. Content now comes from `buildSlidesFromData()` — the same `SlideData[]` array that powers the preview — ensuring 1:1 parity between what users see and what gets exported.
+
+### Added
+- **Auto-discovery engine** — `discoverRole()` scans each template slide's text shapes for `{{PLACEHOLDER}}` patterns and maps them to app slideKeys (title, challenge, solution, approach, investment, nextSteps, etc.).
+- **Dual content-shape detection** — `getContentShapes()` identifies fillable text boxes using placeholder patterns (primary) or the two largest text shapes by area (fallback for templates with empty text boxes).
+- **Slide duplication for unmatched app slides** — `duplicateAndFillRequests()` uses `duplicateObject` with pre-assigned IDs to clone a suitable template layout for app slides that lack a direct template counterpart (prob1/prob2/prob34 duplicate from challenge layout; ben1/ben2/ben34 from solution layout; additional slides from any content layout).
+- **Text style preservation** — Captures `TextRunStyle` (font, size, color, bold) from each content shape before clearing, then reapplies after inserting new content.
+- **Slide reordering** — `updateSlidesPosition` ensures final slide order matches the app's `SlideData[]` order.
+
+### Fixed
+- User edits (`editedProjectTitle`, `editedProblems`, `editedBenefits`, `customTitles`) now flow through to the exported deck (previously dropped by `buildReplaceRequests`).
+- Additional slides added via chat now appear in the exported deck (previously dropped entirely).
+- Conditional slides (approach, nextSteps, prob34, ben34) are correctly present or absent in the export, matching the preview.
+
+---
+
 ## [2026-03-05] — Keep All Template Slides
 
 ### Changed
