@@ -53,7 +53,7 @@ export default function ProgressStepper({ currentStep, onStepClick }: ProgressSt
                   />
                 </motion.svg>
               ) : (
-                <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>{step.number}</span>
+                <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '"DM Sans", system-ui, sans-serif', lineHeight: 1 }}>{step.number}</span>
               )}
 
               {/* Pulse animation for current step */}

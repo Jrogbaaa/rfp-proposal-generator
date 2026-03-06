@@ -14,7 +14,6 @@ import DevTools from './components/DevTools'
 import type { Step, ExpandedContent, DesignConfig, BrandVoiceProfile } from './types/proposal'
 import { DEFAULT_DESIGN_CONFIG } from './types/proposal'
 import { generateProposalContent } from './utils/llmService'
-import { buildSlidesFromData } from './utils/slideBuilder'
 import { getAuthState } from './utils/googleAuth'
 
 type InputMode = 'pdf' | 'paste'

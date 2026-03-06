@@ -25,6 +25,15 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   const activeProblemCount = problems.filter(Boolean).length
   const activeBenefitCount = benefits.filter(Boolean).length
 
+  console.log('[slideBuilder] DEBUG', {
+    benefits2: benefits[2],
+    benefits3: benefits[3],
+    approachSteps: approachSteps,
+    nextSteps: nextSteps,
+    expandedKeys: expanded ? Object.keys(expanded) : 'no expanded',
+    contentBenefits: content?.benefits,
+  })
+
   const slides: SlideData[] = []
   let slideNum = 1
 
