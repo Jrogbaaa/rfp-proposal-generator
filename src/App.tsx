@@ -157,24 +157,25 @@ export default function App() {
     }
   }
 
-  const handleSlideEdit = (slideNumber: number, bulletIndex: number, newText: string) => {
+  const handleSlideEdit = (slideKey: string, bulletIndex: number, newText: string) => {
     if (!expansions) return
-    // Slide 2: edit the problem bullets (stored as editedProblems override)
-    if (slideNumber === 2) {
+    // Challenge slide: edit the problem bullets (stored as editedProblems override)
+    if (slideKey === 'challenge') {
       const base = expansions.editedProblems ?? parsedData?.content?.problems ?? ['', '', '', '']
       const edited = [...base] as [string, string, string, string]
       edited[bulletIndex] = newText
       setExpansions({ ...expansions, editedProblems: edited })
       return
     }
+    // Deep-dive and additional slides
     const probs = [...expansions.problemExpansions] as [string, string, string, string]
     const bens = [...expansions.benefitExpansions] as [string, string, string, string]
-    if (slideNumber === 3 && bulletIndex === 0) probs[0] = newText
-    else if (slideNumber === 4 && bulletIndex === 0) probs[1] = newText
-    else if (slideNumber === 7 && bulletIndex === 0) bens[0] = newText
-    else if (slideNumber === 8 && bulletIndex === 0) bens[1] = newText
-    else if (slideNumber >= 11) {
-      const additionalIdx = slideNumber - 11
+    if (slideKey === 'prob1') probs[0] = newText
+    else if (slideKey === 'prob2') probs[1] = newText
+    else if (slideKey === 'ben1') bens[0] = newText
+    else if (slideKey === 'ben2') bens[1] = newText
+    else if (slideKey.startsWith('additional_')) {
+      const additionalIdx = parseInt(slideKey.replace('additional_', ''), 10)
       const additional = [...(expansions.additionalSlides ?? [])]
       if (additional[additionalIdx]) {
         const bullets = [...additional[additionalIdx].bullets]
@@ -184,29 +185,21 @@ export default function App() {
       }
       return
     } else {
-      // Generic fallback: store in editedBullets for slides 5, 6, 9, 10, etc.
-      const currentSlides = parsedData ? buildSlidesFromData({ ...parsedData, expanded: expansions }) : []
-      const slide = currentSlides.find(s => s.slideNumber === slideNumber)
-      if (!slide) return
-      const currentBullets = expansions.editedBullets?.[slideNumber] ?? [...slide.bullets]
-      const updated = [...currentBullets]
-      updated[bulletIndex] = newText
-      setExpansions({ ...expansions, editedBullets: { ...(expansions.editedBullets ?? {}), [slideNumber]: updated } })
       return
     }
     setExpansions({ ...expansions, problemExpansions: probs, benefitExpansions: bens })
   }
 
-  const handleSlideTitleEdit = (slideNumber: number, newTitle: string) => {
+  const handleSlideTitleEdit = (slideKey: string, newTitle: string) => {
     if (!expansions) return
-    // Slide 1: edit the project title (stored as editedProjectTitle override)
-    if (slideNumber === 1) {
+    // Cover slide: edit the project title (stored as editedProjectTitle override)
+    if (slideKey === 'title') {
       setExpansions({ ...expansions, editedProjectTitle: newTitle })
       return
     }
     setExpansions({
       ...expansions,
-      customTitles: { ...(expansions.customTitles ?? {}), [slideNumber]: newTitle },
+      customTitles: { ...(expansions.customTitles ?? {}), [slideKey]: newTitle },
     })
   }
 

@@ -10,8 +10,8 @@ interface SlidePreviewProps {
   designConfig?: DesignConfig
   isUpdating?: boolean
   chatUpdateVersion?: number
-  onSlideEdit?: (slideNumber: number, bulletIndex: number, newText: string) => void
-  onSlideTitleEdit?: (slideNumber: number, newTitle: string) => void
+  onSlideEdit?: (slideKey: string, bulletIndex: number, newText: string) => void
+  onSlideTitleEdit?: (slideKey: string, newTitle: string) => void
 }
 
 // Theme token shapes for dynamic coloring
@@ -207,8 +207,7 @@ function SlideCard({
   )
 }
 
-// All slides are editable
-const isEditableSlide = (_n: number) => true
+const isEditableSlide = (slide: SlideData) => slide.editable === true
 
 export default function SlidePreview({ fileName, data, designConfig, isUpdating, chatUpdateVersion, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
   const hasRealData = !!(data && (data.client?.company || data.project?.title || data.content?.problems?.[0]))
@@ -255,12 +254,12 @@ export default function SlidePreview({ fileName, data, designConfig, isUpdating,
                 index={index}
                 theme={theme}
                 chatUpdateVersion={chatUpdateVersion}
-                onBulletEdit={onSlideEdit && isEditableSlide(slide.slideNumber)
-                  ? (bulletIndex, newText) => onSlideEdit(slide.slideNumber, bulletIndex, newText)
+                onBulletEdit={onSlideEdit && isEditableSlide(slide) && slide.slideKey
+                  ? (bulletIndex, newText) => onSlideEdit(slide.slideKey!, bulletIndex, newText)
                   : undefined
                 }
-                onTitleEdit={onSlideTitleEdit && isEditableSlide(slide.slideNumber)
-                  ? (newTitle) => onSlideTitleEdit(slide.slideNumber, newTitle)
+                onTitleEdit={onSlideTitleEdit && isEditableSlide(slide) && slide.slideKey
+                  ? (newTitle) => onSlideTitleEdit(slide.slideKey!, newTitle)
                   : undefined
                 }
               />

@@ -1,5 +1,7 @@
 export interface SlideData {
   slideNumber: number
+  slideKey?: string    // stable semantic identity regardless of position (e.g. 'prob1', 'ben1')
+  editable?: boolean   // true if user can click-to-edit bullets/title in the preview
   title: string
   subtitle?: string
   bullets: string[]
