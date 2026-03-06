@@ -64,7 +64,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: 'Challenges 3 & 4',
       subtitle: undefined,
-      bullets: [
+      bullets: expanded?.editedBullets?.[5] ?? [
         problems[2] || '',
         problemExpansions?.[2] || '',
         problems[3] || '',
@@ -76,9 +76,9 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: 'Our Solution',
       subtitle: company !== '—' ? `How we deliver results for ${company}` : undefined,
-      bullets: activeBenefitCount > 0
+      bullets: expanded?.editedBullets?.[6] ?? (activeBenefitCount > 0
         ? benefits.filter(Boolean)
-        : ['Awaiting brief content'],
+        : ['Awaiting brief content']),
     },
     {
       slideNumber: 7,
@@ -103,7 +103,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: 'Investment & Timeline',
       subtitle: undefined,
-      bullets: [
+      bullets: expanded?.editedBullets?.[9] ?? [
         project?.totalValue ? `Total Investment: ${project.totalValue}` : '',
         project?.duration ? `Timeline: ${project.duration}` : '',
         project?.monthOneInvestment ? `Month 1: ${project.monthOneInvestment}` : '',
@@ -116,7 +116,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'closing',
       title: `Let's Build This Together`,
       subtitle: company !== '—' ? company : undefined,
-      bullets: [
+      bullets: expanded?.editedBullets?.[10] ?? [
         `We look forward to building this together.`,
         client?.email ? `Reach us at ${client.email}` : '',
       ].filter(Boolean),

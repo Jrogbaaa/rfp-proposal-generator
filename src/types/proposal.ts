@@ -78,6 +78,8 @@ export interface ExpandedContent {
   editedProjectTitle?: string;
   editedProblems?: [string, string, string, string];
   editedBenefits?: [string, string, string, string];
+  // Generic bullet overrides for any slide (slides 5, 6, 9, 10, etc.)
+  editedBullets?: Record<number, string[]>;
   // Paramount media sales content (Dunkin-style deck)
   paramountMedia?: ParamountMediaContent;
 }

@@ -14,6 +14,7 @@ import DevTools from './components/DevTools'
 import type { Step, ExpandedContent, DesignConfig, BrandVoiceProfile } from './types/proposal'
 import { DEFAULT_DESIGN_CONFIG } from './types/proposal'
 import { generateProposalContent } from './utils/llmService'
+import { buildSlidesFromData } from './utils/slideBuilder'
 import { getAuthState } from './utils/googleAuth'
 
 type InputMode = 'pdf' | 'paste'
@@ -182,7 +183,17 @@ export default function App() {
         setExpansions({ ...expansions, additionalSlides: additional })
       }
       return
-    } else return
+    } else {
+      // Generic fallback: store in editedBullets for slides 5, 6, 9, 10, etc.
+      const currentSlides = parsedData ? buildSlidesFromData({ ...parsedData, expanded: expansions }) : []
+      const slide = currentSlides.find(s => s.slideNumber === slideNumber)
+      if (!slide) return
+      const currentBullets = expansions.editedBullets?.[slideNumber] ?? [...slide.bullets]
+      const updated = [...currentBullets]
+      updated[bulletIndex] = newText
+      setExpansions({ ...expansions, editedBullets: { ...(expansions.editedBullets ?? {}), [slideNumber]: updated } })
+      return
+    }
     setExpansions({ ...expansions, problemExpansions: probs, benefitExpansions: bens })
   }
 

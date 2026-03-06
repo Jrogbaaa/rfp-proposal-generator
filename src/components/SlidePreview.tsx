@@ -161,7 +161,7 @@ function SlideCard({
               const isLabel = bullet.endsWith(':')
               const isPunchLine = isClosing && bullet.length < 60
               const isQuote = bullet.startsWith('"') && bullet.endsWith('"')
-              const isEditable = !!onBulletEdit && !isLabel && !isPunchLine && !isTitle && !isClosing
+              const isEditable = !!onBulletEdit && !isLabel && !isTitle
 
               if (editingIndex === i) {
                 return (
@@ -207,9 +207,8 @@ function SlideCard({
   )
 }
 
-// Editable slides: cover title (1), challenge bullets (2), AI expansions (3,4,7,8), additional (11+)
-const EDITABLE_SLIDES = new Set([1, 2, 3, 4, 7, 8])
-const isEditableSlide = (n: number) => EDITABLE_SLIDES.has(n) || n >= 11
+// All slides are editable
+const isEditableSlide = (_n: number) => true
 
 export default function SlidePreview({ fileName, data, designConfig, isUpdating, chatUpdateVersion, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
   const hasRealData = !!(data && (data.client?.company || data.project?.title || data.content?.problems?.[0]))
