@@ -53,7 +53,7 @@ export default function ProgressStepper({ currentStep, onStepClick }: ProgressSt
                   />
                 </motion.svg>
               ) : (
-                <span className="leading-[0]">{step.number}</span>
+                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 leading-none">{step.number}</span>
               )}
 
               {/* Pulse animation for current step */}
