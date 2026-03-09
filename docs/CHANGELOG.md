@@ -3,7 +3,8 @@
 ## [2026-03-09] — Scroll-to-Top on Step Transitions
 
 ### Fixed
-- **`App.tsx` — page now scrolls to top when switching between steps** — After clicking "Continue to Refine", the viewport was left scrolled down so the loading/progress bar was hidden above the fold. Added `window.scrollTo({ top: 0, behavior: 'smooth' })` to all step transitions: Generate → Refine, Refine → Export, error "Back to Draft", and stepper breadcrumb clicks.
+- **`App.tsx` — page now scrolls to top when switching between steps** — Added instant `scrollToTop()` via `requestAnimationFrame` to all step transitions, plus a `useEffect` on `currentStep` as a safety net.
+- **`ChatInterface.tsx` / `DesignChatInterface.tsx` — stopped `scrollIntoView` from firing on mount** — The chat components' auto-scroll effect was running on initial render, scrolling the entire page down to the chat panel and hiding the loading bar. Now skips the first render and only auto-scrolls after user interaction. Also changed to `block: 'nearest'` so it scrolls within the chat container instead of the whole page.
 
 ---
 

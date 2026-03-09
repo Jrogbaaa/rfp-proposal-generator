@@ -40,9 +40,14 @@ export default function ChatInterface({
   const [isLoading, setIsLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const hasInteracted = useRef(false)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!hasInteracted.current) {
+      hasInteracted.current = messages.length > 1
+      return
+    }
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [messages])
 
   const sendMessage = useCallback(async (text: string) => {
