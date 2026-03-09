@@ -104,6 +104,7 @@ export default function App() {
 
   const handleSlidesSuccess = (url: string) => {
     setSlidesUrl(url)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     setCurrentStep('share')
   }
 
@@ -122,10 +123,12 @@ export default function App() {
 
   const handleStepClick = useCallback((stepIndex: number) => {
     if (stepIndex >= currentStepIndex) return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     setCurrentStep(STEP_ORDER[stepIndex])
   }, [currentStepIndex])
 
   const handleContinueToIteration = async () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     setCurrentStep('iterate')
     setGenerationError(null)
     if (!expansions) {
@@ -553,7 +556,7 @@ export default function App() {
                               Retry
                             </button>
                             <button
-                              onClick={() => setCurrentStep('draft')}
+                              onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setCurrentStep('draft') }}
                               className="flex-1 px-4 py-2.5 rounded-lg border border-red-200 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
                             >
                               Back to Draft
