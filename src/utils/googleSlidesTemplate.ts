@@ -23,7 +23,7 @@ import type { SlideData } from '../data/slideContent'
 import type { CreateSlidesResult } from './googleSlides'
 import { buildSlidesFromData } from './slideBuilder'
 
-const TEMPLATE_ID = '1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo'
+const TEMPLATE_ID = '1brp4caHLITlfqqFiYUs9fNLhC_1tgWDJBzKF-0QHLf8'
 const DRIVE_API   = 'https://www.googleapis.com/drive/v3/files'
 const SLIDES_API  = 'https://slides.googleapis.com/v1/presentations'
 
@@ -228,6 +228,16 @@ function insertTextReq(objectId: string, text: string): object {
   return { insertText: { objectId, insertionIndex: 0, text } }
 }
 
+function autoFitRequest(objectId: string): object {
+  return {
+    updateShapeProperties: {
+      objectId,
+      shapeProperties: { autofit: { autofitType: 'TEXT_AUTOFIT' } },
+      fields: 'autofit',
+    },
+  }
+}
+
 function applyStyleReq(objectId: string, style: TextRunStyle): object {
   const fields: string[] = []
   const s: Record<string, unknown> = {}
@@ -251,13 +261,35 @@ function applyStyleReq(objectId: string, style: TextRunStyle): object {
 // ---------------------------------------------------------------------------
 
 /**
+ * Short headline labels for deep-dive slides.
+ * These go into the large display-font headline box (designed for 2-3 word titles).
+ * The actual problem/benefit text + expansion is combined into the body box below.
+ */
+const DEEP_DIVE_LABEL: Record<string, string> = {
+  prob1:  'Challenge 01',
+  prob2:  'Challenge 02',
+  prob34: 'Challenges 3 & 4',
+  ben1:   'Outcome 01',
+  ben2:   'Outcome 02',
+  ben34:  'Benefits 3 & 4',
+}
+
+/**
  * Build requests to clear and fill a template slide's content shapes
  * with the corresponding SlideData content.
  *
  * Content distribution across shapes (sorted top-to-bottom):
- *   Shape 0: slide.title
- *   Shape 1: slide.subtitle (if present)
- *   Remaining / last shape: bullets joined with newlines
+ *
+ *   Deep-dive slides (prob1/prob2/ben1/ben2/prob34/ben34):
+ *     Shape 0 (large headline box): short label e.g. "Challenge 01"
+ *     Last shape (body box):        title + bullets joined
+ *
+ *   All other slides:
+ *     Shape 0: slide.title
+ *     Shape 1: slide.subtitle (if present)
+ *     Last shape: bullets joined with newlines
+ *
+ * TEXT_AUTOFIT is applied to every filled shape to prevent overflow.
  */
 function fillSlideRequests(
   shapes: ContentShapeInfo[],
@@ -265,9 +297,22 @@ function fillSlideRequests(
 ): object[] {
   if (shapes.length === 0) return []
 
-  const items: string[] = [appSlide.title]
-  if (appSlide.subtitle) items.push(appSlide.subtitle)
-  if (appSlide.bullets.length > 0) items.push(appSlide.bullets.join('\n'))
+  const key = appSlide.slideKey ?? ''
+  const deepDiveLabel = DEEP_DIVE_LABEL[key]
+
+  let items: string[]
+  if (deepDiveLabel) {
+    // Large headline box: concise label (fits the display font)
+    // Body box: full title + expansion bullets combined
+    const bodyParts = [appSlide.title]
+    if (appSlide.subtitle) bodyParts.push(appSlide.subtitle)
+    if (appSlide.bullets.length > 0) bodyParts.push(appSlide.bullets.join('\n'))
+    items = [deepDiveLabel, bodyParts.join('\n\n')]
+  } else {
+    items = [appSlide.title]
+    if (appSlide.subtitle) items.push(appSlide.subtitle)
+    if (appSlide.bullets.length > 0) items.push(appSlide.bullets.join('\n'))
+  }
 
   const reqs: object[] = []
 
@@ -286,6 +331,9 @@ function fillSlideRequests(
       const styleReq = shapes[i].style ? applyStyleReq(shapes[i].objectId, shapes[i].style!) : null
       if (styleReq && Object.keys(styleReq).length > 0) reqs.push(styleReq)
     }
+
+    // Shrink text to fit the box — prevents overflow on all slide types
+    reqs.push(autoFitRequest(shapes[i].objectId))
   }
 
   return reqs
