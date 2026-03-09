@@ -228,15 +228,9 @@ function insertTextReq(objectId: string, text: string): object {
   return { insertText: { objectId, insertionIndex: 0, text } }
 }
 
-function autoFitRequest(objectId: string): object {
-  return {
-    updateShapeProperties: {
-      objectId,
-      shapeProperties: { autofit: { autofitType: 'TEXT_AUTOFIT' } },
-      fields: 'autofit',
-    },
-  }
-}
+// autoFitRequest removed — Google Slides API now treats 'autofit' as read-only;
+// any updateShapeProperties with fields: 'autofit' returns a 400.
+// Template text boxes inherit sizing from the template design instead.
 
 function applyStyleReq(objectId: string, style: TextRunStyle): object {
   const fields: string[] = []
@@ -289,7 +283,7 @@ const DEEP_DIVE_LABEL: Record<string, string> = {
  *     Shape 1: slide.subtitle (if present)
  *     Last shape: bullets joined with newlines
  *
- * TEXT_AUTOFIT is applied to every filled shape to prevent overflow.
+ * Template text boxes inherit sizing from the template design.
  */
 function fillSlideRequests(
   shapes: ContentShapeInfo[],
@@ -332,8 +326,7 @@ function fillSlideRequests(
       if (styleReq && Object.keys(styleReq).length > 0) reqs.push(styleReq)
     }
 
-    // Shrink text to fit the box — prevents overflow on all slide types
-    reqs.push(autoFitRequest(shapes[i].objectId))
+    // autofit removed — API treats it as read-only; template boxes handle sizing
   }
 
   return reqs

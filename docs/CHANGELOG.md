@@ -5,6 +5,7 @@
 ### Fixed
 - **`App.tsx` — page now scrolls to top when switching between steps** — Added instant `scrollToTop()` via `requestAnimationFrame` to all step transitions, plus a `useEffect` on `currentStep` as a safety net.
 - **`ChatInterface.tsx` / `DesignChatInterface.tsx` — stopped `scrollIntoView` from firing on mount** — The chat components' auto-scroll effect was running on initial render, scrolling the entire page down to the chat panel and hiding the loading bar. Now skips the first render and only auto-scrolls after user interaction. Also changed to `block: 'nearest'` so it scrolls within the chat container instead of the whole page.
+- **`googleSlidesTemplate.ts` — removed `autoFitRequest` (read-only field error)** — The template builder still called `updateShapeProperties` with `fields: 'autofit'`, which the Google Slides API now rejects as read-only (`Invalid field mask: * includes read-only fields`). Removed the function and its per-shape invocation in `fillSlideRequests`. Template text boxes inherit their sizing from the template design.
 
 ---
 
