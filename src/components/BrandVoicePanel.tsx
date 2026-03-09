@@ -2,9 +2,7 @@ import { useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { extractBrandVoice } from '../utils/llmService'
 import type { BrandVoiceProfile } from '../types/proposal'
-
-const STORAGE_KEY = 'rfp_brand_voice'
-const STORAGE_COUNT_KEY = 'rfp_brand_voice_count'
+import { saveBrandVoice, deleteBrandVoice } from '../utils/api'
 
 interface BrandVoicePanelProps {
   brandVoice: BrandVoiceProfile | null
@@ -26,9 +24,7 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
   const [error, setError] = useState<string | null>(null)
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
 
-  const trainedCount = brandVoice
-    ? parseInt(localStorage.getItem(STORAGE_COUNT_KEY) || '0', 10)
-    : 0
+  const [trainedCount, setTrainedCount] = useState(0)
 
   const handleFiles = useCallback((files: File[]) => {
     const pdfs = files.filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'))
@@ -77,8 +73,8 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
       const profile = await extractBrandVoice(stagedFiles)
       clearTimeout(t1)
       clearTimeout(t2)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile))
-      localStorage.setItem(STORAGE_COUNT_KEY, String(stagedFiles.length))
+      await saveBrandVoice(profile)
+      setTrainedCount(stagedFiles.length)
       onBrandVoiceExtracted(profile, stagedFiles.length)
       setStagedFiles([])
       setIsExpanded(false)
@@ -94,8 +90,8 @@ export default function BrandVoicePanel({ brandVoice, onBrandVoiceExtracted }: B
   }, [stagedFiles, isProcessing, onBrandVoiceExtracted])
 
   const handleClear = () => {
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem(STORAGE_COUNT_KEY)
+    void deleteBrandVoice()
+    setTrainedCount(0)
     onBrandVoiceExtracted({ tone: [], sentenceStyle: '', perspective: '', forbiddenPhrases: [], preferredVocabulary: [], ctaStyle: '', proseSummary: '' }, 0)
     setStagedFiles([])
     setIsExpanded(true)
