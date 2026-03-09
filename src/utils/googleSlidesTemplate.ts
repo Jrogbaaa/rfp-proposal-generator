@@ -544,10 +544,14 @@ export async function createTemplatePresentation(
     }
   }
 
-  // Reorder slides to match the app's slide order
-  const reorderReqs: object[] = finalSlideOrder.length > 0
-    ? [{ updateSlidesPosition: { slideObjectIds: finalSlideOrder, insertionIndex: 0 } }]
-    : []
+  // Reorder slides to match the app's slide order.
+  // updateSlidesPosition requires slideObjectIds to be in the CURRENT presentation
+  // order — not the desired order. To avoid this constraint, move one slide at a
+  // time (single-element arrays are always valid), processing in reverse so each
+  // slide lands at insertionIndex 0 and pushes previously-placed slides down.
+  const reorderReqs: object[] = [...finalSlideOrder].reverse().map(slideId => ({
+    updateSlidesPosition: { slideObjectIds: [slideId], insertionIndex: 0 },
+  }))
 
   // Assemble requests in the correct execution order:
   //   1. Delete static text shapes

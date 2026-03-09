@@ -82,7 +82,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     slides.push({
       slideNumber: slideNum++,
       slideKey: 'prob34',
-      editable: false,
+      editable: true,
       type: 'content',
       title: 'Challenges 3 & 4',
       subtitle: undefined,
@@ -99,7 +99,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   slides.push({
     slideNumber: slideNum++,
     slideKey: 'solution',
-    editable: false,
+    editable: true,
     type: 'content',
     title: 'Our Solution',
     subtitle: company !== '—' ? `How we deliver results for ${company}` : undefined,
@@ -113,7 +113,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     slides.push({
       slideNumber: slideNum++,
       slideKey: 'approach',
-      editable: false,
+      editable: true,
       type: 'content',
       title: 'Our Approach',
       subtitle: 'How We Deliver',
@@ -148,7 +148,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     slides.push({
       slideNumber: slideNum++,
       slideKey: 'ben34',
-      editable: false,
+      editable: true,
       type: 'content',
       title: 'Benefits 3 & 4',
       subtitle: undefined,
@@ -183,7 +183,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     slides.push({
       slideNumber: slideNum++,
       slideKey: 'nextSteps',
-      editable: false,
+      editable: true,
       type: 'content',
       title: 'Next Steps',
       subtitle: 'What happens next',
@@ -195,7 +195,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   slides.push({
     slideNumber: slideNum++,
     slideKey: 'closing',
-    editable: false,
+    editable: true,
     type: 'closing',
     title: `Let's Build This Together`,
     subtitle: company !== '—' ? company : undefined,

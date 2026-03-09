@@ -166,6 +166,58 @@ export default function App() {
       setExpansions({ ...expansions, editedProblems: edited })
       return
     }
+    // Solution slide: bullets are benefits.filter(Boolean)
+    if (slideKey === 'solution') {
+      const base = expansions.editedBenefits ?? parsedData?.content?.benefits ?? ['', '', '', '']
+      const edited = [...base] as [string, string, string, string]
+      edited[bulletIndex] = newText
+      setExpansions({ ...expansions, editedBenefits: edited })
+      return
+    }
+    // Approach slide: bullets are "01  stepText" — strip number prefix before saving
+    if (slideKey === 'approach') {
+      const stripped = newText.replace(/^\d{2}\s{2}/, '')
+      const steps = [...(expansions.approachSteps ?? [])]
+      steps[bulletIndex] = stripped
+      setExpansions({ ...expansions, approachSteps: steps })
+      return
+    }
+    // Next Steps slide: same "01  stepText" pattern
+    if (slideKey === 'nextSteps') {
+      const stripped = newText.replace(/^\d{2}\s{2}/, '')
+      const steps = [...(expansions.nextSteps ?? [])]
+      steps[bulletIndex] = stripped
+      setExpansions({ ...expansions, nextSteps: steps })
+      return
+    }
+    // prob34 slide: interleaved [prob[2], expansion[2], prob[3], expansion[3]]
+    if (slideKey === 'prob34') {
+      if (bulletIndex % 2 === 0) {
+        const base = expansions.editedProblems ?? parsedData?.content?.problems ?? ['', '', '', '']
+        const edited = [...base] as [string, string, string, string]
+        edited[2 + Math.floor(bulletIndex / 2)] = newText
+        setExpansions({ ...expansions, editedProblems: edited })
+      } else {
+        const probs34 = [...expansions.problemExpansions] as [string, string, string, string]
+        probs34[2 + Math.floor(bulletIndex / 2)] = newText
+        setExpansions({ ...expansions, problemExpansions: probs34 })
+      }
+      return
+    }
+    // ben34 slide: interleaved [ben[2], expansion[2], ben[3], expansion[3]]
+    if (slideKey === 'ben34') {
+      if (bulletIndex % 2 === 0) {
+        const base = expansions.editedBenefits ?? parsedData?.content?.benefits ?? ['', '', '', '']
+        const edited = [...base] as [string, string, string, string]
+        edited[2 + Math.floor(bulletIndex / 2)] = newText
+        setExpansions({ ...expansions, editedBenefits: edited })
+      } else {
+        const bens34 = [...expansions.benefitExpansions] as [string, string, string, string]
+        bens34[2 + Math.floor(bulletIndex / 2)] = newText
+        setExpansions({ ...expansions, benefitExpansions: bens34 })
+      }
+      return
+    }
     // Deep-dive and additional slides
     const probs = [...expansions.problemExpansions] as [string, string, string, string]
     const bens = [...expansions.benefitExpansions] as [string, string, string, string]
