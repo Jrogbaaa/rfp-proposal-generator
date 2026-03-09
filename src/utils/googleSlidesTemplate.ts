@@ -72,6 +72,8 @@ interface TemplateSlide {
 interface ContentShapeInfo {
   objectId: string
   translateY: number
+  height: number
+  width: number
   style?: TextRunStyle
 }
 
@@ -212,6 +214,8 @@ function getContentShapes(slide: TemplateSlide): ContentShapeInfo[] {
     .map(el => ({
       objectId: el.objectId,
       translateY: shapeY(el),
+      height: el.size?.height?.magnitude ?? 0,
+      width: el.size?.width?.magnitude ?? 0,
       style: captureStyle(el),
     }))
 }
@@ -228,9 +232,54 @@ function insertTextReq(objectId: string, text: string): object {
   return { insertText: { objectId, insertionIndex: 0, text } }
 }
 
-// autoFitRequest removed — Google Slides API now treats 'autofit' as read-only;
-// any updateShapeProperties with fields: 'autofit' returns a 400.
-// Template text boxes inherit sizing from the template design instead.
+// autoFitRequest removed — Google Slides API now treats 'autofit' as read-only.
+// Instead we reduce font size via updateTextStyle when content is too long for the box.
+
+const EMU_PER_PT = 12_700
+const LINE_HEIGHT_FACTOR = 1.4
+
+function estimateMaxChars(heightEmu: number, widthEmu: number, fontSizePt: number): number {
+  const lineHeightEmu = fontSizePt * EMU_PER_PT * LINE_HEIGHT_FACTOR
+  const maxLines = Math.max(1, Math.floor(heightEmu / lineHeightEmu))
+  const charWidthEmu = fontSizePt * EMU_PER_PT * 0.55
+  const charsPerLine = Math.max(10, Math.floor(widthEmu / charWidthEmu))
+  return maxLines * charsPerLine
+}
+
+function chooseFontSize(
+  textLength: number,
+  heightEmu: number,
+  widthEmu: number,
+  originalSizePt: number,
+): number {
+  if (heightEmu === 0 || widthEmu === 0) return originalSizePt
+  const fits = estimateMaxChars(heightEmu, widthEmu, originalSizePt)
+  if (textLength <= fits) return originalSizePt
+
+  for (const candidate of [originalSizePt - 2, originalSizePt - 4, 10, 9, 8]) {
+    if (candidate < 7) break
+    if (textLength <= estimateMaxChars(heightEmu, widthEmu, candidate)) return candidate
+  }
+  return 8
+}
+
+function fontSizeReq(objectId: string, sizePt: number): object {
+  return {
+    updateTextStyle: {
+      objectId,
+      style: { fontSize: { magnitude: sizePt, unit: 'PT' } },
+      textRange: { type: 'ALL' },
+      fields: 'fontSize',
+    },
+  }
+}
+
+function truncateToFit(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  const cut = text.slice(0, maxChars - 1)
+  const lastSpace = cut.lastIndexOf(' ')
+  return (lastSpace > maxChars * 0.5 ? cut.slice(0, lastSpace) : cut) + '…'
+}
 
 function applyStyleReq(objectId: string, style: TextRunStyle): object {
   const fields: string[] = []
@@ -296,8 +345,6 @@ function fillSlideRequests(
 
   let items: string[]
   if (deepDiveLabel) {
-    // Large headline box: concise label (fits the display font)
-    // Body box: full title + expansion bullets combined
     const bodyParts = [appSlide.title]
     if (appSlide.subtitle) bodyParts.push(appSlide.subtitle)
     if (appSlide.bullets.length > 0) bodyParts.push(appSlide.bullets.join('\n'))
@@ -311,7 +358,8 @@ function fillSlideRequests(
   const reqs: object[] = []
 
   for (let i = 0; i < shapes.length; i++) {
-    reqs.push(deleteTextReq(shapes[i].objectId))
+    const shape = shapes[i]
+    reqs.push(deleteTextReq(shape.objectId))
 
     let text = ''
     if (i < items.length && i < shapes.length - 1) {
@@ -320,13 +368,21 @@ function fillSlideRequests(
       text = items.slice(Math.min(i, items.length - 1)).join('\n')
     }
 
-    if (text) {
-      reqs.push(insertTextReq(shapes[i].objectId, text))
-      const styleReq = shapes[i].style ? applyStyleReq(shapes[i].objectId, shapes[i].style!) : null
-      if (styleReq && Object.keys(styleReq).length > 0) reqs.push(styleReq)
-    }
+    if (!text) continue
 
-    // autofit removed — API treats it as read-only; template boxes handle sizing
+    const originalPt = shape.style?.fontSize?.magnitude ?? 14
+    const maxChars = estimateMaxChars(shape.height, shape.width, originalPt)
+    text = truncateToFit(text, Math.max(maxChars, 80))
+
+    reqs.push(insertTextReq(shape.objectId, text))
+
+    const styleReq = shape.style ? applyStyleReq(shape.objectId, shape.style) : null
+    if (styleReq && Object.keys(styleReq).length > 0) reqs.push(styleReq)
+
+    const bestPt = chooseFontSize(text.length, shape.height, shape.width, originalPt)
+    if (bestPt < originalPt) {
+      reqs.push(fontSizeReq(shape.objectId, bestPt))
+    }
   }
 
   return reqs

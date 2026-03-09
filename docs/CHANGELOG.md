@@ -1,11 +1,18 @@
 # Changelog
 
-## [2026-03-09] — Scroll-to-Top on Step Transitions
+## [2026-03-09] — Step 1 UX + Google Slides Text Overflow Fix
+
+### Changed
+- **`App.tsx` — pinned "Continue to Refine" button at bottom of right panel** — Moved the CTA out of the scrollable content area and into a `shrink-0 mt-auto` footer with a border separator. The right panel's content area is now `overflow-y-auto` so BrandVoicePanel + parsed fields scroll without pushing the button off-screen.
+- **`App.tsx` — left panel overflow changed from `overflow-hidden` to `overflow-y-auto`** — Prevents the PDF upload box from being clipped.
+- **`PdfUploader.tsx` — removed `absolute inset-0` positioning** — Replaced with normal flow + `min-h-[280px]` so the drop zone doesn't collapse or get cut off.
+- **`slideBuilder.ts` — added content length caps** — Expansion paragraphs capped at 350 chars, bullet lists at 5 items x 120 chars, approach/next steps at 6 items x 100 chars. Truncation uses word boundaries with ellipsis.
+- **`googleSlidesTemplate.ts` — shape-aware font size reduction** — `ContentShapeInfo` now captures height and width from template shapes. `fillSlideRequests` estimates max characters per shape based on dimensions and font size, truncates text to fit, and reduces font size (down to 8pt minimum) when content exceeds the box capacity. Replaces the removed `autoFitRequest` (which the API rejected as read-only).
 
 ### Fixed
 - **`App.tsx` — page now scrolls to top when switching between steps** — Added instant `scrollToTop()` via `requestAnimationFrame` to all step transitions, plus a `useEffect` on `currentStep` as a safety net.
 - **`ChatInterface.tsx` / `DesignChatInterface.tsx` — stopped `scrollIntoView` from firing on mount** — The chat components' auto-scroll effect was running on initial render, scrolling the entire page down to the chat panel and hiding the loading bar. Now skips the first render and only auto-scrolls after user interaction. Also changed to `block: 'nearest'` so it scrolls within the chat container instead of the whole page.
-- **`googleSlidesTemplate.ts` — removed `autoFitRequest` (read-only field error)** — The template builder still called `updateShapeProperties` with `fields: 'autofit'`, which the Google Slides API now rejects as read-only (`Invalid field mask: * includes read-only fields`). Removed the function and its per-shape invocation in `fillSlideRequests`. Template text boxes inherit their sizing from the template design.
+- **`googleSlidesTemplate.ts` — removed `autoFitRequest` (read-only field error)** — The template builder still called `updateShapeProperties` with `fields: 'autofit'`, which the Google Slides API now rejects as read-only (`Invalid field mask: * includes read-only fields`). Replaced with shape-aware font sizing and text truncation.
 
 ---
 

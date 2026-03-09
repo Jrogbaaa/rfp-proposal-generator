@@ -298,7 +298,7 @@ export default function App() {
                 className="grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-8.5rem)]"
               >
                 {/* Left: Input panel */}
-                <section className="relative bg-navy-800 flex flex-col overflow-hidden min-h-[50vh] lg:min-h-0">
+                <section className="relative bg-navy-800 flex flex-col overflow-y-auto min-h-[50vh] lg:min-h-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-gold-500/[0.03] via-transparent to-gold-500/[0.02] pointer-events-none" />
 
                   <div className="relative z-10 flex flex-col h-full p-6 lg:p-10">
@@ -390,25 +390,24 @@ export default function App() {
                 {/* Right: Parsed preview + CTA */}
                 <section className="relative bg-cream-50 flex flex-col border-l border-cream-400 min-h-[50vh] lg:min-h-0">
                   <div className="flex flex-col h-full p-6 lg:p-10">
-                    <BrandVoicePanel
-                      brandVoice={brandVoice}
-                      onBrandVoiceExtracted={(voice, _count) => setBrandVoice(voice.tone.length > 0 || voice.proseSummary ? voice : null)}
-                    />
-                    <div className="mb-6">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-2">
-                        Preview
-                      </p>
-                      <h2 className="font-display text-2xl lg:text-3xl text-navy-800 tracking-tight">
-                        {hasContent ? 'Brief parsed' : 'Waiting for brief'}
-                      </h2>
-                    </div>
+                    <div className="flex-1 overflow-y-auto min-h-0">
+                      <BrandVoicePanel
+                        brandVoice={brandVoice}
+                        onBrandVoiceExtracted={(voice, _count) => setBrandVoice(voice.tone.length > 0 || voice.proseSummary ? voice : null)}
+                      />
+                      <div className="mb-6">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400 mb-2">
+                          Preview
+                        </p>
+                        <h2 className="font-display text-2xl lg:text-3xl text-navy-800 tracking-tight">
+                          {hasContent ? 'Brief parsed' : 'Waiting for brief'}
+                        </h2>
+                      </div>
 
-                    <div className="flex-1 flex flex-col min-h-0">
                       {hasContent ? (
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="flex-1 flex flex-col gap-4"
                         >
                           <div className="rounded-xl bg-white border border-cream-300 p-5 space-y-3">
                             <ParsedField label="Company" value={parsedData?.client?.company} />
@@ -432,19 +431,9 @@ export default function App() {
                               }
                             />
                           </div>
-
-                          <button
-                            onClick={handleContinueToIteration}
-                            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-navy-800 text-cream-100 font-semibold text-base hover:bg-navy-700 transition-colors shadow-md"
-                          >
-                            Continue to Refine
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M5 12h14M12 5l7 7-7 7" />
-                            </svg>
-                          </button>
                         </motion.div>
                       ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center text-navy-400">
+                        <div className="flex-1 flex flex-col items-center justify-center text-center text-navy-400 py-12">
                           <svg className="w-12 h-12 mb-4 opacity-25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                             <polyline points="14 2 14 8 20 8" />
@@ -455,6 +444,22 @@ export default function App() {
                         </div>
                       )}
                     </div>
+
+                    {hasContent && (
+                      <div className="shrink-0 pt-4 mt-auto border-t border-cream-300">
+                        <button
+                          onClick={handleContinueToIteration}
+                          className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-navy-800 text-cream-100 font-semibold text-base hover:bg-navy-700 transition-colors shadow-md"
+                          aria-label="Continue to refine your proposal"
+                          tabIndex={0}
+                        >
+                          Continue to Refine
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </section>
               </motion.div>

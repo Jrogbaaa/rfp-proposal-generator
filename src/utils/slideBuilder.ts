@@ -5,6 +5,23 @@ function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
+const MAX_EXPANSION_CHARS = 350
+const MAX_BULLETS = 5
+const MAX_BULLET_CHARS = 120
+const MAX_STEPS = 6
+const MAX_STEP_CHARS = 100
+
+function truncate(text: string, max: number): string {
+  if (!text || text.length <= max) return text
+  const cut = text.slice(0, max - 1)
+  const lastSpace = cut.lastIndexOf(' ')
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut) + '…'
+}
+
+function capBullets(items: string[], maxItems: number, maxChars: number): string[] {
+  return items.slice(0, maxItems).map(b => truncate(b, maxChars))
+}
+
 export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   const client = data.client
   const project = data.project
@@ -51,7 +68,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     title: 'The Challenge',
     subtitle: company !== '—' ? `What's holding ${company} back` : undefined,
     bullets: activeProblemCount > 0
-      ? problems.filter(Boolean)
+      ? capBullets(problems.filter(Boolean), MAX_BULLETS, MAX_BULLET_CHARS)
       : ['Awaiting brief content'],
   })
 
@@ -63,7 +80,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     type: 'content',
     title: customTitles['prob1'] ?? problems[0] ?? 'Challenge 01',
     subtitle: undefined,
-    bullets: problemExpansions ? [problemExpansions[0]].filter(Boolean) : [],
+    bullets: problemExpansions ? [truncate(problemExpansions[0], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
   })
 
   // Slide 4: Problem 2 deep dive
@@ -74,7 +91,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     type: 'content',
     title: customTitles['prob2'] ?? problems[1] ?? 'Challenge 02',
     subtitle: undefined,
-    bullets: problemExpansions ? [problemExpansions[1]].filter(Boolean) : [],
+    bullets: problemExpansions ? [truncate(problemExpansions[1], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
   })
 
   // Slide 5: Problems 3 & 4 — only if at least one exists (mirrors export behaviour)
@@ -86,12 +103,12 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: 'Challenges 3 & 4',
       subtitle: undefined,
-      bullets: [
+      bullets: capBullets([
         problems[2] || '',
         problemExpansions?.[2] || '',
         problems[3] || '',
         problemExpansions?.[3] || '',
-      ].filter(Boolean),
+      ].filter(Boolean), MAX_BULLETS, MAX_EXPANSION_CHARS),
     })
   }
 
@@ -104,7 +121,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     title: 'Our Solution',
     subtitle: company !== '—' ? `How we deliver results for ${company}` : undefined,
     bullets: activeBenefitCount > 0
-      ? benefits.filter(Boolean)
+      ? capBullets(benefits.filter(Boolean), MAX_BULLETS, MAX_BULLET_CHARS)
       : ['Awaiting brief content'],
   })
 
@@ -117,7 +134,10 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: 'Our Approach',
       subtitle: 'How We Deliver',
-      bullets: approachSteps.map((step, i) => `${pad(i + 1)}  ${step}`),
+      bullets: capBullets(
+        approachSteps.map((step, i) => `${pad(i + 1)}  ${step}`),
+        MAX_STEPS, MAX_STEP_CHARS,
+      ),
     })
   }
 
@@ -129,7 +149,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     type: 'content',
     title: customTitles['ben1'] ?? benefits[0] ?? 'Outcome 01',
     subtitle: undefined,
-    bullets: benefitExpansions ? [benefitExpansions[0]].filter(Boolean) : [],
+    bullets: benefitExpansions ? [truncate(benefitExpansions[0], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
   })
 
   // Benefit 2 deep dive
@@ -140,7 +160,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     type: 'content',
     title: customTitles['ben2'] ?? benefits[1] ?? 'Outcome 02',
     subtitle: undefined,
-    bullets: benefitExpansions ? [benefitExpansions[1]].filter(Boolean) : [],
+    bullets: benefitExpansions ? [truncate(benefitExpansions[1], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
   })
 
   // Benefits 3 & 4 — only if at least one exists (mirrors export behaviour)
@@ -152,12 +172,12 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: 'Benefits 3 & 4',
       subtitle: undefined,
-      bullets: [
+      bullets: capBullets([
         benefits[2] || '',
         benefitExpansions?.[2] || '',
         benefits[3] || '',
         benefitExpansions?.[3] || '',
-      ].filter(Boolean),
+      ].filter(Boolean), MAX_BULLETS, MAX_EXPANSION_CHARS),
     })
   }
 
@@ -187,7 +207,10 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: 'Next Steps',
       subtitle: 'What happens next',
-      bullets: nextSteps.map((step, i) => `${pad(i + 1)}  ${step}`),
+      bullets: capBullets(
+        nextSteps.map((step, i) => `${pad(i + 1)}  ${step}`),
+        MAX_STEPS, MAX_STEP_CHARS,
+      ),
     })
   }
 
@@ -215,7 +238,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       type: 'content',
       title: customTitles[key] ?? s.title,
       subtitle: undefined,
-      bullets: s.bullets,
+      bullets: capBullets(s.bullets, MAX_BULLETS, MAX_BULLET_CHARS),
     })
   })
 

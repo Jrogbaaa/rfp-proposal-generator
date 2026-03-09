@@ -260,14 +260,16 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 **Key functions:**
 - `discoverRole(slide)` — maps placeholder patterns to slideKeys
-- `getContentShapes(slide)` — finds fillable text shapes (primary: `{{` detection; fallback: largest shapes by area)
-- `fillSlideRequests(shapes, appSlide)` — clears and inserts title/subtitle/bullets
+- `getContentShapes(slide)` — finds fillable text shapes (primary: `{{` detection; fallback: largest shapes by area); captures height/width for font sizing
+- `fillSlideRequests(shapes, appSlide)` — clears and inserts title/subtitle/bullets; truncates text to fit shape dimensions; reduces font size when content exceeds box capacity (down to 8pt minimum)
 - `duplicateAndFillRequests(source, shapes, appSlide, newId)` — clones a template slide and populates it
+- `chooseFontSize(textLength, height, width, originalPt)` — estimates max characters for a shape and steps down font size until text fits
+- `truncateToFit(text, maxChars)` — truncates at word boundary with ellipsis
 
 **Returns:** `{ presentationId, presentationUrl, title }`
 
 ---
 
 ## Last Updated
-- Date: 2026-03-06
-- Changes: Replaced `replaceAllText` placeholder approach with clear-and-fill; content now sourced from `buildSlidesFromData()` for preview-export parity; user edits, conditional slides, and additional slides all flow through to the exported deck
+- Date: 2026-03-09
+- Changes: Pinned "Continue to Refine" button; fixed PDF upload box layout; added shape-aware font sizing and text truncation to prevent overflow in exported slides; added content length caps in slideBuilder.ts

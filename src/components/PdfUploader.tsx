@@ -110,12 +110,12 @@ export default function PdfUploader({ uploadedFile, onFileUpload, onTextExtracte
         className="hidden"
       />
 
-      <div className="flex-1 relative">
+      <div className="flex-1 min-h-[280px]">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="absolute inset-0 rounded-xl overflow-hidden"
+          className="h-full rounded-xl overflow-hidden"
         >
           <AnimatePresence mode="wait">
             {!uploadedFile ? (
@@ -130,7 +130,7 @@ export default function PdfUploader({ uploadedFile, onFileUpload, onTextExtracte
                 onDrop={handleDrop}
                 onClick={handleBrowse}
                 className={`
-                  h-full flex flex-col items-center justify-center cursor-pointer
+                  h-full min-h-[280px] flex flex-col items-center justify-center cursor-pointer
                   rounded-xl border-2 border-dashed transition-all duration-200
                   ${isDragActive
                     ? 'border-gold-500 bg-gold-500/[0.05]'
