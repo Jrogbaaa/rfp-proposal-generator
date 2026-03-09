@@ -18,6 +18,14 @@ import { getAuthState } from './utils/googleAuth'
 
 type InputMode = 'pdf' | 'paste'
 
+const scrollToTop = () => {
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  })
+}
+
 export default function App() {
   // Step flow
   const [currentStep, setCurrentStep] = useState<Step>('draft')
@@ -52,6 +60,10 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSlideUpdating, setIsSlideUpdating] = useState(false)
   const [generationError, setGenerationError] = useState<string | null>(null)
+
+  useEffect(() => {
+    scrollToTop()
+  }, [currentStep])
 
   // Generation progress bar
   const [genProgress, setGenProgress] = useState(0)
@@ -104,8 +116,8 @@ export default function App() {
 
   const handleSlidesSuccess = (url: string) => {
     setSlidesUrl(url)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
     setCurrentStep('share')
+    scrollToTop()
   }
 
   const handleReset = () => {
@@ -123,13 +135,13 @@ export default function App() {
 
   const handleStepClick = useCallback((stepIndex: number) => {
     if (stepIndex >= currentStepIndex) return
-    window.scrollTo({ top: 0, behavior: 'smooth' })
     setCurrentStep(STEP_ORDER[stepIndex])
+    scrollToTop()
   }, [currentStepIndex])
 
   const handleContinueToIteration = async () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
     setCurrentStep('iterate')
+    scrollToTop()
     setGenerationError(null)
     if (!expansions) {
       setIsGenerating(true)
@@ -556,7 +568,7 @@ export default function App() {
                               Retry
                             </button>
                             <button
-                              onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setCurrentStep('draft') }}
+                              onClick={() => { setCurrentStep('draft'); scrollToTop() }}
                               className="flex-1 px-4 py-2.5 rounded-lg border border-red-200 text-red-700 text-sm font-medium hover:bg-red-100 transition-colors"
                             >
                               Back to Draft
