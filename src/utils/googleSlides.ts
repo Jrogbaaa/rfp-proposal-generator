@@ -993,6 +993,63 @@ function closingSlide(slideId: string, data: ProposalData, palette: SlidePalette
   return reqs
 }
 
+/** Custom user-added content slide — mirrors the visual style of challengeSlide */
+function additionalContentSlide(
+  slideId: string,
+  title: string,
+  bullets: string[],
+  palette: SlidePalette,
+  opts: SlideOpts,
+): object[] {
+  const headId   = `${slideId}_head`
+  const bodyId   = `${slideId}_body`
+  const barId    = `${slideId}_bar`
+  const accentId = `${slideId}_accent`
+
+  const isDark    = opts.boldAgency || opts.minimal
+  const textColor = isDark ? WHITE : palette.primary
+  const accentW   = opts.minimal ? 6000 : 12000
+  const safeBullets = truncateBullets(bullets.filter(b => b.trim()), 5, 100)
+
+  const reqs: object[] = [
+    bgFill(slideId, isDark ? palette.primary : WHITE),
+    ...createRect(accentId, slideId, 0, 0, accentW, H, palette.accent),
+  ]
+
+  if (opts.minimal) {
+    reqs.push(
+      ...createRect(`${slideId}_topbar`, slideId, 0, 0, W, 4000, palette.primaryLighter),
+      ...createRect(barId, slideId, 0, H - 4000, W, 4000, palette.primaryLighter),
+    )
+  } else {
+    reqs.push(...createRect(barId, slideId, 0, H - 50000, W, 50000,
+      isDark ? palette.primaryDarker : palette.accent))
+  }
+
+  reqs.push(
+    createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 600000),
+    ...(title ? [
+      insertText(headId, title),
+      styleText(headId, { color: textColor, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+    ] : []),
+
+    createTextBox(bodyId, slideId, MARGIN_X + 80000, 1100000, FULL_W - 80000, 3500000),
+    ...(safeBullets.length ? [
+      insertText(bodyId, safeBullets.join('\n')),
+      styleText(bodyId, { color: isDark ? LTGRAY : palette.primary, fontSize: 18, fontFamily: 'Inter' }),
+      {
+        createParagraphBullets: {
+          objectId: bodyId,
+          textRange: { type: 'ALL' },
+          bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+        },
+      },
+    ] : []),
+  )
+
+  return reqs
+}
+
 // ---------------------------------------------------------------------------
 // Paramount Media Sales slide builders (Dunkin-style deck)
 // ---------------------------------------------------------------------------
@@ -1596,6 +1653,15 @@ export async function createGoogleSlidesPresentation(
       { id: 'pm11_invest',   reqs: () => tierInvestmentSlide('pm11_invest', pm, palette) },
       { id: 'pm12_next',     reqs: () => nextStepsSlide('pm12_next', { ...p, expanded: { ...e, nextSteps: pm.nextSteps } }, palette, opts) },
       { id: 'pm13_appendix', reqs: () => appendixSlide('pm13_appendix', pm, palette) },
+      ...(e.additionalSlides ?? []).map((s, i) => {
+        const key = `additional_${i}`
+        const slideId = `pm_add${i}`
+        const resolvedTitle = e.customTitles?.[key] ?? s.title
+        return {
+          id: slideId,
+          reqs: () => additionalContentSlide(slideId, resolvedTitle, s.bullets ?? [], palette, opts),
+        }
+      }),
     ].filter(s => s.reqs().length > 0)
 
   } else {
@@ -1617,6 +1683,15 @@ export async function createGoogleSlidesPresentation(
       { id: 's11_invest',   reqs: () => investmentSlide('s11_invest', p, palette, opts) },
       ...(hasNextSteps ? [{ id: 's12_next', reqs: () => nextStepsSlide('s12_next', p, palette, opts) }] : []),
       { id: 's13_close',    reqs: () => closingSlide('s13_close', p, palette, opts) },
+      ...(e.additionalSlides ?? []).map((s, i) => {
+        const key = `additional_${i}`
+        const slideId = `s_add${i}`
+        const resolvedTitle = e.customTitles?.[key] ?? s.title
+        return {
+          id: slideId,
+          reqs: () => additionalContentSlide(slideId, resolvedTitle, s.bullets ?? [], palette, opts),
+        }
+      }),
     ].filter(s => {
       const r = s.reqs()
       return r.length > 0
@@ -1653,8 +1728,9 @@ export async function createGoogleSlidesPresentation(
   }
 
   // Phase 3: Insert logos (separate request so failures don't break the deck)
+  // Pin to the known closing slide IDs — additional slides may appear after them
   const coverSlideId = orderedSlides[0].id
-  const closeSlideId = orderedSlides[orderedSlides.length - 1].id
+  const closeSlideId = data.expanded?.paramountMedia ? 'pm13_appendix' : 's13_close'
   try {
     const logoReqs = logoRequests(coverSlideId, closeSlideId, p)
     if (logoReqs.length > 0) {
