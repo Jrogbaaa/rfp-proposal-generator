@@ -13,6 +13,34 @@ import { getBrandPalette, derivePaletteFromHex } from './brandColors'
 
 const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 
+/** Converts a failed fetch response into a typed Error with a sentinel prefix. */
+async function toApiError(resp: Response): Promise<Error> {
+  const body = await resp.json().catch(() => ({})) as { error?: { message?: string } }
+  const msg = body?.error?.message || resp.statusText
+  if (resp.status === 401) return new Error('AUTH_EXPIRED')
+  if (resp.status === 403) return new Error(`FORBIDDEN: ${msg}`)
+  if (resp.status === 429) return new Error(`RATE_LIMITED: ${msg}`)
+  return new Error(`API_ERROR_${resp.status}: ${msg}`)
+}
+
+/**
+ * Retries a fetch-based operation with exponential backoff on 429 errors.
+ * Non-429 errors are rethrown immediately.
+ */
+async function withBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const is429 = err instanceof Error && err.message.startsWith('RATE_LIMITED')
+      if (!is429 || attempt === maxRetries) throw err
+      const delay = Math.min((Math.pow(2, attempt) + Math.random()) * 1000, 32000)
+      await new Promise(r => setTimeout(r, delay))
+    }
+  }
+  throw new Error('Max retries exceeded')
+}
+
 // Standard 16:9 widescreen in EMU (1 inch = 914400 EMU)
 // 10" × 5.625" = 9144000 × 5143500 EMU
 const W = 9144000  // slide width
@@ -1618,8 +1646,7 @@ export async function createGoogleSlidesPresentation(
   })
 
   if (!createResp.ok) {
-    const err = await createResp.json().catch(() => ({}))
-    throw new Error(`Failed to create presentation: ${err?.error?.message || createResp.statusText}`)
+    throw await toApiError(createResp)
   }
 
   const presentation = await createResp.json()
@@ -1716,16 +1743,14 @@ export async function createGoogleSlidesPresentation(
 
   const populationRequests: object[] = orderedSlides.flatMap(s => s.reqs())
 
-  const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ requests: [...slideRequests, ...populationRequests] }),
+  await withBackoff(async () => {
+    const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ requests: [...slideRequests, ...populationRequests] }),
+    })
+    if (!batchResp.ok) throw await toApiError(batchResp)
   })
-
-  if (!batchResp.ok) {
-    const err = await batchResp.json().catch(() => ({}))
-    throw new Error(`Failed to build slides: ${err?.error?.message || batchResp.statusText}`)
-  }
 
   // Phase 3: Insert logos (separate request so failures don't break the deck)
   // Pin to the known closing slide IDs — additional slides may appear after them

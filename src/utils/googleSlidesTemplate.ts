@@ -27,6 +27,34 @@ const TEMPLATE_ID = '1brp4caHLITlfqqFiYUs9fNLhC_1tgWDJBzKF-0QHLf8'
 const DRIVE_API   = 'https://www.googleapis.com/drive/v3/files'
 const SLIDES_API  = 'https://slides.googleapis.com/v1/presentations'
 
+/** Converts a failed fetch response into a typed Error with a sentinel prefix. */
+async function toApiError(resp: Response): Promise<Error> {
+  const body = await resp.json().catch(() => ({})) as { error?: { message?: string } }
+  const msg = body?.error?.message || resp.statusText
+  if (resp.status === 401) return new Error('AUTH_EXPIRED')
+  if (resp.status === 403) return new Error(`FORBIDDEN: ${msg}`)
+  if (resp.status === 429) return new Error(`RATE_LIMITED: ${msg}`)
+  return new Error(`API_ERROR_${resp.status}: ${msg}`)
+}
+
+/**
+ * Retries a fetch-based operation with exponential backoff on 429 errors.
+ * Non-429 errors are rethrown immediately.
+ */
+async function withBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const is429 = err instanceof Error && err.message.startsWith('RATE_LIMITED')
+      if (!is429 || attempt === maxRetries) throw err
+      const delay = Math.min((Math.pow(2, attempt) + Math.random()) * 1000, 32000)
+      await new Promise(r => setTimeout(r, delay))
+    }
+  }
+  throw new Error('Max retries exceeded')
+}
+
 const W = 9_144_000
 const H = 6_858_000
 const FAVICON_V2 = 'https://t1.gstatic.com/faviconV2'
@@ -515,12 +543,11 @@ export async function createTemplatePresentation(
   })
 
   if (!copyResp.ok) {
-    const err = await copyResp.json().catch(() => ({}))
-    const msg = (err as any)?.error?.message || copyResp.statusText
-    throw new Error(
-      `Template copy failed (${copyResp.status}): ${msg}. ` +
-      `If "insufficientPermissions", change 'drive.file' to 'drive' in googleAuth.ts.`,
-    )
+    const baseErr = await toApiError(copyResp)
+    if (baseErr.message.startsWith('FORBIDDEN')) {
+      throw new Error(`${baseErr.message} (If "insufficientPermissions", ensure 'drive' scope is active in googleAuth.ts)`)
+    }
+    throw baseErr
   }
 
   const { id: presentationId } = await copyResp.json() as { id: string }
@@ -530,8 +557,7 @@ export async function createTemplatePresentation(
   const getResp = await fetch(`${SLIDES_API}/${presentationId}`, { headers })
 
   if (!getResp.ok) {
-    const err = await getResp.json().catch(() => ({}))
-    throw new Error(`Failed to read presentation: ${(err as any)?.error?.message || getResp.statusText}`)
+    throw await toApiError(getResp)
   }
 
   const presentation = await getResp.json() as { slides?: TemplateSlide[] }
@@ -666,16 +692,14 @@ export async function createTemplatePresentation(
 
   // ── Phase 6: Execute main batchUpdate ────────────────────────────────────
   if (allRequests.length > 0) {
-    const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ requests: allRequests }),
+    await withBackoff(async () => {
+      const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ requests: allRequests }),
+      })
+      if (!batchResp.ok) throw await toApiError(batchResp)
     })
-
-    if (!batchResp.ok) {
-      const err = await batchResp.json().catch(() => ({}))
-      throw new Error(`batchUpdate failed: ${(err as any)?.error?.message || batchResp.statusText}`)
-    }
   }
 
   // ── Phase 7: Logo insertion (best-effort, non-fatal) ─────────────────────

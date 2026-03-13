@@ -104,9 +104,17 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
       setStage('done')
       onSuccess?.(result.presentationUrl)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      logError(message, 'api', { component: 'GoogleSlidesButton' }, 'GoogleSlidesButton')
-      setErrorMessage(message)
+      const raw = err instanceof Error ? err.message : 'Unknown error'
+      let userMessage = raw
+      if (raw.startsWith('AUTH_EXPIRED') || raw.startsWith('AUTH_DENIED') || raw.startsWith('AUTH_TIMEOUT')) {
+        userMessage = 'Your Google session expired or was cancelled. Click "Try again" to re-authenticate.'
+      } else if (raw.startsWith('RATE_LIMITED')) {
+        userMessage = 'Google API rate limit reached. Please wait a moment and try again.'
+      } else if (raw.startsWith('FORBIDDEN')) {
+        userMessage = 'Permission denied. Check your Google Cloud project quotas or OAuth scopes.'
+      }
+      logError(raw, 'api', { component: 'GoogleSlidesButton' }, 'GoogleSlidesButton')
+      setErrorMessage(userMessage)
       setStage('error')
     }
   }

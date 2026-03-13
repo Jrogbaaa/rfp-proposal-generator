@@ -71,12 +71,23 @@ export function requestGoogleToken(): Promise<string> {
       return
     }
 
+    let settled = false
+    const settle = (fn: () => void) => {
+      if (!settled) { settled = true; fn() }
+    }
+
+    // 60-second timeout prevents the promise hanging if the user closes the popup
+    const timeoutId = setTimeout(() => {
+      settle(() => reject(new Error('AUTH_TIMEOUT: Sign-in timed out. Please try again.')))
+    }, 60000)
+
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: SCOPES,
       callback: (response) => {
+        clearTimeout(timeoutId)
         if (response.error) {
-          reject(new Error(`Google sign-in failed: ${response.error_description || response.error}`))
+          settle(() => reject(new Error(`AUTH_DENIED: ${response.error_description || response.error}`)))
           return
         }
         cachedToken = response.access_token
@@ -84,7 +95,7 @@ export function requestGoogleToken(): Promise<string> {
         tokenExpiresAt = Date.now() + (response.expires_in - 60) * 1000
         localStorage.setItem(TOKEN_STORAGE_KEY, cachedToken)
         localStorage.setItem(TOKEN_EXPIRY_KEY, String(tokenExpiresAt))
-        resolve(response.access_token)
+        settle(() => resolve(response.access_token))
       },
     })
 
