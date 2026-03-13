@@ -74,7 +74,8 @@ function geminiIterationBody() {
 
 async function mockGeminiApi(page: Page) {
   let callCount = 0
-  await page.route('**/generativelanguage.googleapis.com/**', (route) => {
+  // Intercept the backend proxy endpoint — Gemini calls go through /api/gemini/generate-content
+  await page.route('**/api/gemini/generate-content', (route) => {
     callCount++
     route.fulfill({
       status: 200,
@@ -538,7 +539,7 @@ test.describe('Step 2 – Slide Preview Structure', () => {
 
   test('shows approach and next steps slides when Gemini returns them', async ({ page }) => {
     let callCount = 0
-    await page.route('**/generativelanguage.googleapis.com/**', (route) => {
+    await page.route('**/api/gemini/generate-content', (route) => {
       callCount++
       route.fulfill({
         status: 200,
@@ -562,7 +563,7 @@ test.describe('Step 2 – Slide Preview Structure', () => {
 
   test('slide count increases by 2 when approach and next steps are present', async ({ page }) => {
     let callCount = 0
-    await page.route('**/generativelanguage.googleapis.com/**', (route) => {
+    await page.route('**/api/gemini/generate-content', (route) => {
       callCount++
       route.fulfill({
         status: 200,
@@ -585,5 +586,138 @@ test.describe('Step 2 – Slide Preview Structure', () => {
     const count = parseInt(slidesText)
     // 11 base + 1 approach + 1 next steps = 13
     expect(count).toBe(13)
+  })
+})
+
+// ─── Error & auth failure scenarios ─────────────────────────────────────────
+
+test.describe('Error and auth failure scenarios', () => {
+  /** Sets up a mock window.google that immediately returns an auth error (simulates denied/closed popup) */
+  async function mockGoogleOAuthDenied(page: Page) {
+    await page.route('**/accounts.google.com/gsi/**', (route) => {
+      route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
+    })
+    await page.addInitScript(function () {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).google = {
+        accounts: {
+          oauth2: {
+            initTokenClient: function (config: { callback: (r: Record<string, unknown>) => void }) {
+              return {
+                requestAccessToken: function () {
+                  // Simulate user closing the popup — GIS reports this via callback with error field
+                  config.callback({ error: 'popup_closed', error_description: 'User closed the sign-in popup.' })
+                },
+              }
+            },
+            revoke: function () {},
+          },
+        },
+      }
+    })
+  }
+
+  test('shows auth error when Google sign-in popup is closed', async ({ page }) => {
+    await mockGeminiApi(page)
+    await mockGoogleOAuthDenied(page)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    await page.getByLabel('Create Google Slides presentation').click()
+
+    // Error UI must appear — auth was denied
+    await expect(page.getByText(/session expired|cancelled/i).first()).toBeVisible({ timeout: 10000 })
+    // Try again button should be present so the user can recover
+    await expect(page.getByRole('button', { name: /try again/i })).toBeVisible()
+  })
+
+  test('shows rate limit error when Slides API returns 429', async ({ page }) => {
+    await mockGeminiApi(page)
+    await mockGoogleOAuth(page)
+
+    // Block GIS noise
+    await page.route('**/*favicon*', (route) => {
+      route.fulfill({ status: 200, contentType: 'image/png', body: '' })
+    })
+
+    // Slides API always returns 429
+    await page.route('**/slides.googleapis.com/**', (route) => {
+      route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { message: 'Quota exceeded for quota metric' } }),
+      })
+    })
+    // Drive API succeeds (template copy path)
+    await page.route('https://www.googleapis.com/drive/**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'fake-presentation-id' }),
+      })
+    })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    await page.getByLabel('Create Google Slides presentation').click()
+
+    // Rate limit message should appear (after all retries are exhausted)
+    await expect(page.getByText(/rate limit|Please wait/i)).toBeVisible({ timeout: 30000 })
+    await expect(page.getByRole('button', { name: /try again/i })).toBeVisible()
+  })
+
+  test('recovers and proceeds after initial auth failure followed by success', async ({ page }) => {
+    // First click: auth denied. Second click: auth succeeds.
+    await mockGeminiApi(page)
+    await mockGoogleOAuthDenied(page)   // starts with denied mock
+    await mockGoogleSlidesApi(page)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    // First attempt — fails with auth error
+    await page.getByLabel('Create Google Slides presentation').click()
+    await expect(page.getByText(/session expired|cancelled/i).first()).toBeVisible({ timeout: 10000 })
+
+    // Swap in the success auth mock via page.evaluate (no page reload needed)
+    await page.evaluate(function () {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).google = {
+        accounts: {
+          oauth2: {
+            initTokenClient: function (config: { callback: (r: Record<string, unknown>) => void }) {
+              return {
+                requestAccessToken: function () {
+                  config.callback({ access_token: 'fake-test-token', expires_in: 3600 })
+                },
+              }
+            },
+            revoke: function () {},
+          },
+        },
+      }
+    })
+
+    // Second attempt via "Try again" — should now succeed
+    await page.getByRole('button', { name: /try again/i }).click()
+    await page.getByLabel('Create Google Slides presentation').click()
+    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
   })
 })

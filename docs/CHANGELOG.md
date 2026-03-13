@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-03-13] — Backend Gemini Proxy + Error Hardening
+
+### Security
+- **`server/routes/gemini.ts` (new)** — Express proxy for all Gemini API calls. `GEMINI_API_KEY` now lives server-side only and is never bundled into the browser JS. Routes: `POST /api/gemini/generate-content`, `POST /api/gemini/upload-file`, `DELETE /api/gemini/files/:fileId`.
+- **`server/index.ts`** — Gemini router mounted before the global JSON body parser so `/api/gemini/upload-file` can accept up to 100 MB of base64 PDF data.
+- **`.env`** — Renamed `VITE_GEMINI_API_KEY` → `GEMINI_API_KEY` (non-`VITE_` prefix so Vite does not embed it in the build).
+
+### Changed
+- **`src/utils/llmService.ts`** — All Gemini `fetch` calls now target `/api/gemini/generate-content` instead of `generativelanguage.googleapis.com` directly. `uploadToFilesApi` sends base64 to `/api/gemini/upload-file`; `deleteFilesApiFile` calls `/api/gemini/files/:id`. Removed all `GEMINI_API_KEY` references and runtime key checks from the frontend.
+- **`e2e/app.spec.ts`** — Gemini mock pattern updated from `**/generativelanguage.googleapis.com/**` to `**/api/gemini/generate-content` to match the new proxy URL.
+
+### Fixed (error hardening — same session)
+- **`src/utils/googleAuth.ts`** — Added 60-second timeout to `requestGoogleToken()` so the promise no longer hangs indefinitely if the user closes the OAuth popup.
+- **`src/utils/googleSlides.ts`** — Added `toApiError()` (sentinel-prefixed errors for 401/403/429) and `withBackoff()` (exponential retry on RATE_LIMITED errors, up to 3 retries, max 32 s delay).
+- **`src/utils/googleSlidesTemplate.ts`** — Same `toApiError` + `withBackoff` patterns applied to template copy, GET, and batchUpdate calls.
+- **`src/components/GoogleSlidesButton.tsx`** — Catch block now maps sentinel prefixes to user-friendly messages: "session expired / cancelled", "rate limit reached", "permission denied".
+- **`e2e/app.spec.ts`** — Added three new error-scenario tests: auth denied → error UI shown; Slides API 429 → rate limit message; auth fail + retry → proceeds to step 3.
+
+---
+
 ## [2026-03-09] — Step 1 UX + Google Slides Text Overflow Fix
 
 ### Changed

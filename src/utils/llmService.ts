@@ -1,11 +1,11 @@
 import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier } from '../types/proposal';
 import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const FILES_API_UPLOAD = `https://generativelanguage.googleapis.com/upload/v1beta/files`;
-const FILES_API_BASE = `https://generativelanguage.googleapis.com/v1beta`;
+// All Gemini calls are proxied through the Express backend (/api/gemini/*)
+// so the API key is never exposed in the browser bundle.
+const GEMINI_PROXY   = '/api/gemini/generate-content';
+const FILES_PROXY_UPLOAD = '/api/gemini/upload-file';
+const FILES_PROXY_DELETE = '/api/gemini/files';
 
 // gemini-2.5-flash is a "thinking" model whose internal reasoning tokens can
 // intermittently consume the output-token budget, producing empty responses.
@@ -31,33 +31,14 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-// Upload a file to Gemini Files API; returns the file URI for use in inference requests.
-// Used for PDFs > LARGE_PDF_THRESHOLD to avoid large base64-encoded request bodies.
-async function uploadToFilesApi(file: File, apiKey: string): Promise<string> {
-  const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const metadata = JSON.stringify({ file: { display_name: file.name } });
-  const fileBuffer = await file.arrayBuffer();
-
-  const encoder = new TextEncoder();
-  const metadataPart = encoder.encode(
-    `--${boundary}\r\nContent-Type: application/json\r\n\r\n${metadata}\r\n`
-  );
-  const filePart = encoder.encode(`--${boundary}\r\nContent-Type: application/pdf\r\n\r\n`);
-  const closingPart = encoder.encode(`\r\n--${boundary}--`);
-
-  const body = new Uint8Array(
-    metadataPart.byteLength + filePart.byteLength + fileBuffer.byteLength + closingPart.byteLength
-  );
-  let offset = 0;
-  body.set(metadataPart, offset); offset += metadataPart.byteLength;
-  body.set(filePart, offset); offset += filePart.byteLength;
-  body.set(new Uint8Array(fileBuffer), offset); offset += fileBuffer.byteLength;
-  body.set(closingPart, offset);
-
-  const response = await fetch(`${FILES_API_UPLOAD}?key=${apiKey}`, {
+// Upload a file to the Gemini Files API via the backend proxy.
+// Used for PDFs > LARGE_PDF_THRESHOLD to avoid large inline request bodies.
+async function uploadToFilesApi(file: File): Promise<string> {
+  const base64Data = await fileToBase64(file);
+  const response = await fetch(FILES_PROXY_UPLOAD, {
     method: 'POST',
-    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-    body,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64Data, mimeType: file.type || 'application/pdf', fileName: file.name }),
   });
 
   if (!response.ok) {
@@ -66,16 +47,16 @@ async function uploadToFilesApi(file: File, apiKey: string): Promise<string> {
   }
 
   const result = await response.json();
-  const fileUri: string | undefined = result.file?.uri;
+  const fileUri: string | undefined = result.fileUri;
   if (!fileUri) throw new Error('Files API did not return a file URI');
   return fileUri;
 }
 
 // Fire-and-forget cleanup; files auto-delete after 48h anyway
-function deleteFilesApiFile(fileUri: string, apiKey: string): void {
+function deleteFilesApiFile(fileUri: string): void {
   const match = fileUri.match(/\/files\/([^/?]+)/);
   if (!match) return;
-  fetch(`${FILES_API_BASE}/files/${match[1]}?key=${apiKey}`, { method: 'DELETE' }).catch(() => {});
+  fetch(`${FILES_PROXY_DELETE}/${match[1]}`, { method: 'DELETE' }).catch(() => {});
 }
 
 // Strip markdown code fences that Gemini sometimes wraps JSON in
@@ -149,10 +130,6 @@ Instructions:
 IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
 export async function analyzeBriefPdf(file: File): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
-  }
-
   if (file.size > MAX_PDF_SIZE) {
     throw new Error('PDF too large. Maximum file size is 50MB.');
   }
@@ -163,7 +140,7 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
 
   if (file.size > LARGE_PDF_THRESHOLD) {
     console.log(`[LLM Service] Large PDF (${(file.size / 1024 / 1024).toFixed(1)}MB) — uploading via Files API`);
-    uploadedFileUri = await uploadToFilesApi(file, GEMINI_API_KEY);
+    uploadedFileUri = await uploadToFilesApi(file);
     pdfPart = { file_data: { mime_type: 'application/pdf', file_uri: uploadedFileUri } };
   } else {
     const base64Data = await fileToBase64(file);
@@ -171,7 +148,7 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
   }
 
   const makeRequest = (withResponseMimeType: boolean) =>
-    fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    fetch(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -227,7 +204,7 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
     return buildBriefText(extracted!);
   } finally {
     // Clean up Files API upload (fire-and-forget; files auto-delete after 48h)
-    if (uploadedFileUri) deleteFilesApiFile(uploadedFileUri, GEMINI_API_KEY);
+    if (uploadedFileUri) deleteFilesApiFile(uploadedFileUri);
   }
 }
 
@@ -256,10 +233,6 @@ Instructions:
 IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
 export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfile> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
-  }
-
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
   if (totalSize > MAX_PDF_SIZE) {
     throw new Error('Combined file size too large. Maximum total is 50MB.');
@@ -273,7 +246,7 @@ export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfil
   try {
     if (useFilesApi) {
       console.log(`[LLM Service] Large brand voice files (${(totalSize / 1024 / 1024).toFixed(1)}MB total) — uploading via Files API`);
-      const uris = await Promise.all(files.map(f => uploadToFilesApi(f, GEMINI_API_KEY!)));
+      const uris = await Promise.all(files.map(f => uploadToFilesApi(f)));
       uploadedUris.push(...uris);
       fileParts = uris.map(uri => ({ file_data: { mime_type: 'application/pdf', file_uri: uri } }));
     } else {
@@ -285,7 +258,7 @@ export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfil
 
     let content: string | undefined;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+      const response = await fetch(GEMINI_PROXY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -337,7 +310,7 @@ export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfil
       proseSummary: profile.proseSummary || '',
     };
   } finally {
-    uploadedUris.forEach(uri => deleteFilesApiFile(uri, GEMINI_API_KEY!));
+    uploadedUris.forEach(uri => deleteFilesApiFile(uri));
   }
 }
 
@@ -461,10 +434,6 @@ export async function generateProposalContent(
   parsedData: Partial<ProposalData>,
   brandVoice?: BrandVoiceProfile
 ): Promise<ExpandedContent> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
-  }
-
   const problems = parsedData.content?.problems || ['', '', '', ''];
   const benefits = parsedData.content?.benefits || ['', '', '', ''];
   const clientCompany = parsedData.client?.company || 'the company';
@@ -502,7 +471,7 @@ Generate personalized expansions for each problem and benefit that reference spe
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -656,10 +625,6 @@ export async function iterateProposalContent(
   history: ChatMessage[],
   brandVoice?: BrandVoiceProfile
 ): Promise<{ reply: string; updatedExpansions?: ExpandedContent }> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
-  }
-
   const problems = parsedData.content?.problems || ['', '', '', ''];
   const benefits = parsedData.content?.benefits || ['', '', '', ''];
   const clientCompany = parsedData.client?.company || 'the company';
@@ -706,7 +671,7 @@ User request: ${userInstruction}`;
 
   let content: string | undefined;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -842,10 +807,6 @@ export async function iterateDesign(
   userInstruction: string,
   history: ChatMessage[]
 ): Promise<{ reply: string; designConfig?: DesignConfig }> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('VITE_GEMINI_API_KEY environment variable is not set');
-  }
-
   const contextPrompt = `Current design theme: ${currentDesignConfig.colorTheme}
 
 User request: ${userInstruction}`;
@@ -861,7 +822,7 @@ User request: ${userInstruction}`;
 
   let content: string | undefined;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
