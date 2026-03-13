@@ -8,7 +8,7 @@
  * No Vite proxy needed — Google Slides API supports CORS with OAuth Bearer tokens.
  */
 
-import type { ProposalData, DesignConfig, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier } from '../types/proposal'
+import type { ProposalData, DesignConfig, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier, FlexibleSlide, ShowcaseContent } from '../types/proposal'
 import { getBrandPalette, derivePaletteFromHex } from './brandColors'
 
 const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
@@ -1659,7 +1659,9 @@ export async function createGoogleSlidesPresentation(
 
   let orderedSlides: { id: string; reqs: () => object[] }[]
 
-  if (hasParamountMedia && pm) {
+  const deckType = e.deckType ?? (hasParamountMedia ? 'paramount-rfp' : 'generic')
+
+  if (deckType === 'paramount-rfp' && hasParamountMedia && pm) {
     // ── Paramount Media Sales Deck (Dunkin-style) ──────────────────────────
     const ip0  = pm.paramountIPAlignments?.[0]
     const ip1  = pm.paramountIPAlignments?.[1]
@@ -1691,8 +1693,73 @@ export async function createGoogleSlidesPresentation(
       }),
     ].filter(s => s.reqs().length > 0)
 
+  } else if (deckType === 'paramount-showcase' && e.showcaseContent) {
+    // ── Paramount Showcase Deck (free-form IP/portfolio request) ───────────
+    const sc: ShowcaseContent = e.showcaseContent
+
+    orderedSlides = [
+      // Cover slide using the showcase title
+      {
+        id: 'sc01_cover',
+        reqs: () => titleSlide('sc01_cover', {
+          ...p,
+          project: { ...p.project, title: sc.showcaseTitle },
+        }, palette),
+      },
+      // Content slides — each FlexibleSlide becomes an additionalContentSlide
+      ...sc.slides.map((s: FlexibleSlide, i: number) => {
+        const slideId = `sc${String(i + 2).padStart(2, '0')}_${s.slideKey}`
+        return {
+          id: slideId,
+          reqs: () => additionalContentSlide(slideId, s.title, s.bullets ?? [], palette, opts),
+        }
+      }),
+      // Audience insights slide
+      ...(sc.audienceInsights && sc.audienceInsights.length > 0 ? [{
+        id: 'sc_audience',
+        reqs: () => additionalContentSlide('sc_audience', 'Audience Insights', sc.audienceInsights!, palette, opts),
+      }] : []),
+      // Measurement slide
+      ...(sc.measurementFramework && sc.measurementFramework.length > 0 ? [{
+        id: 'sc_measure',
+        reqs: () => additionalContentSlide('sc_measure', 'Measurement Framework', sc.measurementFramework!, palette, opts),
+      }] : []),
+      // User-added additional slides
+      ...(e.additionalSlides ?? []).map((s, i) => {
+        const key = `additional_${i}`
+        const slideId = `sc_add${i}`
+        const resolvedTitle = e.customTitles?.[key] ?? s.title
+        return {
+          id: slideId,
+          reqs: () => additionalContentSlide(slideId, resolvedTitle, s.bullets ?? [], palette, opts),
+        }
+      }),
+    ].filter(s => s.reqs().length > 0)
+
+  } else if (deckType === 'generic' && e.flexibleSlides && e.flexibleSlides.length > 0) {
+    // ── Generic Flexible Deck (free-form non-Paramount request) ────────────
+    orderedSlides = [
+      { id: 'gn01_cover', reqs: () => titleSlide('gn01_cover', p, palette) },
+      ...e.flexibleSlides!.map((s: FlexibleSlide, i: number) => {
+        const slideId = `gn${String(i + 2).padStart(2, '0')}_${s.slideKey}`
+        return {
+          id: slideId,
+          reqs: () => additionalContentSlide(slideId, s.title, s.bullets ?? [], palette, opts),
+        }
+      }),
+      ...(e.additionalSlides ?? []).map((s, i) => {
+        const key = `additional_${i}`
+        const slideId = `gn_add${i}`
+        const resolvedTitle = e.customTitles?.[key] ?? s.title
+        return {
+          id: slideId,
+          reqs: () => additionalContentSlide(slideId, resolvedTitle, s.bullets ?? [], palette, opts),
+        }
+      }),
+    ].filter(s => s.reqs().length > 0)
+
   } else {
-    // ── Generic Consulting Deck ─────────────────────────────────────────────
+    // ── Generic Consulting Deck (structured RFP fallback) ───────────────────
     const hasApproach  = (e.approachSteps?.length ?? 0) > 0
     const hasNextSteps = (e.nextSteps?.length ?? 0) > 0
 
@@ -1755,7 +1822,7 @@ export async function createGoogleSlidesPresentation(
   // Phase 3: Insert logos (separate request so failures don't break the deck)
   // Pin to the known closing slide IDs — additional slides may appear after them
   const coverSlideId = orderedSlides[0].id
-  const closeSlideId = data.expanded?.paramountMedia ? 'pm13_appendix' : 's13_close'
+  const closeSlideId = orderedSlides[orderedSlides.length - 1]?.id ?? 's13_close'
   try {
     const logoReqs = logoRequests(coverSlideId, closeSlideId, p)
     if (logoReqs.length > 0) {

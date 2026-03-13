@@ -26,6 +26,26 @@ export interface AdditionalSlide {
   bullets: string[];
 }
 
+// Deck type discriminant — determines which generation path and slide builder to use
+export type DeckType = 'paramount-rfp' | 'paramount-showcase' | 'generic';
+
+// A single slide in a flexible/free-form deck
+export interface FlexibleSlide {
+  slideKey: string;    // unique id, e.g. "comedy_overview"
+  title: string;
+  subtitle?: string;
+  bullets: string[];   // 2–5 items
+}
+
+// Output shape for paramount-showcase requests (IP/portfolio decks, not client RFPs)
+export interface ShowcaseContent {
+  showcaseTitle: string;
+  executiveSummary: string;
+  slides: FlexibleSlide[];          // 6–15 LLM-defined slides
+  audienceInsights?: string[];
+  measurementFramework?: string[];
+}
+
 // Paramount media sales types — used in the Dunkin-style deck output
 export interface IPAlignment {
   propertyName: string;   // e.g. "Big Brother S28", "VMAs 2026"
@@ -82,6 +102,10 @@ export interface ExpandedContent {
   editedBullets?: Record<number, string[]>;
   // Paramount media sales content (Dunkin-style deck)
   paramountMedia?: ParamountMediaContent;
+  // Flexible deck types (showcase and generic)
+  deckType?: DeckType;
+  showcaseContent?: ShowcaseContent;   // paramount-showcase path
+  flexibleSlides?: FlexibleSlide[];    // generic path
 }
 
 export interface GeneratedContent {

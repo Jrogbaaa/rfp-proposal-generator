@@ -7,28 +7,27 @@ interface BriefEditorProps {
   onClear: () => void
 }
 
-const PLACEHOLDER = `Paste your proposal brief here...
+const PLACEHOLDER = `Describe your presentation, or paste a structured brief...
 
-Format guide:
-Project: [project name]
-Client: [first last], [email], [company]
-Timeline: [duration]
-Budget: [total value]
-Month 1 Investment: [amount]
-Month 2 Investment: [amount]
-Month 3 Investment: [amount]
+Free-form request:
+  "Create a 10-slide showcase of Paramount's comedy portfolio for Q1 2026"
+  "Build a cross-IP pitch deck highlighting the 2026 tentpole calendar"
+  "Make a presentation about Paramount's reality TV lineup for a brand partnership"
+  "Generate a general sales deck for a SaaS product launch"
 
-Problems:
-- [challenge 1]
-- [challenge 2]
-- [challenge 3]
-- [challenge 4]
+Or paste a structured RFP brief:
+  Project: [project name]
+  Client: [first last], [email], [company]
+  Timeline: [duration]
+  Budget: [total value]
 
-Benefits:
-- [desired outcome 1]
-- [desired outcome 2]
-- [desired outcome 3]
-- [desired outcome 4]`
+  Problems:
+  - [challenge 1]
+  - [challenge 2]
+
+  Benefits:
+  - [desired outcome 1]
+  - [desired outcome 2]`
 
 export default function BriefEditor({ value, onChange, onClear }: BriefEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)

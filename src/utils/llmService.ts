@@ -1,4 +1,4 @@
-import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier } from '../types/proposal';
+import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier, DeckType, FlexibleSlide, ShowcaseContent } from '../types/proposal';
 import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
 
 // All Gemini calls are proxied through the Express backend (/api/gemini/*)
@@ -332,11 +332,14 @@ export interface ChatMessage {
 }
 
 interface LLMResponse {
-  problemExpansions: [string, string, string, string];
-  benefitExpansions: [string, string, string, string];
+  problemExpansions: string[];
+  benefitExpansions: string[];
   approachSteps: string[];
   nextSteps: string[];
-  paramountMedia: ParamountMediaContent;
+  deckType?: string;
+  paramountMedia?: ParamountMediaContent;
+  showcaseContent?: unknown;
+  flexibleSlides?: unknown[];
 }
 
 const SYSTEM_PROMPT = `You are a senior Paramount Advertising Solutions sales executive writing a custom media partnership proposal. Generate a full Paramount-style media sales deck based on the client brief.
@@ -429,17 +432,134 @@ appendixItems: 3 items. Include one case study referencing a comparable Paramoun
 
 IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
 
+// Paramount IP showcase deck — free-form request about Paramount properties/portfolio
+const SHOWCASE_SYSTEM_PROMPT = `You are a senior Paramount Advertising Solutions strategist building an IP showcase presentation. The user wants to create a presentation about specific Paramount properties, portfolio, or content slate — not a client RFP.
+
+You MUST output valid JSON with this exact structure:
+{
+  "deckType": "paramount-showcase",
+  "problemExpansions": ["", "", "", ""],
+  "benefitExpansions": ["", "", "", ""],
+  "approachSteps": [],
+  "nextSteps": [],
+  "showcaseContent": {
+    "showcaseTitle": "A clear, compelling title for this showcase presentation",
+    "executiveSummary": "2-3 sentence executive overview of what this deck covers and why it matters",
+    "slides": [
+      {
+        "slideKey": "unique_snake_case_id",
+        "title": "Slide Title",
+        "subtitle": "Optional subtitle or section label",
+        "bullets": ["bullet 1", "bullet 2", "bullet 3", "bullet 4"]
+      }
+    ],
+    "audienceInsights": ["stat bullet 1", "stat bullet 2", "stat bullet 3", "stat bullet 4"],
+    "measurementFramework": ["iSpot deterministic sales lift measurement", "EDO search lift + conversion correlation", "Comscore cross-platform deduplicated reach", "Paramount first-party data — 130M+ authenticated users"]
+  }
+}
+
+SHOWCASE SLIDES (6–15 slides):
+- Build the full slide sequence based on what the user requested
+- Each slide should have 2–5 compelling bullet points with specific stats, show names, talent, or dates
+- Use the full Paramount IP inventory, talent roster, and 2026 programming calendar from your training context
+- Include specific season numbers, air dates, audience demographics, and cross-platform data
+- Tailor the slide sequence to match the specific request (e.g. comedy portfolio = comedy-focused shows; Q1 = Q1 tentpoles only)
+- Cover slide and closing/next-steps slide are optional — focus on the content
+
+audienceInsights: 4 bullet points with real Paramount audience stats drawn from training context.
+measurementFramework: Always include iSpot, EDO, Comscore, and one context-appropriate fourth KPI.
+
+IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
+
+// Generic flexible deck — non-Paramount or truly free-form presentation requests
+const GENERIC_SYSTEM_PROMPT = `You are a professional presentation strategist. The user wants to create a custom presentation. Build the best possible deck for their stated request.
+
+You MUST output valid JSON with this exact structure:
+{
+  "deckType": "generic",
+  "problemExpansions": ["", "", "", ""],
+  "benefitExpansions": ["", "", "", ""],
+  "approachSteps": [],
+  "nextSteps": [],
+  "flexibleSlides": [
+    {
+      "slideKey": "unique_snake_case_id",
+      "title": "Slide Title",
+      "subtitle": "Optional subtitle",
+      "bullets": ["bullet 1", "bullet 2", "bullet 3"]
+    }
+  ]
+}
+
+SLIDE GUIDELINES:
+- Build 6–15 slides that directly address the user's request
+- Each slide should have 2–5 focused bullet points
+- Structure the deck logically: intro/context → core content → supporting evidence → conclusion/next steps
+- Match the tone and focus to the specific request (technical, strategic, sales, educational, etc.)
+- Do NOT inject Paramount branding or properties unless the user explicitly mentions Paramount
+
+IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
+
+/**
+ * Detect the deck type from the brief text synchronously (no LLM call).
+ * Returns 'paramount-rfp' (default), 'paramount-showcase', or 'generic'.
+ */
+export function detectDeckType(briefText: string): DeckType {
+  const text = briefText.toLowerCase();
+
+  // Structured brand brief — has explicit Client/Problems/Benefits sections
+  const hasClientField = /\bclient\s*:/i.test(briefText);
+  const hasProblemsField = /\bproblems?\s*:/i.test(briefText) || /\bchallenges?\s*:/i.test(briefText);
+  const hasBenefitsField = /\bbenefits?\s*:/i.test(briefText) || /\boutcomes?\s*:/i.test(briefText);
+  if (hasClientField && hasProblemsField && hasBenefitsField) {
+    return 'paramount-rfp';
+  }
+
+  // Detect if this is a non-Paramount context (cross-brand pitch, competitor mention, etc.)
+  const nonParamountIndicators = [
+    /\buniversal\b/, /\bnetflix\b/, /\bdisney\b/, /\bhbo\b/, /\bwarner\b/,
+    /\bnbc\b/, /\babc\b/, /\bfox network\b/, /\btech startup\b/, /\bsaas\b/,
+    /\bproduct launch\b/, /\breal estate\b/, /\bhealthcare pitch\b/,
+  ];
+  const hasNonParamountContext = nonParamountIndicators.some(re => re.test(text));
+  if (hasNonParamountContext) {
+    return 'generic';
+  }
+
+  // Detect showcase/portfolio request patterns
+  const showcaseIndicators = [
+    /\bshowcase\b/, /\bportfolio\b/, /\bip deck\b/, /\bcontent slate\b/,
+    /\bpresentation (about|on|for) paramount\b/, /\bparamount (ip|properties|shows|content)\b/,
+    /\bcomedy (portfolio|lineup|shows)\b/, /\bdrama (portfolio|lineup)\b/,
+    /\breality (portfolio|lineup)\b/, /\bsports (portfolio|lineup|calendar)\b/,
+    /\btentpole\b/, /\bprogramming calendar\b/, /\b2026 slate\b/,
+    /\bcreate a (deck|presentation|slide)\b/, /\bbuild a (deck|presentation|slide)\b/,
+    /\bgenerate a (deck|presentation|slide)\b/, /\bmake a (deck|presentation|slide)\b/,
+    /\bhighlight reel\b/, /\bsizzle\b/, /\bsales deck\b(?!.*brief)/,
+    /\bcross-ip\b/, /\bip alignment\b/, /\bparamount talent\b/,
+  ];
+  const hasShowcaseIntent = showcaseIndicators.some(re => re.test(text));
+  if (hasShowcaseIntent) {
+    return 'paramount-showcase';
+  }
+
+  // Fallback: treat as RFP (preserves existing behavior for ambiguous inputs)
+  return 'paramount-rfp';
+}
+
 export async function generateProposalContent(
   briefText: string,
   parsedData: Partial<ProposalData>,
   brandVoice?: BrandVoiceProfile
 ): Promise<ExpandedContent> {
+  const deckType = detectDeckType(briefText);
   const problems = parsedData.content?.problems || ['', '', '', ''];
   const benefits = parsedData.content?.benefits || ['', '', '', ''];
   const clientCompany = parsedData.client?.company || 'the company';
   const projectTitle = parsedData.project?.title || 'the project';
 
-  const userPrompt = `Here is the client brief:
+  const userPrompt = deckType === 'paramount-rfp'
+    ? `Here is the client brief:
 
 ---
 ${briefText}
@@ -459,13 +579,22 @@ Parsed information:
   3. ${benefits[2] || 'Not specified'}
   4. ${benefits[3] || 'Not specified'}
 
-Generate personalized expansions for each problem and benefit that reference specific details from this brief. Make the content feel tailored to ${clientCompany}, not generic.`;
+Generate personalized expansions for each problem and benefit that reference specific details from this brief. Make the content feel tailored to ${clientCompany}, not generic.`
+    : `Here is the presentation request:
 
-  const systemPrompt = [
-    brandVoice ? formatBrandVoiceConstraints(brandVoice) : null,
-    PARAMOUNT_TRAINING_CONTEXT,
-    SYSTEM_PROMPT,
-  ].filter(Boolean).join('\n\n');
+---
+${briefText}
+---
+
+Build the best possible presentation for this request. Use the full Paramount IP inventory, talent roster, and programming calendar from your training context where relevant.`;
+
+  // Select system prompt and training context based on deck type
+  const promptsByType: Record<DeckType, (string | null)[]> = {
+    'paramount-rfp':      [brandVoice ? formatBrandVoiceConstraints(brandVoice) : null, PARAMOUNT_TRAINING_CONTEXT, SYSTEM_PROMPT],
+    'paramount-showcase': [brandVoice ? formatBrandVoiceConstraints(brandVoice) : null, PARAMOUNT_TRAINING_CONTEXT, SHOWCASE_SYSTEM_PROMPT],
+    'generic':            [GENERIC_SYSTEM_PROMPT],
+  };
+  const systemPrompt = promptsByType[deckType].filter(Boolean).join('\n\n');
 
   let parsed: LLMResponse | undefined;
   let lastError: Error | undefined;
@@ -509,11 +638,22 @@ Generate personalized expansions for each problem and benefit that reference spe
 
     try {
       const candidate = JSON.parse(content) as LLMResponse;
-      if (!Array.isArray(candidate.problemExpansions) || candidate.problemExpansions.length !== 4) {
-        throw new Error('Invalid problemExpansions in LLM response');
-      }
-      if (!Array.isArray(candidate.benefitExpansions) || candidate.benefitExpansions.length !== 4) {
-        throw new Error('Invalid benefitExpansions in LLM response');
+      if (deckType === 'paramount-rfp') {
+        // Strict validation for RFP decks — must have exactly 4 problem/benefit expansions
+        if (!Array.isArray(candidate.problemExpansions) || candidate.problemExpansions.length !== 4) {
+          throw new Error('Invalid problemExpansions in LLM response');
+        }
+        if (!Array.isArray(candidate.benefitExpansions) || candidate.benefitExpansions.length !== 4) {
+          throw new Error('Invalid benefitExpansions in LLM response');
+        }
+      } else {
+        // Non-RFP decks: validate the type-specific output field exists
+        if (deckType === 'paramount-showcase' && !candidate.showcaseContent) {
+          throw new Error('Missing showcaseContent in showcase LLM response');
+        }
+        if (deckType === 'generic' && !Array.isArray(candidate.flexibleSlides)) {
+          throw new Error('Missing flexibleSlides in generic LLM response');
+        }
       }
       parsed = candidate;
       break;
@@ -531,12 +671,13 @@ Generate personalized expansions for each problem and benefit that reference spe
     throw lastError ?? new Error('No valid content returned from Gemini after retries');
   }
 
+  const EMPTY_FOUR = ['', '', '', ''] as [string, string, string, string];
   const approachSteps: string[] = Array.isArray(parsed.approachSteps) ? parsed.approachSteps : [];
   const nextSteps: string[] = Array.isArray(parsed.nextSteps) ? parsed.nextSteps : [];
 
-  // Parse and validate paramountMedia (Dunkin-style deck content)
+  // Parse and validate paramountMedia (Dunkin-style deck content — RFP path only)
   let paramountMedia: ParamountMediaContent | undefined;
-  if (parsed.paramountMedia && typeof parsed.paramountMedia === 'object') {
+  if (deckType === 'paramount-rfp' && parsed.paramountMedia && typeof parsed.paramountMedia === 'object') {
     const pm = parsed.paramountMedia as unknown as Record<string, unknown>;
     paramountMedia = {
       opportunityStatement: (pm.opportunityStatement as string) || '',
@@ -566,12 +707,38 @@ Generate personalized expansions for each problem and benefit that reference spe
     };
   }
 
+  // Parse showcaseContent (paramount-showcase path)
+  let showcaseContent: ShowcaseContent | undefined;
+  if (deckType === 'paramount-showcase' && parsed.showcaseContent && typeof parsed.showcaseContent === 'object') {
+    const sc = parsed.showcaseContent as unknown as Record<string, unknown>;
+    showcaseContent = {
+      showcaseTitle: (sc.showcaseTitle as string) || '',
+      executiveSummary: (sc.executiveSummary as string) || '',
+      slides: Array.isArray(sc.slides) ? (sc.slides as FlexibleSlide[]) : [],
+      audienceInsights: Array.isArray(sc.audienceInsights) ? (sc.audienceInsights as string[]) : [],
+      measurementFramework: Array.isArray(sc.measurementFramework) ? (sc.measurementFramework as string[]) : [],
+    };
+  }
+
+  // Parse flexibleSlides (generic path)
+  const flexibleSlides: FlexibleSlide[] | undefined =
+    deckType === 'generic' && Array.isArray(parsed.flexibleSlides)
+      ? (parsed.flexibleSlides as FlexibleSlide[])
+      : undefined;
+
   return {
-    problemExpansions: parsed.problemExpansions as [string, string, string, string],
-    benefitExpansions: parsed.benefitExpansions as [string, string, string, string],
+    problemExpansions: Array.isArray(parsed.problemExpansions) && parsed.problemExpansions.length === 4
+      ? parsed.problemExpansions as [string, string, string, string]
+      : EMPTY_FOUR,
+    benefitExpansions: Array.isArray(parsed.benefitExpansions) && parsed.benefitExpansions.length === 4
+      ? parsed.benefitExpansions as [string, string, string, string]
+      : EMPTY_FOUR,
     approachSteps,
     nextSteps,
+    deckType,
     paramountMedia,
+    showcaseContent,
+    flexibleSlides,
   };
 }
 
@@ -629,17 +796,12 @@ export async function iterateProposalContent(
   const benefits = parsedData.content?.benefits || ['', '', '', ''];
   const clientCompany = parsedData.client?.company || 'the company';
 
-  const contextPrompt = `Current proposal context:
-- Company: ${clientCompany}
-- Brief: ${briefText.slice(0, 1000)}${briefText.length > 1000 ? '...' : ''}
+  const activeDeckType = currentExpansions?.deckType ?? 'paramount-rfp';
 
-Current problem summaries:
-${problems.map((p, i) => `${i + 1}. ${p}`).join('\n')}
-
-Current benefit summaries:
-${benefits.map((b, i) => `${i + 1}. ${b}`).join('\n')}
-
-${currentExpansions ? `Current expanded content:
+  // Build context section based on deck type
+  let deckContext = '';
+  if (activeDeckType === 'paramount-rfp' && currentExpansions) {
+    deckContext = `Current expanded content:
 Problems:
 ${currentExpansions.problemExpansions.map((p, i) => `${i + 1}. ${p}`).join('\n')}
 
@@ -650,7 +812,34 @@ Approach steps:
 ${currentExpansions.approachSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}${currentExpansions.nextSteps?.length ? `
 
 Next steps:
-${currentExpansions.nextSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}` : ''}
+${currentExpansions.nextSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}`;
+  } else if (activeDeckType === 'paramount-showcase' && currentExpansions?.showcaseContent) {
+    const sc = currentExpansions.showcaseContent;
+    deckContext = `This is a paramount-showcase deck. Modify the slide bullets in showcaseContent.slides — not problemExpansions/benefitExpansions (those are unused).
+
+Current showcase: ${sc.showcaseTitle}
+Executive summary: ${sc.executiveSummary}
+
+Current slides:
+${sc.slides.map((s, i) => `${i + 1}. ${s.title}\n${s.bullets.map(b => `   - ${b}`).join('\n')}`).join('\n\n')}`;
+  } else if (activeDeckType === 'generic' && currentExpansions?.flexibleSlides) {
+    deckContext = `This is a generic flexible deck. Modify the slide bullets in flexibleSlides — not problemExpansions/benefitExpansions (those are unused).
+
+Current slides:
+${currentExpansions.flexibleSlides.map((s, i) => `${i + 1}. ${s.title}\n${s.bullets.map(b => `   - ${b}`).join('\n')}`).join('\n\n')}`;
+  }
+
+  const contextPrompt = `Current proposal context:
+- Company: ${clientCompany}
+- Brief: ${briefText.slice(0, 1000)}${briefText.length > 1000 ? '...' : ''}
+
+Current problem summaries:
+${problems.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+Current benefit summaries:
+${benefits.map((b, i) => `${i + 1}. ${b}`).join('\n')}
+
+${deckContext}
 
 User request: ${userInstruction}`;
 
@@ -663,9 +852,10 @@ User request: ${userInstruction}`;
     { role: 'user', parts: [{ text: contextPrompt }] },
   ];
 
+  // Always inject Paramount training context for non-generic decks
   const iterateSystemPrompt = [
     brandVoice ? formatBrandVoiceConstraints(brandVoice) : null,
-    PARAMOUNT_TRAINING_CONTEXT,
+    activeDeckType !== 'generic' ? PARAMOUNT_TRAINING_CONTEXT : null,
     ITERATE_SYSTEM_PROMPT,
   ].filter(Boolean).join('\n\n');
 
@@ -742,13 +932,18 @@ User request: ${userInstruction}`;
       nextSteps: e.nextSteps ?? currentExpansions?.nextSteps,
       customTitles: currentExpansions?.customTitles,
       additionalSlides: currentExpansions?.additionalSlides,
+      // Preserve flexible deck fields
+      deckType: currentExpansions?.deckType,
+      showcaseContent: currentExpansions?.showcaseContent,
+      flexibleSlides: currentExpansions?.flexibleSlides,
+      paramountMedia: currentExpansions?.paramountMedia,
     };
   }
 
   // Merge additional slides into updatedExpansions (or create a shell if only additional slides were returned)
   if (Array.isArray(parsed.additionalSlides) && parsed.additionalSlides.length > 0) {
     if (!output.updatedExpansions && currentExpansions) {
-      // Keep existing expansions, just add the new slides
+      // Keep all existing expansions (including flexible deck fields), just add the new slides
       output.updatedExpansions = {
         ...currentExpansions,
         additionalSlides: [
