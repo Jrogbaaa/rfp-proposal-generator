@@ -1,16 +1,20 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { setCors } from '../_lib/cors.js'
-import { db } from '../_lib/db.js'
+import { getDb } from '../_lib/db.js'
 import { proposals } from '../_lib/schema.js'
 import { eq, sql } from 'drizzle-orm'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (setCors(req, res)) return
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.status(204).end()
 
   const id = Number(req.query.id)
   if (isNaN(id)) {
     return res.status(400).json({ error: 'Invalid proposal ID' })
   }
+
+  const db = getDb()
 
   if (req.method === 'GET') {
     try {

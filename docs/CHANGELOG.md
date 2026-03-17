@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-03-17] — Upgrade to Gemini 3 Flash
+
+### Changed
+- **`api/gemini/generate-content.ts`** — Default model changed from `gemini-2.0-flash` (shutdown June 1, 2026) to `gemini-3-flash-preview`. Proxy now normalises legacy `thinkingBudget` to Gemini 3's `thinkingLevel` format.
+- **`server/routes/gemini.ts`** — Default model changed from `gemini-2.5-flash` to `gemini-3-flash-preview`. Model now configurable via `GEMINI_MODEL` env var.
+- **`src/utils/llmService.ts`** — `NO_THINKING` constant updated from `{ thinkingBudget: 0 }` (Gemini 2.5 format) to `{ thinkingLevel: 'low' }` (Gemini 3 format).
+- **`.env.example`** — Added optional `GEMINI_MODEL` override documentation.
+
+---
+
 ## [2026-03-17] — Vercel Serverless Functions (Production Deployment Fix)
 
 ### Added

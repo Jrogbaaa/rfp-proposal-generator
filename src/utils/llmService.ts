@@ -7,10 +7,10 @@ const GEMINI_PROXY   = '/api/gemini/generate-content';
 const FILES_PROXY_UPLOAD = '/api/gemini/upload-file';
 const FILES_PROXY_DELETE = '/api/gemini/files';
 
-// gemini-2.5-flash is a "thinking" model whose internal reasoning tokens can
-// intermittently consume the output-token budget, producing empty responses.
-// Disabling thinking for structured-JSON calls eliminates this failure mode.
-const NO_THINKING = { thinkingConfig: { thinkingBudget: 0 } } as const;
+// Gemini 3 "thinking" models default to thinkingLevel "high" which can consume
+// output-token budget and increase latency. Use "low" for structured-JSON calls
+// to keep responses fast and avoid empty-response failures.
+const NO_THINKING = { thinkingConfig: { thinkingLevel: 'low' } } as const;
 const MAX_RETRIES = 2;
 
 // PDFs ≤ 15MB use inline_data; larger files upload via Files API first

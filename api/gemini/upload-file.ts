@@ -1,17 +1,17 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { setCors } from '../_lib/cors.js'
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-const FILES_API_UPLOAD = 'https://generativelanguage.googleapis.com/upload/v1beta/files'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (setCors(req, res)) return
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') return res.status(204).end()
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  if (!GEMINI_API_KEY) {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server' })
   }
 
@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const body = Buffer.concat([metadataPart, filePart, fileBytes, closingPart])
 
-    const uploadRes = await fetch(`${FILES_API_UPLOAD}?key=${GEMINI_API_KEY}`, {
+    const uploadRes = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
       body,
@@ -53,8 +53,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fileUri = result.file?.uri
     if (!fileUri) return res.status(502).json({ error: 'Files API did not return a file URI' })
     return res.json({ fileUri })
-  } catch (err) {
-    console.error('[Gemini proxy] upload-file error:', err)
-    return res.status(502).json({ error: 'Failed to upload file to Gemini Files API' })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    return res.status(502).json({ error: 'Failed to upload file to Gemini Files API', detail: message })
   }
 }

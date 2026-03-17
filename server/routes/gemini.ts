@@ -15,7 +15,7 @@ import type { Request, Response } from 'express'
 const router = Router()
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-const GEMINI_MODEL   = 'gemini-2.5-flash'
+const GEMINI_MODEL   = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
 const GEMINI_ENDPOINT  = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const FILES_API_UPLOAD = `https://generativelanguage.googleapis.com/upload/v1beta/files`
 const FILES_API_BASE   = `https://generativelanguage.googleapis.com/v1beta`
