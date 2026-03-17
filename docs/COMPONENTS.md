@@ -270,6 +270,35 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 ---
 
+---
+
+## Vercel Serverless Functions (API Layer)
+
+The Express backend (`server/`) runs locally in dev. For production on Vercel, equivalent Serverless Functions live in `api/`.
+
+| Function | Path | Methods | Purpose |
+|----------|------|---------|---------|
+| `api/gemini/generate-content.ts` | `/api/gemini/generate-content` | POST | Proxy Gemini generateContent (keeps API key server-side) |
+| `api/gemini/upload-file.ts` | `/api/gemini/upload-file` | POST | Upload base64 PDF to Gemini Files API |
+| `api/gemini/files/[fileId].ts` | `/api/gemini/files/:fileId` | DELETE | Delete file from Gemini Files API |
+| `api/brand-voice/index.ts` | `/api/brand-voice` | GET, POST, DELETE | CRUD for brand voice profiles (PostgreSQL) |
+| `api/proposals/index.ts` | `/api/proposals` | GET, POST | List/create proposals (PostgreSQL) |
+| `api/proposals/[id].ts` | `/api/proposals/:id` | GET, PATCH, DELETE | Read/update/delete single proposal |
+| `api/health.ts` | `/api/health` | GET | Health check |
+
+**Shared modules (`api/_lib/`):**
+- `db.ts` — Drizzle ORM + postgres.js connection with `globalThis` caching for serverless warm starts
+- `schema.ts` — Database schema (mirrors `server/schema.ts`)
+- `cors.ts` — CORS preflight handler for all functions
+
+**Required Vercel Environment Variables:**
+- `GEMINI_API_KEY` — Gemini API key (server-side only, not `VITE_` prefixed)
+- `DATABASE_URL` — PostgreSQL connection string with SSL
+- `VITE_GOOGLE_CLIENT_ID` — Google OAuth Client ID (build-time, needs `VITE_` prefix)
+- `FRONTEND_ORIGIN` — Production URL for CORS (defaults to Vercel app URL)
+
+---
+
 ## Last Updated
-- Date: 2026-03-09
-- Changes: Pinned "Continue to Refine" button; fixed PDF upload box layout; added shape-aware font sizing and text truncation to prevent overflow in exported slides; added content length caps in slideBuilder.ts
+- Date: 2026-03-17
+- Changes: Added Vercel Serverless Functions (api/ directory) to fix production 404 errors; all Express routes ported to serverless equivalents

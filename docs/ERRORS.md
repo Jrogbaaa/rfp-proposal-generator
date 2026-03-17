@@ -13,6 +13,28 @@ When you encounter an error:
 
 ---
 
+## Vercel Deployment Errors
+
+### API routes return 404 on Vercel (`/api/gemini/generate-content` not found)
+**Error:** `Failed to load resource: the server responded with a status of 404` for all `/api/*` endpoints on the Vercel deployment.
+
+**Cause:** The Express backend (`server/index.ts`, port 3001) is a standalone Node.js server that only runs in local dev via `npm run dev:server`. Vercel only deploys the static Vite build (`dist/`). The Vite dev proxy (`/api -> localhost:3001`) has no equivalent in production.
+
+**Solution:** Created Vercel Serverless Functions in the `api/` directory that mirror every Express route:
+- `api/gemini/generate-content.ts` — Gemini proxy
+- `api/gemini/upload-file.ts` — Files API upload
+- `api/gemini/files/[fileId].ts` — Files API delete
+- `api/brand-voice/index.ts` — Brand voice CRUD
+- `api/proposals/index.ts` — Proposals list/create
+- `api/proposals/[id].ts` — Proposals read/update/delete
+- `api/health.ts` — Health check
+
+**Required Vercel env vars:** `GEMINI_API_KEY`, `DATABASE_URL`, `VITE_GOOGLE_CLIENT_ID`, `FRONTEND_ORIGIN`.
+
+**Fix applied:** Added `vercel.json`, `api/` directory with all serverless functions, and `@vercel/node` dev dependency.
+
+---
+
 ## Google Slides / OAuth Errors
 
 ### Template output has overlapping text — static "Lorem ipsum" text boxes
@@ -379,6 +401,7 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 
 | Date | Error | File | Solution | Status |
 |------|-------|------|----------|--------|
+| 2026-03-17 | API 404 on Vercel (Express not deployed) | api/ directory | Created Vercel Serverless Functions for all routes | Fixed |
 | 2026-01-19 | useContext null (framer-motion) | App.tsx | Restart dev server / clear .vite cache | Workaround |
 | 2026-01-20 | OpenAI 429 insufficient_quota | llmService.ts | Migrated to Gemini — no longer applicable | Obsolete |
 | 2026-02-26 | TS2322 Step type mismatch after migration | useProposalState.ts (deleted) | Steps collapsed to draft/refine/export; state inlined in App.tsx | Fixed |

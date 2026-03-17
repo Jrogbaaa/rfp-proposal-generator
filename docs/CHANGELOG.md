@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-03-17] — Vercel Serverless Functions (Production Deployment Fix)
+
+### Added
+- **`vercel.json`** — Vercel deployment config with `buildCommand`, `outputDirectory: "dist"`, `framework: "vite"`, and 60s max duration for serverless functions.
+- **`api/gemini/generate-content.ts`** — Vercel Serverless Function proxying Gemini `generateContent` requests; ports logic from `server/routes/gemini.ts` POST handler.
+- **`api/gemini/upload-file.ts`** — Vercel Serverless Function for uploading base64 PDFs to the Gemini Files API; ports the multipart upload logic from the Express route.
+- **`api/gemini/files/[fileId].ts`** — Vercel Serverless Function for fire-and-forget file deletion from the Gemini Files API.
+- **`api/brand-voice/index.ts`** — Vercel Serverless Function handling GET/POST/DELETE for brand voice profiles; ports logic from `server/routes/brandVoice.ts`.
+- **`api/proposals/index.ts`** — Vercel Serverless Function for GET (list) and POST (create) proposals; ports logic from `server/routes/proposals.ts`.
+- **`api/proposals/[id].ts`** — Vercel Serverless Function for GET/PATCH/DELETE single proposal by ID.
+- **`api/health.ts`** — Simple health check endpoint returning `{ ok: true }`.
+- **`api/_lib/db.ts`** — Shared database connection module for serverless functions; uses `globalThis` caching to reuse connections across warm invocations; single-connection pool (`max: 1`) suitable for serverless.
+- **`api/_lib/schema.ts`** — Drizzle ORM schema (copy of `server/schema.ts`) for use by serverless functions.
+- **`api/_lib/cors.ts`** — Shared CORS handler for all serverless functions; handles OPTIONS preflight and sets `Access-Control-Allow-*` headers.
+- **`@vercel/node`** — Added as dev dependency for Vercel Serverless Function types.
+
+### Fixed
+- **Production API 404 errors** — The Express backend (`server/index.ts`) was not deployed to Vercel; all `/api/*` requests returned 404 because Vercel only served the static Vite build. Serverless Functions now handle all API routes that the frontend depends on.
+
+---
+
 ## [2026-03-13] — Backend Gemini Proxy + Error Hardening
 
 ### Security
