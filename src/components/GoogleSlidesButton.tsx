@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { ProposalData, ExpandedContent, DesignConfig } from '../types/proposal'
-import { getValidToken } from '../utils/googleAuth'
+import type { ProposalData, ExpandedContent, DesignConfig, BrandVoiceProfile } from '../types/proposal'
+import { ensureFreshToken } from '../utils/googleAuth'
 import { createGoogleSlidesPresentation } from '../utils/googleSlides'
 import { generateProposalContent } from '../utils/llmService'
+import { GeminiBlockedError } from '../utils/llmService'
+import { FetchTimeoutError, FetchRetryExhaustedError } from '../utils/fetchWithRetry'
 import { logError } from '../utils/errorHandler'
 
 interface GoogleSlidesButtonProps {
@@ -13,6 +15,7 @@ interface GoogleSlidesButtonProps {
   preGeneratedContent?: ExpandedContent | null
   onSuccess?: (url: string) => void
   designConfig?: DesignConfig
+  brandVoice?: BrandVoiceProfile | null
 }
 
 type Stage = 'idle' | 'authenticating' | 'generating' | 'creating' | 'done' | 'error'
@@ -65,7 +68,7 @@ function buildProposalData(parsedData: Partial<ProposalData>, llmContent?: Expan
   }
 }
 
-export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, onSuccess, designConfig }: GoogleSlidesButtonProps) {
+export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, onSuccess, designConfig, brandVoice }: GoogleSlidesButtonProps) {
   const [stage, setStage] = useState<Stage>('idle')
   const [progressStep, setProgressStep] = useState(0)
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
@@ -82,13 +85,13 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
     setSlidesUrl(null)
 
     try {
-      // Step 1: Get OAuth token
-      const token = await getValidToken()
+      // Step 1: Ensure OAuth token with enough lifetime for the full flow
+      await ensureFreshToken()
       setProgressStep(1)
 
       // Step 2: Generate LLM content (skip if already pre-generated via chatbot)
       setStage('generating')
-      const llmContent = preGeneratedContent ?? await generateProposalContent(briefText, data)
+      const llmContent = preGeneratedContent ?? await generateProposalContent(briefText, data, brandVoice ?? undefined)
       setProgressStep(2)
 
       // Step 3: Build full proposal data
@@ -96,8 +99,9 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
       setStage('creating')
       setProgressStep(3)
 
-      // Step 4: Create presentation from scratch
-      const result = await createGoogleSlidesPresentation(proposalData, token, designConfig)
+      // Step 4: Re-validate token right before Slides creation (generation may have consumed time)
+      const tokenGetter = () => ensureFreshToken()
+      const result = await createGoogleSlidesPresentation(proposalData, tokenGetter, designConfig)
       setProgressStep(4)
 
       setSlidesUrl(result.presentationUrl)
@@ -106,13 +110,29 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Unknown error'
       let userMessage = raw
-      if (raw.startsWith('AUTH_EXPIRED') || raw.startsWith('AUTH_DENIED') || raw.startsWith('AUTH_TIMEOUT')) {
+
+      if (err instanceof FetchTimeoutError) {
+        userMessage = 'The request timed out. The AI service may be under heavy load — please try again in a moment.'
+      } else if (err instanceof FetchRetryExhaustedError) {
+        if (err.status === 429) {
+          userMessage = 'The AI service is busy. Please wait a moment and try again.'
+        } else {
+          userMessage = 'The AI service is temporarily unavailable. Please try again shortly.'
+        }
+      } else if (err instanceof GeminiBlockedError) {
+        if (raw.startsWith('SAFETY_BLOCKED')) {
+          userMessage = 'The AI flagged the content for safety reasons. Try rephrasing or simplifying the brief.'
+        } else {
+          userMessage = `AI generation error: ${raw}`
+        }
+      } else if (raw.startsWith('AUTH_EXPIRED') || raw.startsWith('AUTH_DENIED') || raw.startsWith('AUTH_TIMEOUT')) {
         userMessage = 'Your Google session expired or was cancelled. Click "Try again" to re-authenticate.'
       } else if (raw.startsWith('RATE_LIMITED')) {
         userMessage = 'Google API rate limit reached. Please wait a moment and try again.'
       } else if (raw.startsWith('FORBIDDEN')) {
         userMessage = 'Permission denied. Check your Google Cloud project quotas or OAuth scopes.'
       }
+
       logError(raw, 'api', { component: 'GoogleSlidesButton' }, 'GoogleSlidesButton')
       setErrorMessage(userMessage)
       setStage('error')

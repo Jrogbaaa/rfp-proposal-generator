@@ -13,6 +13,8 @@ import { getBrandPalette, derivePaletteFromHex } from './brandColors'
 
 const SLIDES_API = 'https://slides.googleapis.com/v1/presentations'
 
+export type TokenGetter = () => Promise<string>
+
 /** Converts a failed fetch response into a typed Error with a sentinel prefix. */
 async function toApiError(resp: Response): Promise<Error> {
   const body = await resp.json().catch(() => ({})) as { error?: { message?: string } }
@@ -24,15 +26,29 @@ async function toApiError(resp: Response): Promise<Error> {
 }
 
 /**
- * Retries a fetch-based operation with exponential backoff on 429 errors.
- * Non-429 errors are rethrown immediately.
+ * Retries a fetch-based operation with exponential backoff on 429 and 401.
+ * On AUTH_EXPIRED (401), refreshes the token via getToken() and retries once.
  */
-async function withBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+async function withBackoff<T>(
+  fn: (token: string) => Promise<T>,
+  getToken: TokenGetter,
+  maxRetries = 3,
+): Promise<T> {
+  let currentToken = await getToken()
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn()
+      return await fn(currentToken)
     } catch (err) {
       const is429 = err instanceof Error && err.message.startsWith('RATE_LIMITED')
+      const is401 = err instanceof Error && err.message.startsWith('AUTH_EXPIRED')
+
+      if (is401 && attempt < maxRetries) {
+        console.warn('[Slides] Token expired mid-flow, refreshing and retrying…')
+        currentToken = await getToken()
+        continue
+      }
+
       if (!is429 || attempt === maxRetries) throw err
       const delay = Math.min((Math.pow(2, attempt) + Math.random()) * 1000, 32000)
       await new Promise(r => setTimeout(r, delay))
@@ -1609,14 +1625,9 @@ function logoRequests(coverSlideId: string, closeSlideId: string, data: Proposal
 
 export async function createGoogleSlidesPresentation(
   data: ProposalData,
-  accessToken: string,
-  designConfig?: DesignConfig
+  getToken: TokenGetter,
+  designConfig?: DesignConfig,
 ): Promise<CreateSlidesResult> {
-  // Palette selection priority:
-  //   1. Custom hex supplied by user (designConfig.customBrandHex)
-  //   2. Auto-detect from company name (unless disableBrandDetection)
-  //   3. Manual color theme preset
-  //   4. Default to 'paramount' when paramountMedia content is present
   const hasParamountMedia = !!data.expanded?.paramountMedia?.opportunityStatement
   const defaultTheme = hasParamountMedia ? 'paramount' : 'navy-gold'
 
@@ -1626,32 +1637,34 @@ export async function createGoogleSlidesPresentation(
       ?? PALETTE_MAP[designConfig?.colorTheme ?? defaultTheme]
       ?? PALETTE_MAP[defaultTheme]
 
-  // Layout variant
   const designStyle = designConfig?.designStyle ?? 'standard'
   const opts: SlideOpts = {
     boldAgency: designStyle === 'bold-agency',
     minimal:    designStyle === 'executive-minimal',
   }
 
-  const headers = {
+  const makeHeaders = (token: string) => ({
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${accessToken}`,
-  }
-
-  // Phase 1: Create empty presentation
-  const createResp = await fetch(SLIDES_API, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ title: data.project.title }),
+    'Authorization': `Bearer ${token}`,
   })
 
-  if (!createResp.ok) {
-    throw await toApiError(createResp)
-  }
-
-  const presentation = await createResp.json()
-  const presentationId: string = presentation.presentationId
-  const defaultSlideId: string = presentation.slides?.[0]?.objectId
+  // Phase 1: Create empty presentation (with retry)
+  const { presentationId, defaultSlideId } = await withBackoff(
+    async (token) => {
+      const createResp = await fetch(SLIDES_API, {
+        method: 'POST',
+        headers: makeHeaders(token),
+        body: JSON.stringify({ title: data.project.title }),
+      })
+      if (!createResp.ok) throw await toApiError(createResp)
+      const pres = await createResp.json()
+      return {
+        presentationId: pres.presentationId as string,
+        defaultSlideId: pres.slides?.[0]?.objectId as string,
+      }
+    },
+    getToken,
+  )
 
   const p  = data
   const e  = data.expanded
@@ -1810,34 +1823,33 @@ export async function createGoogleSlidesPresentation(
 
   const populationRequests: object[] = orderedSlides.flatMap(s => s.reqs())
 
-  await withBackoff(async () => {
+  await withBackoff(async (token) => {
     const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
       method: 'POST',
-      headers,
+      headers: makeHeaders(token),
       body: JSON.stringify({ requests: [...slideRequests, ...populationRequests] }),
     })
     if (!batchResp.ok) throw await toApiError(batchResp)
-  })
+  }, getToken)
 
   // Phase 3: Insert logos (separate request so failures don't break the deck)
-  // Pin to the known closing slide IDs — additional slides may appear after them
   const coverSlideId = orderedSlides[0].id
   const closeSlideId = orderedSlides[orderedSlides.length - 1]?.id ?? 's13_close'
   try {
+    const freshToken = await getToken()
     const logoReqs = logoRequests(coverSlideId, closeSlideId, p)
     if (logoReqs.length > 0) {
       const logoResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
         method: 'POST',
-        headers,
+        headers: makeHeaders(freshToken),
         body: JSON.stringify({ requests: logoReqs }),
       })
       if (!logoResp.ok) {
         const logoErr = await logoResp.json().catch(() => ({}))
-        console.warn('[Slides] Logo insertion failed:', logoErr?.error?.message || logoResp.statusText)
+        console.warn('[Slides] Logo insertion failed:', (logoErr as Record<string, Record<string, string>>)?.error?.message || logoResp.statusText)
       }
     }
   } catch (e) {
-    // Logo insertion is best-effort — don't throw, but log so it's diagnosable
     console.warn('[Slides] Logo insertion error:', e)
   }
 

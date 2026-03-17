@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026-03-17] — Gemini + Google API Resilience Hardening
+
+### Added
+- **`src/utils/fetchWithRetry.ts`** (new) — Drop-in `fetch()` replacement with exponential backoff (1s/2s/4s base, capped at 32s), configurable timeout via `AbortController`, and automatic retries on 429/500/502/503. Respects `Retry-After` headers. Exports `FetchTimeoutError` and `FetchRetryExhaustedError` typed errors for catch blocks.
+- **`validateGeminiBody()` helper** — `src/utils/llmService.ts`; detects Gemini 200 OK responses containing error payloads (`result.error`), safety blocks (`finishReason: 'SAFETY'`), and recitation blocks. Throws `GeminiBlockedError` with actionable messages.
+- **`GeminiBlockedError` class** — `src/utils/llmService.ts`; typed error for Gemini content blocks (safety, recitation, quota-in-body).
+- **`ensureFreshToken(bufferMs=120000)`** — `src/utils/googleAuth.ts`; guarantees the cached token has at least `bufferMs` milliseconds remaining. Triggers re-auth if not. Used before multi-step flows to prevent mid-flow expiry.
+- **`clearExpiredToken()`** — `src/utils/googleAuth.ts`; clears stale token from memory + localStorage. Called by the new `visibilitychange` handler.
+- **`visibilitychange` handler** — `src/App.tsx`; proactively clears expired tokens when user returns to the tab after idle, updating the auth badge immediately.
+- **`TokenGetter` type** — `src/utils/googleSlides.ts`; `() => Promise<string>` callback type used by Slides/Template builders for dynamic token refresh.
+- **6 resilience E2E tests** — `e2e/app.spec.ts`; Gemini 503 retry recovery, Gemini 429 backoff recovery, Gemini 200-with-error-body detection, token-expiry-mid-flow re-auth, Slides 401 mid-batch token refresh, full happy-path regression.
+
+### Changed
+- **`src/utils/llmService.ts`** — All 6 `fetch()` calls (5 Gemini + 1 Files API upload) replaced with `fetchWithRetry()` with per-call-site timeouts (30s–120s). Every Gemini response now validated via `validateGeminiBody()` before content extraction.
+- **`src/utils/googleAuth.ts`** — `prompt: 'consent'` changed to `prompt: ''` after first successful consent (tracked via `gis_has_consented` localStorage key) for faster/silent re-auth on subsequent sign-ins.
+- **`src/utils/googleSlides.ts`** — `createGoogleSlidesPresentation()` signature changed from `(data, accessToken, designConfig?)` to `(data, getToken: TokenGetter, designConfig?)`. `withBackoff()` now accepts `(fn, getToken, maxRetries)` and handles both `RATE_LIMITED` (429) and `AUTH_EXPIRED` (401) with automatic token refresh. Initial `POST /v1/presentations` wrapped in `withBackoff`.
+- **`src/utils/googleSlidesTemplate.ts`** — `createTemplatePresentation()` signature changed from `(data, accessToken)` to `(data, getToken: TokenGetter)`. Same `withBackoff` upgrade: Drive copy, GET presentation, and batchUpdate all have retry + 401 recovery. Removed duplicated `toApiError`/`withBackoff` in favor of shared pattern.
+- **`src/components/GoogleSlidesButton.tsx`** — Uses `ensureFreshToken()` instead of `getValidToken()`. Re-validates token AGAIN before Slides creation. Passes `brandVoice` to `generateProposalContent()` when `preGeneratedContent` is null (previously dropped). Passes `ensureFreshToken` as the `TokenGetter` callback. Error catch block now uses typed error detection (`FetchTimeoutError`, `FetchRetryExhaustedError`, `GeminiBlockedError`) for actionable user messages.
+- **`src/App.tsx`** — Added `humanizeGenerationError()` helper for user-friendly error messages from typed errors. Added `brandVoice` prop to `GoogleSlidesButton`. Added `visibilitychange` listener for proactive token cleanup.
+
+### Fixed
+- **Gemini HTTP errors (429/500/502/503) no longer cause immediate failure** — `fetchWithRetry` automatically retries with exponential backoff instead of throwing on first error.
+- **Gemini 200 OK with hidden error body now properly detected** — `validateGeminiBody()` surfaces the real error message instead of treating it as "empty response."
+- **OAuth token no longer expires mid-flow** — `ensureFreshToken(120000)` guarantees 2+ minutes of token lifetime before starting generation; token re-validated before Slides creation.
+- **Google Slides 401 mid-batch now retried** — `withBackoff` catches `AUTH_EXPIRED`, refreshes the token, and retries the request.
+- **Initial presentation creation / template copy now retried** — Previously had no retry; now wrapped in `withBackoff`.
+- **Brand voice no longer dropped on direct export** — `GoogleSlidesButton` passes `brandVoice` to `generateProposalContent()` when generating content inline.
+- **OAuth popup no longer forces consent screen after first grant** — `prompt: ''` used for subsequent auth after `gis_has_consented` is set.
+
+---
+
 ## [2026-03-17] — Upgrade to Gemini 3 Flash
 
 ### Changed

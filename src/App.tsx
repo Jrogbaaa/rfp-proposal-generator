@@ -13,8 +13,26 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import DevTools from './components/DevTools'
 import type { Step, ExpandedContent, DesignConfig, BrandVoiceProfile } from './types/proposal'
 import { DEFAULT_DESIGN_CONFIG } from './types/proposal'
-import { generateProposalContent } from './utils/llmService'
-import { getAuthState } from './utils/googleAuth'
+import { generateProposalContent, GeminiBlockedError } from './utils/llmService'
+import { FetchTimeoutError, FetchRetryExhaustedError } from './utils/fetchWithRetry'
+import { getAuthState, clearExpiredToken } from './utils/googleAuth'
+
+function humanizeGenerationError(err: unknown): string {
+  if (err instanceof FetchTimeoutError) {
+    return 'The AI request timed out. The service may be under heavy load — please try again.'
+  }
+  if (err instanceof FetchRetryExhaustedError) {
+    if (err.status === 429) return 'The AI service is busy. Please wait a moment and try again.'
+    return 'The AI service is temporarily unavailable. Please try again shortly.'
+  }
+  if (err instanceof GeminiBlockedError) {
+    if (err.message.startsWith('SAFETY_BLOCKED')) {
+      return 'The AI flagged the content for safety reasons. Try simplifying the brief.'
+    }
+    return `AI error: ${err.message}`
+  }
+  return err instanceof Error ? err.message : 'Failed to generate content. Please try again.'
+}
 
 type InputMode = 'pdf' | 'paste'
 
@@ -88,6 +106,18 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
+  // Proactively clear expired tokens when user returns to the tab after idle
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        clearExpiredToken()
+        setIsGoogleConnected(getAuthState().isSignedIn)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [])
+
   useEffect(() => {
     if (lastChatUpdate > 0) {
       setShowUpdateBanner(true)
@@ -150,7 +180,7 @@ export default function App() {
         setExpansions(result)
       } catch (err) {
         console.error('[App] Failed to generate proposal content:', err)
-        setGenerationError(err instanceof Error ? err.message : 'Failed to generate content. Please try again.')
+        setGenerationError(humanizeGenerationError(err))
       } finally {
         setIsGenerating(false)
       }
@@ -165,7 +195,7 @@ export default function App() {
       setExpansions(result)
     } catch (err) {
       console.error('[App] Retry failed:', err)
-      setGenerationError(err instanceof Error ? err.message : 'Failed to generate content. Please try again.')
+      setGenerationError(humanizeGenerationError(err))
     } finally {
       setIsGenerating(false)
     }
@@ -626,6 +656,7 @@ export default function App() {
                         preGeneratedContent={expansions}
                         onSuccess={handleSlidesSuccess}
                         designConfig={designConfig}
+                        brandVoice={brandVoice}
                       />
                     </div>
                   </div>

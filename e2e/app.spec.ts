@@ -721,3 +721,250 @@ test.describe('Error and auth failure scenarios', () => {
     await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
   })
 })
+
+// ─── Resilience Hardening ──────────────────────────────────────────────────
+
+test.describe('Resilience Hardening', () => {
+  test('Gemini 503 → fetchWithRetry recovers on second attempt', async ({ page }) => {
+    let geminiCallCount = 0
+    await page.route('**/api/gemini/generate-content', (route) => {
+      geminiCallCount++
+      if (geminiCallCount === 1) {
+        route.fulfill({ status: 503, contentType: 'text/plain', body: 'Service Unavailable' })
+      } else {
+        route.fulfill({ status: 200, contentType: 'application/json', body: geminiContentBody() })
+      }
+    })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+
+    // Wait for actual generated expansion text (proves the retry succeeded)
+    await expect(
+      page.getByText('Mobile engagement has declined sharply', { exact: false })
+    ).toBeVisible({ timeout: 30000 })
+    expect(geminiCallCount).toBeGreaterThanOrEqual(2)
+  })
+
+  test('Gemini 429 rate limit → backs off and recovers on third call', async ({ page }) => {
+    let geminiCallCount = 0
+    await page.route('**/api/gemini/generate-content', (route) => {
+      geminiCallCount++
+      if (geminiCallCount <= 2) {
+        route.fulfill({
+          status: 429,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { message: 'Resource exhausted' } }),
+        })
+      } else {
+        route.fulfill({ status: 200, contentType: 'application/json', body: geminiContentBody() })
+      }
+    })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+
+    // Wait for actual generated expansion text (proves the retry after 429s succeeded)
+    await expect(
+      page.getByText('Mobile engagement has declined sharply', { exact: false })
+    ).toBeVisible({ timeout: 60000 })
+    expect(geminiCallCount).toBeGreaterThanOrEqual(3)
+  })
+
+  test('Gemini 200 OK with error body → surfaces actionable error', async ({ page }) => {
+    await page.route('**/api/gemini/generate-content', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 429, message: 'Quota exceeded for project' } }),
+      })
+    })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+
+    await expect(
+      page.getByText(/AI error|Quota exceeded|generation error/i).first()
+    ).toBeVisible({ timeout: 15000 })
+  })
+
+  test('token expires mid-flow → ensureFreshToken re-auths before Slides creation', async ({ page }) => {
+    await page.route('**/accounts.google.com/gsi/**', (route) => {
+      route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
+    })
+
+    let tokenCallCount = 0
+    await page.addInitScript(function () {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__tokenCallCount = 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).google = {
+        accounts: {
+          oauth2: {
+            initTokenClient: function (config: { callback: (r: Record<string, unknown>) => void }) {
+              return {
+                requestAccessToken: function () {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (window as any).__tokenCallCount++;
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const count = (window as any).__tokenCallCount;
+                  if (count === 1) {
+                    config.callback({ access_token: 'short-lived-token', expires_in: 5 })
+                  } else {
+                    config.callback({ access_token: 'fresh-token-' + count, expires_in: 3600 })
+                  }
+                },
+              }
+            },
+            revoke: function () {},
+          },
+        },
+      }
+    })
+
+    await mockGeminiApi(page)
+    await mockGoogleSlidesApi(page)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    await page.getByLabel('Create Google Slides presentation').click()
+    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
+
+    tokenCallCount = await page.evaluate(() => (window as any).__tokenCallCount)
+    expect(tokenCallCount).toBeGreaterThanOrEqual(2)
+  })
+
+  test('Slides API 401 mid-batch → withBackoff refreshes token and retries', async ({ page }) => {
+    await page.route('**/accounts.google.com/gsi/**', (route) => {
+      route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
+    })
+
+    await page.addInitScript(function () {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__tokenCallCount = 0;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).google = {
+        accounts: {
+          oauth2: {
+            initTokenClient: function (config: { callback: (r: Record<string, unknown>) => void }) {
+              return {
+                requestAccessToken: function () {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (window as any).__tokenCallCount++;
+                  config.callback({ access_token: 'token-' + (window as any).__tokenCallCount, expires_in: 3600 })
+                },
+              }
+            },
+            revoke: function () {},
+          },
+        },
+      }
+    })
+
+    await mockGeminiApi(page)
+
+    // Drive API succeeds
+    await page.route('https://www.googleapis.com/drive/**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'fake-presentation-id' }),
+      })
+    })
+
+    // Slides API: first POST create returns 200, first batchUpdate returns 401, then 200
+    let slidesCallCount = 0
+    await page.route('**/slides.googleapis.com/**', (route) => {
+      slidesCallCount++
+      const url = route.request().url()
+      const method = route.request().method()
+
+      if (url.includes(':batchUpdate')) {
+        if (slidesCallCount <= 3) {
+          route.fulfill({
+            status: 401,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { message: 'Token expired' } }),
+          })
+        } else {
+          route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
+        }
+      } else if (method === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ presentationId: 'fake-presentation-id', slides: [] }),
+        })
+      } else {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ presentationId: 'fake-presentation-id' }),
+        })
+      }
+    })
+
+    await page.route('**/*favicon*', (route) => {
+      route.fulfill({ status: 200, contentType: 'image/png', body: '' })
+    })
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    await page.getByLabel('Create Google Slides presentation').click()
+    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 20000 })
+  })
+
+  test('full happy path regression (Draft → Refine → Chat → Export → Share)', async ({ page }) => {
+    await mockGeminiApi(page)
+    await mockGoogleOAuth(page)
+    await mockGoogleSlidesApi(page)
+
+    await page.goto('/')
+
+    // Step 1: Paste brief
+    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await expect(page.getByRole('button', { name: 'Continue to Refine' })).toBeVisible()
+
+    // Step 2: Navigate to Refine
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    // Step 3: Chat interaction
+    await page.getByRole('button', { name: 'Make it more concise' }).click()
+    const replyBubble = page.locator('[class*="rounded-2xl"]').filter({
+      hasText: "I've tightened the language across all sections"
+    }).first()
+    await expect(replyBubble).toBeVisible({ timeout: 10000 })
+
+    // Step 4: Export to Google Slides
+    await page.getByLabel('Create Google Slides presentation').click()
+
+    // Step 5: Verify Share screen
+    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
+    const link = page.getByRole('link', { name: 'Open in Google Slides' })
+    await expect(link).toBeVisible()
+    const href = await link.getAttribute('href')
+    expect(href).toContain('fake-presentation-id')
+  })
+})

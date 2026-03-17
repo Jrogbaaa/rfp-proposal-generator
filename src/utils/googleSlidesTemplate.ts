@@ -20,14 +20,13 @@
 
 import type { ProposalData } from '../types/proposal'
 import type { SlideData } from '../data/slideContent'
-import type { CreateSlidesResult } from './googleSlides'
+import type { CreateSlidesResult, TokenGetter } from './googleSlides'
 import { buildSlidesFromData } from './slideBuilder'
 
 const TEMPLATE_ID = '1brp4caHLITlfqqFiYUs9fNLhC_1tgWDJBzKF-0QHLf8'
 const DRIVE_API   = 'https://www.googleapis.com/drive/v3/files'
 const SLIDES_API  = 'https://slides.googleapis.com/v1/presentations'
 
-/** Converts a failed fetch response into a typed Error with a sentinel prefix. */
 async function toApiError(resp: Response): Promise<Error> {
   const body = await resp.json().catch(() => ({})) as { error?: { message?: string } }
   const msg = body?.error?.message || resp.statusText
@@ -37,16 +36,26 @@ async function toApiError(resp: Response): Promise<Error> {
   return new Error(`API_ERROR_${resp.status}: ${msg}`)
 }
 
-/**
- * Retries a fetch-based operation with exponential backoff on 429 errors.
- * Non-429 errors are rethrown immediately.
- */
-async function withBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+async function withBackoff<T>(
+  fn: (token: string) => Promise<T>,
+  getToken: TokenGetter,
+  maxRetries = 3,
+): Promise<T> {
+  let currentToken = await getToken()
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await fn()
+      return await fn(currentToken)
     } catch (err) {
       const is429 = err instanceof Error && err.message.startsWith('RATE_LIMITED')
+      const is401 = err instanceof Error && err.message.startsWith('AUTH_EXPIRED')
+
+      if (is401 && attempt < maxRetries) {
+        console.warn('[TemplateSlides] Token expired mid-flow, refreshing and retrying…')
+        currentToken = await getToken()
+        continue
+      }
+
       if (!is429 || attempt === maxRetries) throw err
       const delay = Math.min((Math.pow(2, attempt) + Math.random()) * 1000, 32000)
       await new Promise(r => setTimeout(r, delay))
@@ -528,39 +537,45 @@ function buildLogoRequests(
 
 export async function createTemplatePresentation(
   data: ProposalData,
-  accessToken: string,
+  getToken: TokenGetter,
 ): Promise<CreateSlidesResult> {
-  const headers = {
+  const makeHeaders = (token: string) => ({
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${accessToken}`,
-  }
-
-  // ── Phase 1: Copy the template ───────────────────────────────────────────
-  const copyResp = await fetch(`${DRIVE_API}/${TEMPLATE_ID}/copy`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ name: data.project.title || 'New Proposal' }),
+    'Authorization': `Bearer ${token}`,
   })
 
-  if (!copyResp.ok) {
-    const baseErr = await toApiError(copyResp)
-    if (baseErr.message.startsWith('FORBIDDEN')) {
-      throw new Error(`${baseErr.message} (If "insufficientPermissions", ensure 'drive' scope is active in googleAuth.ts)`)
-    }
-    throw baseErr
-  }
+  // ── Phase 1: Copy the template (with retry) ─────────────────────────────
+  const presentationId = await withBackoff(
+    async (token) => {
+      const copyResp = await fetch(`${DRIVE_API}/${TEMPLATE_ID}/copy`, {
+        method: 'POST',
+        headers: makeHeaders(token),
+        body: JSON.stringify({ name: data.project.title || 'New Proposal' }),
+      })
+      if (!copyResp.ok) {
+        const baseErr = await toApiError(copyResp)
+        if (baseErr.message.startsWith('FORBIDDEN')) {
+          throw new Error(`${baseErr.message} (If "insufficientPermissions", ensure 'drive' scope is active in googleAuth.ts)`)
+        }
+        throw baseErr
+      }
+      const { id } = await copyResp.json() as { id: string }
+      if (!id) throw new Error('Drive copy returned no file id')
+      return id
+    },
+    getToken,
+  )
 
-  const { id: presentationId } = await copyResp.json() as { id: string }
-  if (!presentationId) throw new Error('Drive copy returned no file id')
+  // ── Phase 2: Read copied presentation structure (with retry) ─────────────
+  const presentation = await withBackoff(
+    async (token) => {
+      const getResp = await fetch(`${SLIDES_API}/${presentationId}`, { headers: makeHeaders(token) })
+      if (!getResp.ok) throw await toApiError(getResp)
+      return getResp.json() as Promise<{ slides?: TemplateSlide[] }>
+    },
+    getToken,
+  )
 
-  // ── Phase 2: Read copied presentation structure ──────────────────────────
-  const getResp = await fetch(`${SLIDES_API}/${presentationId}`, { headers })
-
-  if (!getResp.ok) {
-    throw await toApiError(getResp)
-  }
-
-  const presentation = await getResp.json() as { slides?: TemplateSlide[] }
   const templateSlides = presentation.slides ?? []
 
   // ── Phase 3: Build app slides from same source as preview ────────────────
@@ -692,19 +707,20 @@ export async function createTemplatePresentation(
 
   // ── Phase 6: Execute main batchUpdate ────────────────────────────────────
   if (allRequests.length > 0) {
-    await withBackoff(async () => {
+    await withBackoff(async (token) => {
       const batchResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
         method: 'POST',
-        headers,
+        headers: makeHeaders(token),
         body: JSON.stringify({ requests: allRequests }),
       })
       if (!batchResp.ok) throw await toApiError(batchResp)
-    })
+    }, getToken)
   }
 
   // ── Phase 7: Logo insertion (best-effort, non-fatal) ─────────────────────
   try {
-    const readResp = await fetch(`${SLIDES_API}/${presentationId}`, { headers })
+    const freshToken = await getToken()
+    const readResp = await fetch(`${SLIDES_API}/${presentationId}`, { headers: makeHeaders(freshToken) })
     if (readResp.ok) {
       const pres = await readResp.json() as { slides?: TemplateSlide[] }
       const finalSlides = pres.slides ?? []
@@ -716,12 +732,12 @@ export async function createTemplatePresentation(
       if (logoReqs.length > 0) {
         const logoResp = await fetch(`${SLIDES_API}/${presentationId}:batchUpdate`, {
           method: 'POST',
-          headers,
+          headers: makeHeaders(freshToken),
           body: JSON.stringify({ requests: logoReqs }),
         })
         if (!logoResp.ok) {
           const err = await logoResp.json().catch(() => ({}))
-          console.warn('[TemplateSlides] Logo insertion failed:', (err as any)?.error?.message)
+          console.warn('[TemplateSlides] Logo insertion failed:', (err as Record<string, Record<string, string>>)?.error?.message)
         }
       }
     }

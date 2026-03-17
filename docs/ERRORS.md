@@ -288,7 +288,47 @@ generationConfig: {
 }
 ```
 
-**Fix applied:** Added `thinkingConfig: { thinkingBudget: 0 }` to all 5 Gemini call sites in `src/utils/llmService.ts`. Also added retry logic (up to 2 retries) and increased `maxOutputTokens` to prevent recurrence.
+**Fix applied:** Added `thinkingConfig: { thinkingBudget: 0 }` to all 5 Gemini call sites in `src/utils/llmService.ts`. Also added retry logic (up to 2 retries) and increased `maxOutputTokens` to prevent recurrence. All Gemini calls now use `fetchWithRetry` which automatically retries on 429/500/502/503.
+
+---
+
+#### Gemini 200 OK with error in response body
+**Error:** Gemini API returns HTTP 200 but the JSON body contains `{ "error": { "code": 429, "message": "Quota exceeded" } }` instead of `candidates`. The app previously treated this as an "empty response" without surfacing the real error.
+
+**Cause:** The Vercel/Express proxy forwards the upstream Gemini status code verbatim. Gemini can return 200 with an error body for soft rate limits, quota issues, or safety blocks.
+
+**Solution:** Added `validateGeminiBody(result)` in `llmService.ts` that checks for `result.error`, `finishReason: 'SAFETY'`, and `finishReason: 'RECITATION'` before extracting content. Throws typed `GeminiBlockedError` with an actionable message.
+
+**Fix applied:** All 6 Gemini call sites now call `validateGeminiBody()` after parsing the response JSON.
+
+---
+
+#### OAuth token expires during multi-step generation
+**Error:** `AUTH_EXPIRED` error when creating Google Slides after a successful Gemini generation. The Gemini generation takes 15-60 seconds, during which the OAuth token expires.
+
+**Cause:** `getValidToken()` could return a token with only seconds remaining. After the LLM generation completes, the token is expired for the Slides API call.
+
+**Solution:** Added `ensureFreshToken(bufferMs=120000)` in `googleAuth.ts` that guarantees the token has at least 2 minutes of lifetime remaining. `GoogleSlidesButton` calls it before generation AND again before Slides creation. Slides builders now accept a `getToken` callback and re-fetch tokens automatically on 401 errors.
+
+**Fix applied:** `ensureFreshToken()` exported from `googleAuth.ts`; `GoogleSlidesButton` calls it at both critical points; `withBackoff()` in slides builders now handles AUTH_EXPIRED by refreshing the token and retrying.
+
+---
+
+#### Vercel 4.5MB body limit breaks large PDF uploads
+**Error:** `413 Payload Too Large` when uploading PDFs larger than ~3.4MB on Vercel production.
+
+**Cause:** Vercel enforces a hard 4.5MB request body limit on serverless functions. Base64 encoding inflates files by ~33%, so PDFs over ~3.4MB raw size exceed the limit. The Express dev server allows 100MB.
+
+**Workaround:** For production, keep PDF uploads under ~3.4MB. Alternatively, use the "Paste Text" input mode for large briefs. A future fix could use chunked uploads or Vercel Edge Functions.
+
+---
+
+#### fetchWithRetry timeout
+**Error:** `TIMEOUT: Request to /api/gemini/generate-content timed out after 90s` — the user sees "The request timed out. The AI service may be under heavy load."
+
+**Cause:** Gemini API didn't respond within the configured timeout (90s for most calls, 120s for proposal generation). Can happen after Vercel cold starts or during high API load.
+
+**Solution:** The `fetchWithRetry` utility retries timed-out requests up to 3 times with exponential backoff. If all retries fail, a user-friendly timeout message is shown with a "Try again" button.
 
 ---
 
@@ -408,6 +448,11 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 | 2026-02-27 | 12 E2E failures in CI (missing VITE_* env vars) | .github/workflows/e2e.yml | Added dummy env vars to build step | Fixed |
 | 2026-03-04 | Empty response from gemini-2.5-flash (thinking tokens) | src/utils/llmService.ts | Disabled thinking via thinkingBudget: 0 + retry logic | Fixed |
 | 2026-03-04 | autofit read-only field mask error (Google Slides API) | src/utils/googleSlides.ts | Removed autoFitRequest() and all 20 call sites | Fixed |
+| 2026-03-17 | Gemini HTTP errors (429/503) cause immediate failure | src/utils/fetchWithRetry.ts | Created fetchWithRetry with exponential backoff | Fixed |
+| 2026-03-17 | Gemini 200 OK with error body not detected | src/utils/llmService.ts | Added validateGeminiBody() checking error/safety/recitation | Fixed |
+| 2026-03-17 | OAuth token expires during multi-step generation | src/utils/googleAuth.ts | Added ensureFreshToken(bufferMs=120000) + token-getter callbacks | Fixed |
+| 2026-03-17 | Google Slides 401 mid-batch not retried | src/utils/googleSlides.ts | Extended withBackoff to handle AUTH_EXPIRED with token refresh | Fixed |
+| 2026-03-17 | Initial presentation creation has no retry | src/utils/googleSlides.ts | Wrapped POST create + Drive copy in withBackoff | Fixed |
 
 ---
 

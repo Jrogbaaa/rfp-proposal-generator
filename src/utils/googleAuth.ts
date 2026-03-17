@@ -3,7 +3,7 @@
  *
  * Uses the implicit token flow — no backend required. The access token is
  * persisted in localStorage so it survives page refreshes until it expires
- * (~1 hour). After expiry, GIS silently re-authenticates when possible.
+ * (~1 hour). After expiry, GIS re-authenticates via popup.
  *
  * Scopes requested:
  *   - presentations: create & write Google Slides presentations
@@ -17,22 +17,20 @@ const SCOPES = [
 
 const TOKEN_STORAGE_KEY = 'gis_access_token'
 const TOKEN_EXPIRY_KEY = 'gis_token_expires_at'
-// Bump this when scopes change to force re-auth
 const SCOPE_VERSION = 'v3'
 const SCOPE_VERSION_KEY = 'gis_scope_version'
+const CONSENTED_KEY = 'gis_has_consented'
 
-// If scope version changed, clear cached token to force re-auth with new scopes
 if (localStorage.getItem(SCOPE_VERSION_KEY) !== SCOPE_VERSION) {
   localStorage.removeItem(TOKEN_STORAGE_KEY)
   localStorage.removeItem(TOKEN_EXPIRY_KEY)
+  localStorage.removeItem(CONSENTED_KEY)
   localStorage.setItem(SCOPE_VERSION_KEY, SCOPE_VERSION)
 }
 
-// In-memory token store — pre-populated from localStorage on module load
 let cachedToken: string | null = null
 let tokenExpiresAt: number | null = null
 
-// Restore persisted token (survives page refresh until expiry)
 const _storedToken = localStorage.getItem(TOKEN_STORAGE_KEY)
 const _storedExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY)
 if (_storedToken && _storedExpiry && Date.now() < Number(_storedExpiry)) {
@@ -54,10 +52,6 @@ export function getAuthState(): GoogleAuthState {
   }
 }
 
-/**
- * Triggers the Google OAuth popup and resolves with a fresh access token.
- * If the user has already granted consent, the popup may close immediately.
- */
 export function requestGoogleToken(): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!window.google) {
@@ -76,10 +70,11 @@ export function requestGoogleToken(): Promise<string> {
       if (!settled) { settled = true; fn() }
     }
 
-    // 60-second timeout prevents the promise hanging if the user closes the popup
     const timeoutId = setTimeout(() => {
       settle(() => reject(new Error('AUTH_TIMEOUT: Sign-in timed out. Please try again.')))
     }, 60000)
+
+    const hasConsented = localStorage.getItem(CONSENTED_KEY) === 'true'
 
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
@@ -91,27 +86,42 @@ export function requestGoogleToken(): Promise<string> {
           return
         }
         cachedToken = response.access_token
-        // GIS tokens are valid for 3600 seconds; subtract 60s buffer
         tokenExpiresAt = Date.now() + (response.expires_in - 60) * 1000
         localStorage.setItem(TOKEN_STORAGE_KEY, cachedToken)
         localStorage.setItem(TOKEN_EXPIRY_KEY, String(tokenExpiresAt))
+        localStorage.setItem(CONSENTED_KEY, 'true')
         settle(() => resolve(response.access_token))
       },
     })
 
-    // prompt: 'consent' = always show the Google consent screen so new scopes are explicitly granted
-    tokenClient.requestAccessToken({ prompt: 'consent' })
+    tokenClient.requestAccessToken({ prompt: hasConsented ? '' : 'consent' })
   })
 }
 
-/**
- * Returns a valid access token, requesting a new one if the cached token
- * is missing or expired.
- */
 export async function getValidToken(): Promise<string> {
   const { isSignedIn, accessToken } = getAuthState()
   if (isSignedIn && accessToken) return accessToken
   return requestGoogleToken()
+}
+
+/**
+ * Returns a token guaranteed to be valid for at least `bufferMs` more
+ * milliseconds. Use before multi-step flows to prevent mid-flow expiry.
+ */
+export async function ensureFreshToken(bufferMs = 120_000): Promise<string> {
+  if (cachedToken && tokenExpiresAt && (tokenExpiresAt - Date.now()) > bufferMs) {
+    return cachedToken
+  }
+  return requestGoogleToken()
+}
+
+export function clearExpiredToken(): void {
+  if (tokenExpiresAt && Date.now() > tokenExpiresAt) {
+    cachedToken = null
+    tokenExpiresAt = null
+    localStorage.removeItem(TOKEN_STORAGE_KEY)
+    localStorage.removeItem(TOKEN_EXPIRY_KEY)
+  }
 }
 
 export function revokeToken(): void {

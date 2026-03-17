@@ -1,17 +1,44 @@
 import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier, DeckType, FlexibleSlide, ShowcaseContent } from '../types/proposal';
 import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
+import { fetchWithRetry } from './fetchWithRetry';
 
-// All Gemini calls are proxied through the Express backend (/api/gemini/*)
-// so the API key is never exposed in the browser bundle.
 const GEMINI_PROXY   = '/api/gemini/generate-content';
 const FILES_PROXY_UPLOAD = '/api/gemini/upload-file';
 const FILES_PROXY_DELETE = '/api/gemini/files';
 
-// Gemini 3 "thinking" models default to thinkingLevel "high" which can consume
-// output-token budget and increase latency. Use "low" for structured-JSON calls
-// to keep responses fast and avoid empty-response failures.
 const NO_THINKING = { thinkingConfig: { thinkingLevel: 'low' } } as const;
 const MAX_RETRIES = 2;
+
+export class GeminiBlockedError extends Error {
+  constructor(reason: string, detail?: string) {
+    super(detail ? `${reason}: ${detail}` : reason)
+    this.name = 'GeminiBlockedError'
+  }
+}
+
+/**
+ * Validates the parsed JSON body of a Gemini API response.
+ * Detects 200 OK responses that contain error payloads or safety blocks.
+ */
+function validateGeminiBody(result: Record<string, unknown>): void {
+  if (result.error && typeof result.error === 'object') {
+    const err = result.error as Record<string, unknown>
+    const code = err.code ?? err.status ?? 'UNKNOWN'
+    const msg = (err.message as string) || 'Gemini returned an error'
+    throw new GeminiBlockedError(`GEMINI_ERROR_${code}`, msg)
+  }
+
+  const candidate = (result.candidates as Record<string, unknown>[])?.[0]
+  if (candidate?.finishReason === 'SAFETY') {
+    const ratings = candidate.safetyRatings as Record<string, string>[] | undefined
+    const flagged = ratings?.filter(r => r.probability !== 'NEGLIGIBLE').map(r => r.category).join(', ')
+    throw new GeminiBlockedError('SAFETY_BLOCKED', flagged || 'Content flagged by safety filter')
+  }
+
+  if (candidate?.finishReason === 'RECITATION') {
+    throw new GeminiBlockedError('RECITATION_BLOCKED', 'Response blocked due to recitation concerns')
+  }
+}
 
 // PDFs ≤ 15MB use inline_data; larger files upload via Files API first
 const LARGE_PDF_THRESHOLD = 15 * 1024 * 1024;
@@ -35,11 +62,11 @@ function fileToBase64(file: File): Promise<string> {
 // Used for PDFs > LARGE_PDF_THRESHOLD to avoid large inline request bodies.
 async function uploadToFilesApi(file: File): Promise<string> {
   const base64Data = await fileToBase64(file);
-  const response = await fetch(FILES_PROXY_UPLOAD, {
+  const response = await fetchWithRetry(FILES_PROXY_UPLOAD, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ base64Data, mimeType: file.type || 'application/pdf', fileName: file.name }),
-  });
+  }, { timeoutMs: 90_000 });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -148,7 +175,7 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
   }
 
   const makeRequest = (withResponseMimeType: boolean) =>
-    fetch(GEMINI_PROXY, {
+    fetchWithRetry(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -160,10 +187,9 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
           ...(withResponseMimeType ? { responseMimeType: 'application/json' } : {}),
         },
       }),
-    });
+    }, { timeoutMs: 90_000 });
 
   try {
-    // First attempt — responseMimeType nudges Gemini toward clean JSON output
     let response = await makeRequest(true);
 
     if (!response.ok) {
@@ -173,6 +199,7 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
     }
 
     let result = await response.json();
+    validateGeminiBody(result);
     let contentText: string = result.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
     if (!contentText) {
@@ -183,7 +210,6 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
     try {
       extracted = JSON.parse(contentText);
     } catch {
-      // JSON truncated or wrapped in fences — retry without responseMimeType
       console.warn('[LLM Service] PDF JSON parse failed, retrying without responseMimeType...');
       response = await makeRequest(false);
       if (!response.ok) {
@@ -191,6 +217,7 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
         throw new Error(`Gemini PDF analysis retry failed: ${response.status} - ${errorText}`);
       }
       result = await response.json();
+      validateGeminiBody(result);
       contentText = result.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
       if (!contentText) throw new Error('No content returned from Gemini PDF analysis retry');
       try {
@@ -258,7 +285,7 @@ export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfil
 
     let content: string | undefined;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      const response = await fetch(GEMINI_PROXY, {
+      const response = await fetchWithRetry(GEMINI_PROXY, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -270,7 +297,7 @@ export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfil
             responseMimeType: 'application/json',
           },
         }),
-      });
+      }, { timeoutMs: 90_000 });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -279,6 +306,7 @@ export async function extractBrandVoice(files: File[]): Promise<BrandVoiceProfil
       }
 
       const result = await response.json();
+      validateGeminiBody(result);
       content = result.candidates?.[0]?.content?.parts?.[0]?.text;
       if (content) break;
 
@@ -600,7 +628,7 @@ Build the best possible presentation for this request. Use the full Paramount IP
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch(GEMINI_PROXY, {
+    const response = await fetchWithRetry(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -617,7 +645,7 @@ Build the best possible presentation for this request. Use the full Paramount IP
           responseMimeType: 'application/json',
         },
       }),
-    });
+    }, { timeoutMs: 120_000 });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -626,6 +654,7 @@ Build the best possible presentation for this request. Use the full Paramount IP
     }
 
     const result = await response.json();
+    validateGeminiBody(result);
     const content = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
@@ -861,7 +890,7 @@ User request: ${userInstruction}`;
 
   let content: string | undefined;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch(GEMINI_PROXY, {
+    const response = await fetchWithRetry(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -874,7 +903,7 @@ User request: ${userInstruction}`;
           responseMimeType: 'application/json',
         },
       }),
-    });
+    }, { timeoutMs: 60_000 });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -883,6 +912,7 @@ User request: ${userInstruction}`;
     }
 
     const result = await response.json();
+    validateGeminiBody(result);
     content = result.candidates?.[0]?.content?.parts?.[0]?.text;
     if (content) break;
 
@@ -1017,7 +1047,7 @@ User request: ${userInstruction}`;
 
   let content: string | undefined;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const response = await fetch(GEMINI_PROXY, {
+    const response = await fetchWithRetry(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1030,7 +1060,7 @@ User request: ${userInstruction}`;
           responseMimeType: 'application/json',
         },
       }),
-    });
+    }, { timeoutMs: 30_000 });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -1039,6 +1069,7 @@ User request: ${userInstruction}`;
     }
 
     const result = await response.json();
+    validateGeminiBody(result);
     content = result.candidates?.[0]?.content?.parts?.[0]?.text;
     if (content) break;
 

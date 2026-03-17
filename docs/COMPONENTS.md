@@ -87,24 +87,26 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `isEmpty: boolean` — Disables button when no brief is entered
 - `preGeneratedContent` — Pre-generated expansions from `ChatInterface`; skips the LLM call inside this component when already iterated in Step 2
 - `onSuccess` — Callback fired after successful slide creation; used by `App.tsx` to advance to the Export step
+- `designConfig?: DesignConfig` — Color theme and design style for the presentation
+- `brandVoice?: BrandVoiceProfile | null` — Structured brand voice profile; passed to `generateProposalContent()` when `preGeneratedContent` is null
 
 **State machine:** `idle → authenticating → generating → creating → done | error`
 
 **Flow:**
-1. User clicks button → `getValidToken()` triggers Google OAuth popup
-2. LLM generates personalized problem/benefit expansions via Gemini (skipped if `preGeneratedContent` provided)
-3. **Routing:** If `paramountMedia` data is present → `createGoogleSlidesPresentation()` (original builder); otherwise → `createTemplatePresentation()` (template-copy path)
-4. "Open in Google Slides" link appears; `onSuccess` callback fires to advance to Export step
+1. User clicks button → `ensureFreshToken()` guarantees token has ≥2 min remaining
+2. LLM generates personalized content via Gemini with `brandVoice` (skipped if `preGeneratedContent` provided)
+3. `ensureFreshToken()` called AGAIN before Slides creation to prevent mid-flow expiry
+4. Slides builders receive a `getToken` callback (not a static token) so they can refresh on 401
+5. "Open in Google Slides" link appears; `onSuccess` callback fires to advance to Export step
 
-**Progress steps:** "Connecting to Google..." → "Generating content..." → "Copying template..." → "Populating slides..." → done
-
-**Slide structure — standard path (template):** 7 slides derived from the master template (cover, opportunity, two concept slides, audience, calendar/measurement, next steps). Paramount path retains the original 13-slide deck.
+**Error handling:** Typed error detection for `FetchTimeoutError` (timeout message), `FetchRetryExhaustedError` (429 → "busy", 5xx → "unavailable"), `GeminiBlockedError` (safety → "flagged content"), and sentinel prefixes (`AUTH_EXPIRED`, `RATE_LIMITED`, `FORBIDDEN`).
 
 **Utilities used:**
-- `src/utils/googleAuth.ts` — OAuth token management
-- `src/utils/googleSlides.ts` — Paramount deck creation (legacy path)
-- `src/utils/googleSlidesTemplate.ts` — Template-copy deck creation (default path)
+- `src/utils/googleAuth.ts` — `ensureFreshToken()` for OAuth token management
+- `src/utils/googleSlides.ts` — Paramount deck creation (accepts `TokenGetter` callback)
+- `src/utils/googleSlidesTemplate.ts` — Template-copy deck creation (accepts `TokenGetter` callback)
 - `src/utils/llmService.ts` — Gemini content generation
+- `src/utils/fetchWithRetry.ts` — Error types for typed catch blocks
 - `src/utils/errorHandler.ts` — `logError`
 
 ---
@@ -151,11 +153,13 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 **Exports:**
 - `getValidToken(): Promise<string>` — Returns cached token or triggers new sign-in
+- `ensureFreshToken(bufferMs?: number): Promise<string>` — Returns cached token only if it has ≥`bufferMs` (default 120s) remaining; otherwise triggers re-auth. Use before multi-step flows.
 - `requestGoogleToken(): Promise<string>` — Forces fresh OAuth popup
 - `getAuthState(): GoogleAuthState` — Current token state
+- `clearExpiredToken(): void` — Clears in-memory + localStorage token if expired (used by visibilitychange handler)
 - `revokeToken(): void` — Clears cached token and revokes with Google
 
-**Notes:** Token persisted to `localStorage` (`gis_access_token` + `gis_token_expires_at`) on sign-in and restored on page load. Survives refreshes for the ~1-hour token lifetime. GIS `prompt: ''` attempts silent re-auth after expiry. No backend required.
+**Notes:** Token persisted to `localStorage` (`gis_access_token` + `gis_token_expires_at`) on sign-in and restored on page load. Survives refreshes for the ~1-hour token lifetime. After first consent, `prompt: ''` is used for faster/silent re-auth (tracked via `gis_has_consented` localStorage key). `App.tsx` has a `visibilitychange` handler that calls `clearExpiredToken()` when the user returns to the tab after idle.
 
 ---
 
@@ -165,11 +169,13 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Purpose:** Creates Google Slides presentations via REST API using a three-phase approach with Paramount branding.
 
 **Exports:**
-- `createGoogleSlidesPresentation(data: ProposalData, accessToken: string, designConfig?: DesignConfig): Promise<CreateSlidesResult>`
+- `createGoogleSlidesPresentation(data: ProposalData, getToken: TokenGetter, designConfig?: DesignConfig): Promise<CreateSlidesResult>` — Accepts a `TokenGetter` callback (not a static token) so tokens can be refreshed mid-flow on 401 errors.
+- `TokenGetter` — Type alias: `() => Promise<string>`
+- `CreateSlidesResult` — Interface: `{ presentationId, presentationUrl, title }`
 
-**Phase 1:** `POST /v1/presentations` — create empty presentation
-**Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all slides (10–13) in one atomic request; `orderedSlides` array filters out optional slides (`approachSlide`, `benefitsCombined`, `nextStepsSlide`) when their data arrays are empty
-**Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught); cover/close IDs resolved dynamically from `orderedSlides` so they're correct regardless of which optional slides are present
+**Phase 1:** `POST /v1/presentations` — create empty presentation (wrapped in `withBackoff` with token refresh on 401)
+**Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all slides (10–13) in one atomic request; `orderedSlides` array filters out optional slides; wrapped in `withBackoff` with 401 retry
+**Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught); uses fresh token from `getToken()`
 
 **Brand:** Montserrat headings, Inter body text. Brand colors are driven by `designConfig`. Logos auto-fetched via Google Favicon API (`google.com/s2/favicons?sz=128`).
 
@@ -207,14 +213,15 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 | Utility | Location | Purpose |
 |---------|----------|---------|
+| fetchWithRetry | `src/utils/fetchWithRetry.ts` | Drop-in `fetch()` replacement with exponential backoff, configurable timeout via `AbortController`, auto-retry on 429/500/502/503. Exports `FetchTimeoutError` and `FetchRetryExhaustedError` for typed catch blocks. |
 | slideBuilder | `src/utils/slideBuilder.ts` | `buildSlidesFromData()` — converts `ProposalData` into `SlideData` cards for preview (10+ when approach/next steps present) |
 | contentExpander | `src/utils/contentExpander.ts` | Template-based content expansion for problems and benefits |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | Gemini 2.5 Flash: `analyzeBriefPdf()`, `generateProposalContent()` (returns 4 content arrays incl. `approachSteps`/`nextSteps`), `iterateProposalContent()` (preserves/updates all 4 arrays), `iterateDesign()`, `extractBrandVoice()` |
-| googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS |
-| googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system |
-| googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies template via Drive API, auto-discovers roles, clear-and-fill from SlideData[], duplicates for extra slides, inserts logos |
+| llmService | `src/utils/llmService.ts` | Gemini 3 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()`, `iterateDesign()`, `extractBrandVoice()`. All calls use `fetchWithRetry` + `validateGeminiBody()`. Exports `GeminiBlockedError` for typed error handling. |
+| googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS; `ensureFreshToken(bufferMs)` for long-running flows |
+| googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system; `withBackoff` retries on 429 + 401 |
+| googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies template via Drive API, auto-discovers roles, clear-and-fill from SlideData[]; `withBackoff` retries on 429 + 401 |
 | brandColors | `src/utils/brandColors.ts` | Brand palette derivation: `getBrandPalette(company)` for ~50 known brands; `derivePaletteFromHex(hex)` derives a full 4-stop `SlidePalette` from any hex color |
 
 ---
@@ -245,9 +252,9 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 **Purpose:** Template-based Google Slides builder using a clear-and-fill approach. Copies a pre-designed master template via the Drive API, auto-discovers slide roles from `{{PLACEHOLDER}}` patterns, then clears text and injects content from the same `SlideData[]` array that powers the preview — ensuring 1:1 parity between what the user sees and what gets exported.
 
 **Exports:**
-- `createTemplatePresentation(data: ProposalData, accessToken: string): Promise<CreateSlidesResult>`
+- `createTemplatePresentation(data: ProposalData, getToken: TokenGetter): Promise<CreateSlidesResult>` — Accepts a `TokenGetter` callback for token refresh on 401. All phases (copy, read, batchUpdate, logos) use `withBackoff` with automatic token refresh.
 
-**Template ID:** `1Hu53M6vbJRH4XaXJzyo6V30b8vxteN_sv2NO4FQfzHo`
+**Template ID:** `1brp4caHLITlfqqFiYUs9fNLhC_1tgWDJBzKF-0QHLf8`
 
 **7-phase build process:**
 1. **Copy** — `POST /drive/v3/files/{templateId}/copy` duplicates the master template
@@ -301,4 +308,4 @@ The Express backend (`server/`) runs locally in dev. For production on Vercel, e
 
 ## Last Updated
 - Date: 2026-03-17
-- Changes: Added Vercel Serverless Functions (api/ directory) to fix production 404 errors; all Express routes ported to serverless equivalents
+- Changes: Resilience hardening — added fetchWithRetry utility, Gemini body validation, ensureFreshToken, token-getter callbacks in Slides builders, visibilitychange handler, improved error messages
