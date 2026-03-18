@@ -210,7 +210,7 @@ function SlideCard({
 const isEditableSlide = (slide: SlideData) => slide.editable === true
 
 export default function SlidePreview({ fileName, data, designConfig, isUpdating, chatUpdateVersion, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
-  const hasRealData = !!(data && (data.client?.company || data.project?.title || data.content?.problems?.[0]))
+  const hasRealData = !!(data && (data.client?.company || data.project?.title || data.content?.problems?.[0] || data.expanded))
   const slides = hasRealData ? buildSlidesFromData(data!) : null
   const theme = THEME_MAP[designConfig?.colorTheme ?? 'navy-gold'] ?? DEFAULT_THEME
 
