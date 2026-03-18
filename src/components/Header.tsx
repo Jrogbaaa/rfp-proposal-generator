@@ -16,6 +16,7 @@ export default function Header({ isConnected, onNew }: HeaderProps) {
           className="flex items-center gap-3"
         >
           <img src="/logo.svg" alt="Paramount" className="h-12 w-auto" />
+          <span className="text-sm font-semibold text-navy-700 hidden sm:inline">Paramount Proj</span>
         </motion.div>
 
         {/* Actions */}

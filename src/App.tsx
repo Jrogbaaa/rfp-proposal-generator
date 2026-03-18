@@ -743,6 +743,14 @@ export default function App() {
         </main>
 
         <DevTools />
+
+        {/* Legal footer */}
+        <footer className="text-center py-4 text-xs text-navy-400 border-t border-cream-300 bg-cream-100">
+          &copy; 2026 Paramount Proj &nbsp;&middot;&nbsp;
+          <a href="/privacy.html" className="underline hover:text-navy-600 transition-colors">Privacy Policy</a>
+          &nbsp;&middot;&nbsp;
+          <a href="/terms.html" className="underline hover:text-navy-600 transition-colors">Terms of Service</a>
+        </footer>
       </div>
     </ErrorBoundary>
   )
