@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-03-18] — Short-Prompt Support, App Branding & Google OAuth Verification
+
+### Fixed
+- **`src/components/SlidePreview.tsx`** — `hasRealData` guard now includes `data.expanded` check. Previously, AI-generated content from short prompts (e.g. "Make a presentation about Paramount IP") would never render slides because `hasRealData` only checked `client.company`, `project.title`, and `content.problems[0]` — all empty for prompt-only inputs. Slide preview now renders correctly for all three deck types (`paramount-rfp`, `paramount-showcase`, `generic`) regardless of whether the brief has structured fields.
+
+### Changed
+- **`src/App.tsx`** — "Paste Text" tab renamed to **"Prompt"**; subtitle updated to "Paste your brief or type a prompt" to reflect short-prompt use case
+- **`src/App.tsx`** — Added legal footer (`© 2026 Paramount Proj · Privacy Policy · Terms of Service`) to every page — required for Google OAuth consent screen verification
+- **`src/components/Header.tsx`** — Added "Paramount Proj" text label next to logo for app name visibility (required for Google Cloud Console app name match)
+- **`index.html`** — Page `<title>` updated from "Proposal Generator" to "Paramount Proj" to match Google Cloud Console OAuth consent screen app name
+
+### Added
+- **`public/privacy.html`** — Privacy Policy page at `/privacy.html`; covers data collection, Google API scopes, data retention, user rights, and contact info. Required for Google OAuth app verification.
+- **`public/terms.html`** — Terms of Service page at `/terms.html`; covers acceptable use, AI-generated content disclaimer, Google Services integration, IP ownership, and governing law. Required for Google OAuth app verification.
+- **`public/google574603289c4a64bf.html`** — Google Search Console domain ownership verification file for `rfp-proposal-generator-kappa.vercel.app`
+
+---
+
 ## [2026-03-17] — Gemini + Google API Resilience Hardening
 
 ### Added

@@ -9,7 +9,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | App | `src/App.tsx` | 3-step flow orchestrator: Draft → Refine → Export |
-| Header | `src/components/Header.tsx` | Application header with logo, auth badge, and New button |
+| Header | `src/components/Header.tsx` | Application header with logo, "Paramount Proj" app name label, auth badge, and New button |
 | BriefEditor | `src/components/BriefEditor.tsx` | Free-form brief text input (Step 1 paste mode) |
 | BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
@@ -124,6 +124,8 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Theme system:** `ThemeTokens` interface maps 6 Tailwind slot names (`accentBar`, `badgeBg`, `badgeText`, `title`, `subtitle`, `bullet`) to class strings. `THEME_MAP` provides token objects for all three `ColorTheme` values (navy-gold, slate-blue, forest-green). Defaults to navy-gold when no `designConfig` is provided.
 
 **Slide data:** Calls `buildSlidesFromData()` from `src/utils/slideBuilder.ts` to convert `ProposalData` into 10 `SlideData` cards; uses `'—'` as placeholder for missing fields.
+
+**`hasRealData` guard:** `true` when any of `client.company`, `project.title`, `content.problems[0]`, or `data.expanded` is present. The `data.expanded` check is critical for short-prompt flows where `parsedData` is null but AI-generated `ExpandedContent` is set.
 
 ---
 
@@ -307,5 +309,5 @@ The Express backend (`server/`) runs locally in dev. For production on Vercel, e
 ---
 
 ## Last Updated
-- Date: 2026-03-17
-- Changes: Resilience hardening — added fetchWithRetry utility, Gemini body validation, ensureFreshToken, token-getter callbacks in Slides builders, visibilitychange handler, improved error messages
+- Date: 2026-03-18
+- Changes: Short-prompt slide preview fix (hasRealData guard), app branding alignment (Paramount Proj), legal pages (privacy/terms), Google OAuth verification files
