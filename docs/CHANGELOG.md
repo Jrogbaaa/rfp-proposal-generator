@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-03-19] — Production QA Pass & Branding Consistency Fix
+
+### Fixed
+- **`public/privacy.html`** — Page title corrected from "RFP Proposal Generator" to "Paramount Proj" for consistency with OAuth consent screen app name
+- **`public/terms.html`** — Page title corrected from "RFP Proposal Generator" to "Paramount Proj" for consistency with OAuth consent screen app name
+
+### Verified (Production)
+- Full 3-step flow confirmed working on `rfp-proposal-generator-kappa.vercel.app`: prompt input → Gemini generation → Refine step with chat interface and Google Slides button
+- `/privacy.html` and `/terms.html` both return 200 and are linked in footer
+- Google Search Console domain verification file live at root
+- "Google hasn't verified this app" OAuth warning is expected — app is in Production mode pending Google manual review (3–7 business days)
+
+---
+
 ## [2026-03-18] — Short-Prompt Support, App Branding & Google OAuth Verification
 
 ### Fixed
