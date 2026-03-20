@@ -1,5 +1,5 @@
-import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier, DeckType, FlexibleSlide, ShowcaseContent } from '../types/proposal';
-import { PARAMOUNT_TRAINING_CONTEXT } from './trainingContext';
+import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier, DeckType, FlexibleSlide, ShowcaseContent, ProofPoint, CustomClientPlan, IndustryInsight } from '../types/proposal';
+import { PARAMOUNT_TRAINING_CONTEXT, PROOF_POINTS_DATABASE, INDUSTRY_INSIGHTS_MAP } from './trainingContext';
 import { fetchWithRetry } from './fetchWithRetry';
 
 const GEMINI_PROXY   = '/api/gemini/generate-content';
@@ -368,6 +368,13 @@ interface LLMResponse {
   paramountMedia?: ParamountMediaContent;
   showcaseContent?: unknown;
   flexibleSlides?: unknown[];
+  culturalShift?: string[];
+  realProblem?: string[];
+  costOfInaction?: string[];
+  coreInsight?: string;
+  proofPoints?: ProofPoint[];
+  customPlan?: CustomClientPlan;
+  industryInsights?: IndustryInsight[];
 }
 
 const SYSTEM_PROMPT = `You are a senior Paramount Advertising Solutions sales executive writing a custom media partnership proposal. Generate a full Paramount-style media sales deck based on the client brief.

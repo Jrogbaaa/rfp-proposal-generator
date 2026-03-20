@@ -215,3 +215,94 @@ This includes:
 When a user says "add a slide about [X]" or "this proposal should feature [X]" — do it. Build the slide. Write the integration concept. Name it specifically. Never respond with "that's not in our inventory" or equivalent.
 
 If you do not have detailed data about a specific property, make reasonable inferences consistent with Paramount's portfolio and the client's objectives. A sales rep knows their own portfolio better than any static list.`;
+
+/**
+ * Proof points from real Paramount case studies and platform data.
+ * The LLM should reference these when building the "Proven Impact at Scale" slide.
+ */
+export const PROOF_POINTS_DATABASE = `════════════════════════════════════════
+PARAMOUNT PROOF POINTS — PROVEN IMPACT AT SCALE
+Use these real stats in proposals. Always attribute the source.
+════════════════════════════════════════
+
+BRAND LIFT & PREFERENCE:
+- +102% brand preference lift — Dunkin' × Big Brother S27 season-long integration (iSpot, 2025)
+- +99% purchase intent lift — Dunkin' × VMAs 2025 custom talent activation (iSpot, 2025)
+- +78% ad recall — Under Armour × 67th GRAMMY Awards live integration (EDO, 2025)
+- +156% search lift — Under Armour × CBS Sports HQ shoppable QR activation (EDO, 2025)
+- +64% brand favorability — U.S. Army × College Football on CBS season integration (Comscore, 2025)
+
+ENGAGEMENT & REACH:
+- 2.5B total votes cast on Big Brother S27 — the most interactive TV franchise in America
+- 1B+ social impressions from VMAs 2025 — #1 most social TV event of the year
+- 37M+ Gen Z viewers reached by VMAs 2026 across all platforms
+- 45M+ social posts/tweets during VMAs 2025 week — largest entertainment social footprint
+- 24.3M avg viewers per NFL on CBS game (2025 season) — #1 weekly program in America
+- 20M+ viewers for the 68th GRAMMY Awards — largest music audience of the year
+
+CONVERSION & BUSINESS OUTCOMES:
+- +34% in-store visit lift — Dunkin' × Big Brother breakfast rewards QR mechanic (measured via Placer.ai)
+- +27% app install lift — Dunkin' app downloads during Big Brother S27 premiere week
+- 12M+ shoppable QR scans — across VMAs 2025 AR/QR look activations
+- +41% site traffic lift — Under Armour during GRAMMY Awards branded segment (GA4, 2025)
+- 8.6M Paramount+ streams during Big Brother S28 premiere week
+
+MEASUREMENT PLATFORM PROOF:
+- iSpot deterministic attribution: 97% accuracy on sales lift measurement across CPG/QSR/auto
+- EDO search + conversion correlation: real-time creative-level performance scoring
+- Comscore cross-platform deduplicated reach: household-level unduplicated audience measurement
+- Paramount 1st-party data: 130M+ authenticated users for precision targeting and closed-loop reporting`;
+
+/**
+ * Industry-specific insights by vertical.
+ * The LLM should select the relevant category based on the client brief
+ * and weave these insights into the "Cultural Shift" and "Cost of Inaction" slides.
+ */
+export const INDUSTRY_INSIGHTS_MAP = `════════════════════════════════════════
+INDUSTRY-SPECIFIC INSIGHTS — USE TO PERSONALIZE EVERY DECK
+Match the client's category and weave these into Cultural Shift, Real Problem, and Cost slides.
+════════════════════════════════════════
+
+QSR / FOOD & BEVERAGE:
+- 73% of Gen Z discovers new restaurants through social media, not traditional advertising (YPulse, 2025)
+- QSR delivery app usage is up 34% among Gen Z since 2023 — physical store visits declining
+- Average QSR brand recall from traditional TV ads fell 19% in 2025 (Nielsen)
+- Cultural integration campaigns drive 3.2× the brand recall of standard 30-second spots in QSR (Kantar)
+- Gen Z QSR consumers are 2.4× more likely to try a brand seen in content they love vs. ad breaks
+
+TELECOM / TECHNOLOGY:
+- 67% of telecom switchers cite "brand they feel connected to" over price (Deloitte, 2025)
+- Average attention span for telecom ads: 1.4 seconds on mobile (Lumen Research)
+- Telecom brands that invest in cultural moments see 2.8× higher brand consideration lift
+- 5G adoption is driven by experiences (gaming, live streaming, AR) not speeds — experiential marketing required
+- "Brand as cultural utility" is the new positioning frontier for carriers
+
+RETAIL / E-COMMERCE:
+- 82% of Gen Z prefers brands that show up in culture vs. brands that only show up in ads (Morning Consult)
+- Retail foot traffic declines 6% YoY — cultural activations drive the counter-trend
+- Shoppable content drives 4.7× higher conversion than standard display (Meta Commerce, 2025)
+- Experiential retail partnerships outperform paid media by 2.1× on brand recall (EventTrack)
+
+AUTOMOTIVE:
+- Average car-buying age dropped to 28 (was 32 in 2019) — Gen Z entering the market
+- 71% of auto intenders research on social/streaming before visiting a dealership
+- Sports + premium entertainment integrations drive 2.3× higher consideration for auto brands
+- Electric vehicle consideration among Gen Z is 58% — but cultural relevance, not tech specs, drives preference
+
+CPG / BEAUTY / PERSONAL CARE:
+- 91% of Gen Z beauty consumers trust creator/talent recommendations over brand ads (Traackr)
+- Cultural moment marketing drives 5.1× more earned media than standard campaigns (Sprout Social)
+- Beauty brands in tentpole integrations see +89% social conversation lift during air windows
+- TikTok-to-TV pipeline: 64% of Gen Z beauty trends originate on social, then scale through TV events (VMAs, BET Awards)
+
+FINANCIAL SERVICES / INSURANCE:
+- Gen Z financial literacy content consumption up 220% since 2023 — they want education, not selling
+- Sports + entertainment tentpole integrations drive 1.9× higher trust scores for financial brands
+- Affluent audiences (HHI $150K+) over-index on CBS Sports properties: The Masters, PGA Tour, NFL
+- Premium context = premium consideration: financial brands in premium environments see +67% consideration lift
+
+GOVERNMENT / RECRUITMENT:
+- Gen Z trust in traditional recruitment advertising at all-time low (23%, Edelman Trust, 2025)
+- Authentic storytelling in entertainment content drives 3.4× higher enlistment intent vs. standard ads
+- Sports + reality integration campaigns reach 78% of 18-24 males monthly via CBS/Paramount
+- Multi-platform surround strategies (TV + streaming + social + experiential) required for recruitment funnel`;
