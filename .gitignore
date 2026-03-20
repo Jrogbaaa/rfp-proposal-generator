@@ -26,6 +26,7 @@ Thumbs.db
 
 # Test screenshots / Playwright artifacts
 *.png
+!public/paramount-advertising-logo.png
 .playwright-mcp/
 /test-results/
 /playwright-report/

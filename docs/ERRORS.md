@@ -37,6 +37,22 @@ When you encounter an error:
 
 ## Google Slides / OAuth Errors
 
+### Programmatic slides have overlapping text — headings overflow into body content
+**Error:** Generated Google Slides presentations show heading text overlapping with bullet content below. Visible on content slides with long LLM-generated titles (e.g. "Live Sports: The Ultimate Reach Vehicle") and on the title slide when the project title wraps to 2+ lines.
+
+**Cause:** Text boxes are created with fixed EMU coordinates and fixed font sizes. Google Slides API no longer supports `autofit` (TEXT_AUTOFIT is read-only, returns 400). When text wraps to more lines than the box can hold, it overflows visually and collides with elements below. The heading box in `additionalContentSlide` was only 600,000 EMU tall -- barely enough for one line at 36pt (640,000 EMU per line). The body started only 100,000 EMU below the heading box bottom.
+
+**Solution:** Added adaptive font sizing system to `googleSlides.ts`:
+1. `estimateMaxChars(h, w, fontSize)` calculates character capacity of a text box
+2. `adaptiveFontSize(text, h, w, targetPt, minPt)` steps down font size until text fits
+3. Heading boxes made taller (600k -> 1.2M EMU), body pushed down (1.1M -> 1.7M)
+4. Title slide: project title box 500k -> 800k, rule/date moved 320k down
+5. `paragraphSpacing()` adds lineSpacing and spaceBelow for bullet readability
+
+**Fix applied:** All changes in `src/utils/googleSlides.ts`. Affects `titleSlide()`, `additionalContentSlide()`, and the utility functions section.
+
+---
+
 ### Template output has overlapping text — static "Lorem ipsum" text boxes
 **Error:** Generated Google Slides presentations show overlapping text on Benefits, Investment, and other slides. Template sample text ("Lorem ipsum dolor sit amet...") renders on top of the replaced placeholder content.
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-03-20] — Fix Slide Text Overlap & Add Paramount Advertising Logo
+
+### Fixed
+- **`src/utils/googleSlides.ts`** — Title slide: project title text box overflow fixed. Box height increased from 500k to 800k EMU, accent rule and date line moved down. Adaptive font sizing (22pt down to 16pt) prevents long titles from overlapping the date line.
+- **`src/utils/googleSlides.ts`** — Content slides (`additionalContentSlide`): heading-to-body overlap fixed. Heading box increased from 600k to 1.2M EMU, body pushed from y=1.1M to y=1.7M. Adaptive font sizing (36pt down to 22pt) handles wrapping headings. Bullet paragraph spacing added (lineSpacing: 140%, spaceBelow: 6pt).
+
+### Added
+- **`src/utils/googleSlides.ts`** — Adaptive font sizing system: `estimateMaxChars()`, `adaptiveFontSize()`, and `paragraphSpacing()` utilities prevent text overflow across all dynamically-titled slides.
+- **`public/paramount-advertising-logo.png`** — Paramount Advertising branded logo (white, transparent background) for use in generated presentations.
+
+### Changed
+- **`src/utils/googleSlides.ts`** — Cover slide right panel: replaced small 256px Google favicon with full Paramount Advertising branded logo (2.2" x 1.75"). Removed redundant "PARAMOUNT" text label since the logo includes the wordmark.
+- **`src/utils/googleSlides.ts`** — Closing slide: Paramount Advertising logo replaces favicon, larger and centered.
+
+---
+
 ## [2026-03-19] — Production QA Pass & Branding Consistency Fix
 
 ### Fixed

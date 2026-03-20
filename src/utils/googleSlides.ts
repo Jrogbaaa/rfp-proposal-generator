@@ -221,6 +221,65 @@ function truncateBullets(bullets: string[], maxBullets = 5, maxBulletChars = 120
   return bullets.slice(0, maxBullets).map(b => truncate(b, maxBulletChars))
 }
 
+// ---------------------------------------------------------------------------
+// Adaptive font sizing — prevents text overflow in dynamically-sized titles
+// ---------------------------------------------------------------------------
+
+const EMU_PER_PT = 12700
+const LINE_HEIGHT_FACTOR = 1.5
+
+/** Estimate the max characters a text box can hold at a given font size. */
+function estimateMaxChars(heightEmu: number, widthEmu: number, fontSizePt: number): number {
+  const lineHeightEmu = fontSizePt * EMU_PER_PT * LINE_HEIGHT_FACTOR
+  const maxLines = Math.max(1, Math.floor(heightEmu / lineHeightEmu))
+  const charWidthEmu = fontSizePt * EMU_PER_PT * 0.55
+  const charsPerLine = Math.max(10, Math.floor(widthEmu / charWidthEmu))
+  return maxLines * charsPerLine
+}
+
+/** Pick the largest font size (stepping down by 2pt) at which text fits the box. */
+function adaptiveFontSize(
+  text: string, heightEmu: number, widthEmu: number,
+  targetPt: number, minPt: number = 14,
+): number {
+  if (!text) return targetPt
+  for (let pt = targetPt; pt >= minPt; pt -= 2) {
+    if (text.length <= estimateMaxChars(heightEmu, widthEmu, pt)) return pt
+  }
+  return minPt
+}
+
+/** Build an updateParagraphStyle request for spacing / line height. */
+function paragraphSpacing(id: string, opts: {
+  lineSpacing?: number
+  spaceAbove?: number
+  spaceBelow?: number
+}) {
+  const style: Record<string, unknown> = {}
+  const fields: string[] = []
+  if (opts.lineSpacing != null) {
+    style.lineSpacing = opts.lineSpacing
+    fields.push('lineSpacing')
+  }
+  if (opts.spaceAbove != null) {
+    style.spaceAbove = { magnitude: opts.spaceAbove, unit: 'PT' }
+    fields.push('spaceAbove')
+  }
+  if (opts.spaceBelow != null) {
+    style.spaceBelow = { magnitude: opts.spaceBelow, unit: 'PT' }
+    fields.push('spaceBelow')
+  }
+  if (fields.length === 0) return null
+  return {
+    updateParagraphStyle: {
+      objectId: id,
+      style,
+      textRange: { type: 'ALL' },
+      fields: fields.join(','),
+    },
+  }
+}
+
 function createImageReq(
   id: string, slideId: string, url: string,
   x: number, y: number, w: number, h: number,
@@ -397,12 +456,6 @@ function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette):
     // Panel: thin accent horizontal rule between the two logos
     ...createRect(panelDivId, slideId, PANEL_X + 300000, COVER_DIV_Y, PANEL_W - 600000, 12000, palette.accent),
 
-    // Panel: "PARAMOUNT" label (above Paramount logo placeholder)
-    createTextBox(partnerLblId, slideId, labelX, COVER_PLABEL_Y, labelW, 180000),
-    insertText(partnerLblId, 'PARAMOUNT'),
-    styleText(partnerLblId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
-    paragraphAlign(partnerLblId, 'CENTER'),
-
     // Left content zone — constrained to CONTENT_W so text stays clear of the panel
     createTextBox(eyebrowId, slideId, MARGIN_X, 180000, CONTENT_W, 200000),
     insertText(eyebrowId, 'PARAMOUNT'),
@@ -413,18 +466,22 @@ function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette):
     insertText(heroId, `${data.client.company} \u00d7 Paramount`),
     styleText(heroId, { color: WHITE, fontSize: 52, fontFamily: 'Montserrat', bold: true }),
 
-    // Project title (supporting, smaller) — user edits in Refine tab take priority
-    createTextBox(titleId, slideId, MARGIN_X, 2400000, CONTENT_W, 500000),
-    ...((data.expanded?.editedProjectTitle ?? data.project.title) ? [
-      insertText(titleId, data.expanded?.editedProjectTitle ?? data.project.title),
-      styleText(titleId, { color: GRAY, fontSize: 22, fontFamily: 'Inter' }),
-    ] : []),
+    // Project title (supporting, smaller) — adaptive sizing prevents overflow
+    createTextBox(titleId, slideId, MARGIN_X, 2400000, CONTENT_W, 800000),
+    ...((data.expanded?.editedProjectTitle ?? data.project.title) ? (() => {
+      const titleText = data.expanded?.editedProjectTitle ?? data.project.title
+      const titleFontSize = adaptiveFontSize(titleText, 800000, CONTENT_W, 22, 16)
+      return [
+        insertText(titleId, titleText),
+        styleText(titleId, { color: GRAY, fontSize: titleFontSize, fontFamily: 'Inter' }),
+      ]
+    })() : []),
 
     // Thin accent divider rule
-    ...createRect(ruleId, slideId, MARGIN_X, 2960000, CONTENT_W, 18000, palette.accent),
+    ...createRect(ruleId, slideId, MARGIN_X, 3280000, CONTENT_W, 18000, palette.accent),
 
     // Date line
-    createTextBox(dateId, slideId, MARGIN_X, 3040000, CONTENT_W, 280000),
+    createTextBox(dateId, slideId, MARGIN_X, 3360000, CONTENT_W, 280000),
     insertText(dateId, `Prepared for ${data.client.company}  \u00b7  ${data.generated.createdDate}`),
     styleText(dateId, { color: GRAY, fontSize: 14, fontFamily: 'Inter' }),
   ]
@@ -1070,14 +1127,17 @@ function additionalContentSlide(
       isDark ? palette.primaryDarker : palette.accent))
   }
 
+  const HEAD_H = 1200000
+  const headFontSize = title ? adaptiveFontSize(title, HEAD_H, FULL_W, 36, 22) : 36
+
   reqs.push(
-    createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, 600000),
+    createTextBox(headId, slideId, MARGIN_X, MARGIN_TOP, FULL_W, HEAD_H),
     ...(title ? [
       insertText(headId, title),
-      styleText(headId, { color: textColor, fontSize: 36, fontFamily: 'Montserrat', bold: true }),
+      styleText(headId, { color: textColor, fontSize: headFontSize, fontFamily: 'Montserrat', bold: true }),
     ] : []),
 
-    createTextBox(bodyId, slideId, MARGIN_X + 80000, 1100000, FULL_W - 80000, 3500000),
+    createTextBox(bodyId, slideId, MARGIN_X + 80000, 1700000, FULL_W - 80000, 2900000),
     ...(safeBullets.length ? [
       insertText(bodyId, safeBullets.join('\n')),
       styleText(bodyId, { color: isDark ? LTGRAY : palette.primary, fontSize: 18, fontFamily: 'Inter' }),
@@ -1088,7 +1148,8 @@ function additionalContentSlide(
           bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
         },
       },
-    ] : []),
+      paragraphSpacing(bodyId, { lineSpacing: 140, spaceBelow: 6 }),
+    ].filter(Boolean) : []),
   )
 
   return reqs
@@ -1563,6 +1624,7 @@ function appendixSlide(slideId: string, pm: ParamountMediaContent, palette: Slid
 // ---------------------------------------------------------------------------
 
 const PARAMOUNT_DOMAIN = 'paramount.com'
+const PARAMOUNT_AD_LOGO_URL = 'https://rfp-proposal-generator-kappa.vercel.app/paramount-advertising-logo.png'
 // Google faviconV2 returns direct PNG at up to 256px — no redirects, reliable with Google Slides API.
 // The older s2/favicons maxed at 128px. faviconV2 doubles the resolution at the same zero-auth cost.
 // ClearBit's free logo API was deprecated (HubSpot acquisition) and now returns 302 redirects
@@ -1597,22 +1659,26 @@ function logoRequests(coverSlideId: string, closeSlideId: string, data: Proposal
     )
   }
 
-  // Paramount logo — aligned to its label and divider drawn in Phase 2
+  // Paramount Advertising logo — full branded image replaces small favicon
+  const paramLogoW = 2000000
+  const paramLogoH = 1600000
+  const paramLogoX = PANEL_X + Math.round((PANEL_W - paramLogoW) / 2)
   reqs.push(
     createImageReq(
       `${coverSlideId}_plogo`, coverSlideId,
-      logoUrl(PARAMOUNT_DOMAIN),
-      LOGO_X, COVER_PLOGO_Y, LOGO_SIZE, LOGO_SIZE,
+      PARAMOUNT_AD_LOGO_URL,
+      paramLogoX, COVER_PLOGO_Y, paramLogoW, paramLogoH,
     ),
   )
 
-  // Paramount logo on closing slide (centered, above the bracketing rules)
-  const closeLogoSize = 686000
+  // Paramount Advertising logo on closing slide (centered, above the bracketing rules)
+  const closeLogoW = 1800000
+  const closeLogoH = 1440000
   reqs.push(
     createImageReq(
       `${closeSlideId}_plogo`, closeSlideId,
-      logoUrl(PARAMOUNT_DOMAIN),
-      Math.round(W / 2 - closeLogoSize / 2), 800000, closeLogoSize, closeLogoSize,
+      PARAMOUNT_AD_LOGO_URL,
+      Math.round(W / 2 - closeLogoW / 2), 700000, closeLogoW, closeLogoH,
     ),
   )
 
