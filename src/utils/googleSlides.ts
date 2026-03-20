@@ -411,7 +411,6 @@ const LOGO_X         = PANEL_X + Math.round(PANEL_W / 2) - Math.round(LOGO_SIZE 
 const COVER_CLABEL_Y = 1286350             // client company label (e.g. "STARBUCKS")
 const COVER_CLOGO_Y  = 1526350             // client logo image
 const COVER_DIV_Y    = 2590750             // thin orange rule between logos
-const _COVER_PLABEL_Y = 2682750            // "PARAMOUNT" label (unused — logo includes wordmark)
 const COVER_PLOGO_Y  = 2922750             // Paramount logo image
 
 /** Slide 1: Title / Cover */
