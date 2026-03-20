@@ -5,7 +5,6 @@ function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-const MAX_EXPANSION_CHARS = 350
 const MAX_BULLETS = 5
 const MAX_BULLET_CHARS = 120
 const MAX_STEPS = 6
@@ -25,7 +24,6 @@ function capBullets(items: string[], maxItems: number, maxChars: number): string
 export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   const client = data.client
   const project = data.project
-  const content = data.content
   const expanded = data.expanded
 
   // Route to flexible slide builders for non-RFP deck types
@@ -137,17 +135,10 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
 
   const company = client?.company || '—'
   const projectTitle = expanded?.editedProjectTitle ?? project?.title ?? '—'
-  const problems = (expanded?.editedProblems ?? content?.problems ?? ['', '', '', '']) as string[]
-  const benefits = (expanded?.editedBenefits ?? content?.benefits ?? ['', '', '', '']) as string[]
-  const problemExpansions = expanded?.problemExpansions
-  const benefitExpansions = expanded?.benefitExpansions
-  const approachSteps = expanded?.approachSteps ?? []
   const nextSteps = expanded?.nextSteps ?? []
+  const approachSteps = expanded?.approachSteps ?? []
   const customTitles = expanded?.customTitles ?? {}
   const additionalSlides = expanded?.additionalSlides ?? []
-
-  const activeProblemCount = problems.filter(Boolean).length
-  const activeBenefitCount = benefits.filter(Boolean).length
 
   const slides: SlideData[] = []
   let slideNum = 1
@@ -166,146 +157,154 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     ].filter(Boolean),
   })
 
-  // Slide 2: The Challenge
+  // Slide 2: The New Reality of Attention (Cultural Shift)
   slides.push({
     slideNumber: slideNum++,
-    slideKey: 'challenge',
+    slideKey: 'cultural_shift',
     editable: true,
     type: 'content',
-    title: 'The Challenge',
-    subtitle: company !== '—' ? `What's holding ${company} back` : undefined,
-    bullets: activeProblemCount > 0
-      ? capBullets(problems.filter(Boolean), MAX_BULLETS, MAX_BULLET_CHARS)
-      : ['Awaiting brief content'],
+    title: 'The New Reality of Attention',
+    subtitle: company !== '—' ? `${company} · The Attention Crisis` : undefined,
+    bullets: expanded?.culturalShift?.length
+      ? capBullets(expanded.culturalShift, MAX_BULLETS, MAX_BULLET_CHARS)
+      : ['Media is fragmenting across TikTok, streaming, and fan communities',
+         'Gen Z lives in culture, not channels — if your brand isn\'t part of it, you\'re invisible',
+         'Traditional reach metrics mask a deeper problem: attention ≠ engagement'],
   })
 
-  // Slide 3: Problem 1 deep dive
+  // Slide 3: Why Most Brand Campaigns Fail Today (Real Problem)
   slides.push({
     slideNumber: slideNum++,
-    slideKey: 'prob1',
+    slideKey: 'real_problem',
     editable: true,
     type: 'content',
-    title: customTitles['prob1'] ?? problems[0] ?? 'Challenge 01',
+    title: 'Why Most Brand Campaigns Fail Today',
+    subtitle: 'The Reframe',
+    bullets: expanded?.realProblem?.length
+      ? capBullets(expanded.realProblem, MAX_BULLETS, MAX_BULLET_CHARS)
+      : ['Interruptive ads don\'t create impact — they create skip buttons',
+         'Media spend ≠ cultural relevance. Presence ≠ remembrance.',
+         'Brands are buying impressions but not earning attention'],
+  })
+
+  // Slide 4: What This Is Costing You (Cost of Inaction)
+  slides.push({
+    slideNumber: slideNum++,
+    slideKey: 'cost_of_inaction',
+    editable: true,
+    type: 'content',
+    title: 'What This Is Costing You',
     subtitle: undefined,
-    bullets: problemExpansions ? [truncate(problemExpansions[0], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
+    bullets: expanded?.costOfInaction?.length
+      ? capBullets(expanded.costOfInaction, MAX_BULLETS, MAX_BULLET_CHARS)
+      : ['Lost attention — your ads play but nobody remembers',
+         'Low brand recall — declining ROI on traditional media',
+         'Weak emotional connection — no cultural currency with Gen Z'],
   })
 
-  // Slide 4: Problem 2 deep dive
+  // Slide 5: The Core Insight (Money Slide)
   slides.push({
     slideNumber: slideNum++,
-    slideKey: 'prob2',
+    slideKey: 'core_insight',
+    editable: true,
+    type: 'impact',
+    title: expanded?.coreInsight ?? 'Winning Brands Don\'t Buy Media — They Join Culture',
+    subtitle: 'The Core Insight',
+    bullets: [
+      'Big Brother integrations — brand becomes part of the content',
+      'VMAs moments — shoppable, social-first, in the cultural conversation',
+      'Talent + fandom + live moments = emotional brand equity at scale',
+    ],
+  })
+
+  // Slide 6: How Paramount Turns Brands Into Cultural Moments
+  slides.push({
+    slideNumber: slideNum++,
+    slideKey: 'paramount_advantage',
     editable: true,
     type: 'content',
-    title: customTitles['prob2'] ?? problems[1] ?? 'Challenge 02',
-    subtitle: undefined,
-    bullets: problemExpansions ? [truncate(problemExpansions[1], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
+    title: 'How Paramount Turns Brands Into Cultural Moments',
+    subtitle: company !== '—' ? `${company} × Paramount` : undefined,
+    bullets: [
+      'IP: Big Brother, VMAs, NFL, GRAMMYs — culture\'s biggest stages',
+      'Talent: Named partnerships that drive authentic brand connections',
+      'Multi-platform: CBS + Paramount+ + MTV + BET + social',
+      'Integration formats: Not ads — native content, shoppable moments, fan activations',
+    ],
   })
 
-  // Slide 5: Problems 3 & 4 — only if at least one exists (mirrors export behaviour)
-  if (problems[2] || problems[3]) {
-    slides.push({
-      slideNumber: slideNum++,
-      slideKey: 'prob34',
-      editable: true,
-      type: 'content',
-      title: 'Challenges 3 & 4',
-      subtitle: undefined,
-      bullets: capBullets([
-        problems[2] || '',
-        problemExpansions?.[2] || '',
-        problems[3] || '',
-        problemExpansions?.[3] || '',
-      ].filter(Boolean), MAX_BULLETS, MAX_EXPANSION_CHARS),
-    })
-  }
-
-  // Slide 6: Our Solution
+  // Slide 7: Proven Impact at Scale (Proof)
   slides.push({
     slideNumber: slideNum++,
-    slideKey: 'solution',
+    slideKey: 'proof',
+    editable: true,
+    type: 'impact',
+    title: 'Proven Impact at Scale',
+    subtitle: 'When brands integrate into culture — this happens',
+    bullets: expanded?.proofPoints?.length
+      ? capBullets(expanded.proofPoints.map(pp => `${pp.stat} — ${pp.source}`), MAX_BULLETS, MAX_BULLET_CHARS)
+      : ['+102% brand preference lift — Dunkin\' × Big Brother S27',
+         '+99% purchase intent lift — Dunkin\' × VMAs 2025',
+         '2.5B votes cast — Big Brother S27',
+         '1B+ social impressions — VMAs 2025'],
+  })
+
+  // Slide 8: From Idea to Cultural Moment (How It Works)
+  slides.push({
+    slideNumber: slideNum++,
+    slideKey: 'how_it_works',
     editable: true,
     type: 'content',
-    title: 'Our Solution',
-    subtitle: company !== '—' ? `How we deliver results for ${company}` : undefined,
-    bullets: activeBenefitCount > 0
-      ? capBullets(benefits.filter(Boolean), MAX_BULLETS, MAX_BULLET_CHARS)
-      : ['Awaiting brief content'],
+    title: 'From Idea to Cultural Moment',
+    subtitle: 'The Activation Playbook',
+    bullets: approachSteps.length > 0
+      ? capBullets(approachSteps.map((step, i) => `${pad(i + 1)}  ${step}`), MAX_STEPS, MAX_STEP_CHARS)
+      : ['01  Identify the cultural moment — match your brand to the right IP',
+         '02  Design native integration — content that belongs, not interrupts',
+         '03  Amplify across platforms — CBS, Paramount+, social, in-store'],
   })
 
-  // Our Approach — conditional (only when approachSteps generated, mirrors export)
-  if (approachSteps.length > 0) {
-    slides.push({
-      slideNumber: slideNum++,
-      slideKey: 'approach',
-      editable: true,
-      type: 'content',
-      title: 'Our Approach',
-      subtitle: 'How We Deliver',
-      bullets: capBullets(
-        approachSteps.map((step, i) => `${pad(i + 1)}  ${step}`),
-        MAX_STEPS, MAX_STEP_CHARS,
-      ),
-    })
-  }
-
-  // Benefit 1 deep dive
+  // Slide 9: Your Opportunity with Paramount (Custom Plan)
   slides.push({
     slideNumber: slideNum++,
-    slideKey: 'ben1',
+    slideKey: 'custom_plan',
     editable: true,
     type: 'content',
-    title: customTitles['ben1'] ?? benefits[0] ?? 'Outcome 01',
-    subtitle: undefined,
-    bullets: benefitExpansions ? [truncate(benefitExpansions[0], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
+    title: 'Your Opportunity with Paramount',
+    subtitle: company !== '—' ? `Custom Plan for ${company}` : undefined,
+    bullets: expanded?.customPlan
+      ? capBullets([
+          expanded.customPlan.recommendedProperties?.length
+            ? `Properties: ${expanded.customPlan.recommendedProperties.join(', ')}` : '',
+          expanded.customPlan.formats?.length
+            ? `Formats: ${expanded.customPlan.formats.join(', ')}` : '',
+          expanded.customPlan.audienceMatch || '',
+          expanded.customPlan.timeline ? `Timeline: ${expanded.customPlan.timeline}` : '',
+        ].filter(Boolean), MAX_BULLETS, MAX_BULLET_CHARS)
+      : ['Tailored IP selection based on your audience',
+         'Custom integration formats for your brand',
+         'Specific audience alignment with Paramount properties',
+         'Activation timeline synced to your calendar'],
   })
 
-  // Benefit 2 deep dive
+  // Slide 10: Investment vs Impact (ROI Framing)
   slides.push({
     slideNumber: slideNum++,
-    slideKey: 'ben2',
-    editable: true,
-    type: 'content',
-    title: customTitles['ben2'] ?? benefits[1] ?? 'Outcome 02',
-    subtitle: undefined,
-    bullets: benefitExpansions ? [truncate(benefitExpansions[1], MAX_EXPANSION_CHARS)].filter(Boolean) : [],
-  })
-
-  // Benefits 3 & 4 — only if at least one exists (mirrors export behaviour)
-  if (benefits[2] || benefits[3]) {
-    slides.push({
-      slideNumber: slideNum++,
-      slideKey: 'ben34',
-      editable: true,
-      type: 'content',
-      title: 'Benefits 3 & 4',
-      subtitle: undefined,
-      bullets: capBullets([
-        benefits[2] || '',
-        benefitExpansions?.[2] || '',
-        benefits[3] || '',
-        benefitExpansions?.[3] || '',
-      ].filter(Boolean), MAX_BULLETS, MAX_EXPANSION_CHARS),
-    })
-  }
-
-  // Investment & Timeline
-  slides.push({
-    slideNumber: slideNum++,
-    slideKey: 'investment',
+    slideKey: 'roi_framing',
     editable: false,
     type: 'content',
-    title: 'Investment & Timeline',
+    title: 'Investment vs Impact',
     subtitle: undefined,
     bullets: [
       project?.totalValue ? `Total Investment: ${project.totalValue}` : '',
       project?.duration ? `Timeline: ${project.duration}` : '',
-      project?.monthOneInvestment ? `Month 1: ${project.monthOneInvestment}` : '',
-      project?.monthTwoInvestment ? `Month 2: ${project.monthTwoInvestment}` : '',
-      project?.monthThreeInvestment ? `Month 3: ${project.monthThreeInvestment}` : '',
+      company !== '—' ? `Reach: ${company} reaches its exact audience through Paramount\'s 200M+ monthly viewers` : '',
+      'Engagement: Native integrations drive 3.2× higher recall than standard ads',
+      'Conversion: QR, app, retail pathways from cultural moment to measurable outcome',
     ].filter(Boolean),
   })
 
-  // Next Steps — conditional (only when nextSteps generated, mirrors export)
+  // Slide 11: Next Steps — conditional
   if (nextSteps.length > 0) {
     slides.push({
       slideNumber: slideNum++,
@@ -321,7 +320,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     })
   }
 
-  // Closing
+  // Slide 12: Closing
   slides.push({
     slideNumber: slideNum++,
     slideKey: 'closing',

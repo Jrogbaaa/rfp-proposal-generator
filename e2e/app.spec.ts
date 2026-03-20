@@ -37,6 +37,37 @@ function geminiContentBody() {
               'Faster resolution dramatically improves NPS and reduces costly repeat contacts.',
               'Eliminating checkout friction directly increases completed transactions and revenue per visit.',
             ],
+            culturalShift: [
+              'QSR discovery is now 73% social-media-driven among Gen Z — traditional ads miss them entirely.',
+              'Starbucks customers live across TikTok, streaming, and fan communities, not linear TV channels.',
+              'Average QSR brand recall from TV ads fell 19% in 2025 — attention has fundamentally shifted.',
+            ],
+            realProblem: [
+              'Interruptive ads don\'t drive app engagement — they create skip buttons.',
+              'Media spend ≠ cultural relevance. Starbucks is present but not remembered.',
+              'Brands buying impressions but not earning attention will lose to culturally-native competitors.',
+            ],
+            costOfInaction: [
+              'Lost attention — Starbucks ads play but Gen Z doesn\'t remember.',
+              'Low brand recall — declining ROI on traditional media, 19% drop in QSR ad recall.',
+              'Weak emotional connection — no cultural currency with the audience that matters most.',
+            ],
+            coreInsight: 'Winning Brands Don\'t Buy Media — They Join Culture',
+            proofPoints: [
+              { stat: '+102% brand preference lift', source: 'Dunkin\' × Big Brother S27', context: 'Season-long integration' },
+              { stat: '+99% purchase intent lift', source: 'Dunkin\' × VMAs 2025', context: 'Custom talent activation' },
+              { stat: '+34% in-store visit lift', source: 'Dunkin\' × Big Brother QR mechanic', context: 'Measured via Placer.ai' },
+            ],
+            customPlan: {
+              recommendedProperties: ['Big Brother S28', 'VMAs 2026', '68th GRAMMY Awards'],
+              formats: ['Season-long integration', 'Custom talent sketches', 'Shoppable AR/QR'],
+              audienceMatch: 'Gen Z coffee culture consumers who over-index on reality TV and live music events.',
+              timeline: 'Q3 2026 – Q1 2027',
+            },
+            industryInsights: [
+              { trend: '73% of Gen Z discovers new restaurants through social media', implication: 'Starbucks needs cultural presence, not just ad presence', category: 'QSR' },
+              { trend: 'QSR delivery app usage up 34% among Gen Z', implication: 'Digital-first discovery requires digital-first brand moments', category: 'QSR' },
+            ],
           }),
         }],
       },
@@ -160,7 +191,7 @@ async function mockGoogleSlidesApi(page: Page) {
 async function goToIterateStep(page: Page) {
   await mockGeminiApi(page)
   await page.goto('/')
-  await page.getByRole('button', { name: 'Paste Text' }).click()
+  await page.getByRole('button', { name: 'Prompt' }).click()
   await page.locator('textarea').fill(SAMPLE_BRIEF)
   await page.getByRole('button', { name: 'Continue to Refine' }).click()
   await expect(
@@ -174,7 +205,7 @@ async function goToShareStep(page: Page) {
   await mockGoogleOAuth(page)   // must come before page.goto
   await mockGoogleSlidesApi(page)
   await page.goto('/')
-  await page.getByRole('button', { name: 'Paste Text' }).click()
+  await page.getByRole('button', { name: 'Prompt' }).click()
   await page.locator('textarea').fill(SAMPLE_BRIEF)
   await page.getByRole('button', { name: 'Continue to Refine' }).click()
   await expect(
@@ -202,11 +233,39 @@ function geminiContentWithApproachBody() {
               'Faster resolution dramatically improves NPS and reduces costly repeat contacts.',
               'Eliminating checkout friction directly increases completed transactions and revenue per visit.',
             ],
+            culturalShift: [
+              'QSR discovery is now 73% social-media-driven among Gen Z.',
+              'Starbucks customers live across TikTok, streaming, and fan communities.',
+              'Average QSR brand recall from TV ads fell 19% in 2025.',
+            ],
+            realProblem: [
+              'Interruptive ads don\'t drive app engagement.',
+              'Media spend ≠ cultural relevance.',
+              'Brands buying impressions but not earning attention.',
+            ],
+            costOfInaction: [
+              'Lost attention — Starbucks ads play but Gen Z doesn\'t remember.',
+              'Low brand recall — declining ROI on traditional media.',
+              'Weak emotional connection — no cultural currency.',
+            ],
+            coreInsight: 'Winning Brands Don\'t Buy Media — They Join Culture',
+            proofPoints: [
+              { stat: '+102% brand preference lift', source: 'Dunkin\' × Big Brother S27' },
+              { stat: '+99% purchase intent lift', source: 'Dunkin\' × VMAs 2025' },
+            ],
+            customPlan: {
+              recommendedProperties: ['Big Brother S28', 'VMAs 2026'],
+              formats: ['Season-long integration', 'Custom talent sketches'],
+              audienceMatch: 'Gen Z coffee culture consumers.',
+              timeline: 'Q3 2026 – Q1 2027',
+            },
+            industryInsights: [
+              { trend: '73% of Gen Z discovers new restaurants through social media', implication: 'Cultural presence required', category: 'QSR' },
+            ],
             approachSteps: [
-              'Discovery & audit of existing digital touchpoints and data silos.',
-              'Architecture design and unified data platform build-out.',
-              'Pilot rollout with mobile app integration and live testing.',
-              'Full deployment, measurement framework, and optimization loop.',
+              'Identify the cultural moment — match Starbucks to Big Brother S28 and VMAs 2026.',
+              'Design native integration — in-show coffee cart, shoppable AR, rewards mechanic.',
+              'Amplify across platforms — CBS, Paramount+, social, in-store activations.',
             ],
             nextSteps: [
               'Sign engagement letter within 5 business days.',
@@ -253,16 +312,16 @@ test.describe('Step 1 – Input Modes', () => {
     await expect(page.getByText('Drop a PDF — Gemini extracts structure automatically')).toBeVisible()
   })
 
-  test('switches to Paste Text mode', async ({ page }) => {
+  test('switches to Prompt mode', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await expect(page.locator('textarea')).toBeVisible()
-    await expect(page.getByText('Paste your RFP or brief text below')).toBeVisible()
+    await expect(page.getByText('Paste your brief or type a prompt')).toBeVisible()
   })
 
   test('switches back to Upload PDF mode', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.getByRole('button', { name: 'Upload PDF' }).click()
     await expect(page.getByText('Drop a PDF — Gemini extracts structure automatically')).toBeVisible()
     await expect(page.locator('textarea')).not.toBeVisible()
@@ -284,14 +343,14 @@ test.describe('Step 1 – Brief Parsing', () => {
 
   test('entering brief text switches preview to "Brief parsed"', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await expect(page.getByText('Brief parsed')).toBeVisible()
   })
 
   test('parsed fields (Company, Project, Timeline, Budget) appear in preview', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     // Check the right panel parsed field values
     const preview = page.locator('section').filter({ hasText: 'Preview' })
@@ -303,7 +362,7 @@ test.describe('Step 1 – Brief Parsing', () => {
 
   test('"Continue to Refine" button appears when brief has content', async ({ page }) => {
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await expect(page.getByRole('button', { name: 'Continue to Refine' })).toBeVisible()
   })
@@ -506,30 +565,61 @@ test.describe('Step 3 – Share Screen', () => {
 // ─── Step 2: Slide Preview Structure ─────────────────────────────────────────
 
 test.describe('Step 2 – Slide Preview Structure', () => {
-  test('shows The Challenge and Our Solution slides in preview', async ({ page }) => {
+  test('shows persuasion-engine slide titles in preview', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByText('The Challenge')).toBeVisible()
-    await expect(page.getByText('Our Solution')).toBeVisible()
+    await expect(page.getByText('The New Reality of Attention')).toBeVisible()
+    await expect(page.getByText('Why Most Brand Campaigns Fail Today')).toBeVisible()
   })
 
-  test('does NOT show approach or next steps slides when Gemini omits them', async ({ page }) => {
+  test('shows old titles are replaced — no Challenge or Our Solution', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByText('Our Approach')).not.toBeVisible()
+    await expect(page.getByText('The Challenge', { exact: true })).not.toBeVisible()
+    await expect(page.getByText('Our Solution', { exact: true })).not.toBeVisible()
+  })
+
+  test('does NOT show next steps when Gemini omits them', async ({ page }) => {
+    await goToIterateStep(page)
     await expect(page.getByText('Next Steps')).not.toBeVisible()
   })
 
-  test('shows benefit 1 expansion text in preview', async ({ page }) => {
+  test('shows proof points in preview', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByText('A unified customer view enables hyper-personalised', { exact: false })).toBeVisible()
+    await expect(page.getByText('+102% brand preference lift', { exact: false })).toBeVisible({ timeout: 10000 })
   })
 
-  test('slide count in preview toolbar matches export slide count', async ({ page }) => {
-    // Standard mock: 4 problems + 4 benefits, no approach/nextSteps
-    // Expected: cover, challenge, prob1, prob2, prob34, solution, ben1, ben2, ben34, investment, closing = 11
+  test('shows custom plan with client name in preview', async ({ page }) => {
     await goToIterateStep(page)
-    // Wait for expansions to be applied (benefit expansion text visible in preview)
+    await expect(page.getByText('Your Opportunity with Paramount')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Custom Plan for Starbucks', { exact: false })).toBeVisible()
+  })
+
+  test('shows core insight / money slide in preview', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('Winning Brands Don\'t Buy Media', { exact: false })).toBeVisible({ timeout: 10000 })
+  })
+
+  test('shows cost of inaction slide in preview', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('What This Is Costing You')).toBeVisible({ timeout: 10000 })
+  })
+
+  test('shows investment vs impact slide in preview', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('Investment vs Impact')).toBeVisible({ timeout: 10000 })
+  })
+
+  test('shows industry insights in cultural shift slide', async ({ page }) => {
+    await goToIterateStep(page)
+    await expect(page.getByText('73% social-media-driven', { exact: false })).toBeVisible({ timeout: 10000 })
+  })
+
+  test('slide count in preview toolbar matches new persuasion structure', async ({ page }) => {
+    // New persuasion structure without nextSteps:
+    // cover, cultural_shift, real_problem, cost_of_inaction, core_insight,
+    // paramount_advantage, proof, how_it_works, custom_plan, roi_framing, closing = 11
+    await goToIterateStep(page)
     await expect(
-      page.getByText('A unified customer view enables hyper-personalised', { exact: false })
+      page.getByText('The New Reality of Attention', { exact: false })
     ).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/\d+ slides/)).toBeVisible()
     const slidesText = await page.getByText(/\d+ slides/).innerText()
@@ -537,7 +627,7 @@ test.describe('Step 2 – Slide Preview Structure', () => {
     expect(count).toBe(11)
   })
 
-  test('shows approach and next steps slides when Gemini returns them', async ({ page }) => {
+  test('shows next steps slide when Gemini returns them', async ({ page }) => {
     let callCount = 0
     await page.route('**/api/gemini/generate-content', (route) => {
       callCount++
@@ -548,20 +638,19 @@ test.describe('Step 2 – Slide Preview Structure', () => {
       })
     })
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
       page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
-    // Wait for expansions to be applied before checking approach slide
-    await expect(page.getByText('Our Approach')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('Next Steps')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText('Discovery & audit of existing digital touchpoints', { exact: false })).toBeVisible()
+    await expect(page.getByText('From Idea to Cultural Moment')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Identify the cultural moment', { exact: false })).toBeVisible()
   })
 
-  test('slide count increases by 2 when approach and next steps are present', async ({ page }) => {
+  test('slide count increases by 1 when next steps are present', async ({ page }) => {
     let callCount = 0
     await page.route('**/api/gemini/generate-content', (route) => {
       callCount++
@@ -572,20 +661,19 @@ test.describe('Step 2 – Slide Preview Structure', () => {
       })
     })
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
       page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
-    // Wait for expansions (and approach slide) to be applied before reading count
-    await expect(page.getByText('Our Approach')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Next Steps')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText(/\d+ slides/)).toBeVisible()
     const slidesText = await page.getByText(/\d+ slides/).innerText()
     const count = parseInt(slidesText)
-    // 11 base + 1 approach + 1 next steps = 13
-    expect(count).toBe(13)
+    // 11 base + 1 next steps = 12
+    expect(count).toBe(12)
   })
 })
 
@@ -622,7 +710,7 @@ test.describe('Error and auth failure scenarios', () => {
     await mockGoogleOAuthDenied(page)
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
@@ -664,7 +752,7 @@ test.describe('Error and auth failure scenarios', () => {
     })
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
@@ -685,7 +773,7 @@ test.describe('Error and auth failure scenarios', () => {
     await mockGoogleSlidesApi(page)
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
@@ -737,13 +825,13 @@ test.describe('Resilience Hardening', () => {
     })
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
 
-    // Wait for actual generated expansion text (proves the retry succeeded)
+    // Wait for generated persuasion slide text (proves the retry succeeded)
     await expect(
-      page.getByText('Mobile engagement has declined sharply', { exact: false })
+      page.getByText('73% social-media-driven', { exact: false })
     ).toBeVisible({ timeout: 30000 })
     expect(geminiCallCount).toBeGreaterThanOrEqual(2)
   })
@@ -764,13 +852,13 @@ test.describe('Resilience Hardening', () => {
     })
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
 
-    // Wait for actual generated expansion text (proves the retry after 429s succeeded)
+    // Wait for generated persuasion slide text (proves the retry after 429s succeeded)
     await expect(
-      page.getByText('Mobile engagement has declined sharply', { exact: false })
+      page.getByText('73% social-media-driven', { exact: false })
     ).toBeVisible({ timeout: 60000 })
     expect(geminiCallCount).toBeGreaterThanOrEqual(3)
   })
@@ -785,7 +873,7 @@ test.describe('Resilience Hardening', () => {
     })
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
 
@@ -832,7 +920,7 @@ test.describe('Resilience Hardening', () => {
     await mockGoogleSlidesApi(page)
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
@@ -921,7 +1009,7 @@ test.describe('Resilience Hardening', () => {
     })
 
     await page.goto('/')
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
@@ -940,7 +1028,7 @@ test.describe('Resilience Hardening', () => {
     await page.goto('/')
 
     // Step 1: Paste brief
-    await page.getByRole('button', { name: 'Paste Text' }).click()
+    await page.getByRole('button', { name: 'Prompt' }).click()
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await expect(page.getByRole('button', { name: 'Continue to Refine' })).toBeVisible()
 

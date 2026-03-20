@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-03-20] — Persuasion-Engine Presentation Template Overhaul
+
+### Added
+- **`src/types/proposal.ts`** — New interfaces: `ProofPoint`, `CustomClientPlan`, `IndustryInsight`; new `ExpandedContent` fields: `culturalShift`, `realProblem`, `costOfInaction`, `coreInsight`, `proofPoints`, `customPlan`, `industryInsights`; new `ParamountMediaContent` fields: `proofPoints`, `industryInsights`
+- **`src/utils/trainingContext.ts`** — `PROOF_POINTS_DATABASE` (real Paramount case study stats) and `INDUSTRY_INSIGHTS_MAP` (category-specific insights: QSR, telecom, retail, auto, CPG, financial, government)
+- **`src/utils/googleSlides.ts`** — 9 new persuasion slide builders: `culturalShiftSlide`, `realProblemSlide`, `costSlide`, `coreInsightSlide`, `paramountAdvantageSlide`, `proofSlide`, `howItWorksSlide`, `customPlanSlide`, `roiFramingSlide`
+- **`e2e/app.spec.ts`** — 10 new E2E tests for the persuasion slide structure: titles, slide count, proof points, client personalization, core insight, cost of inaction, investment vs impact, industry insights
+
+### Changed
+- **`src/utils/llmService.ts`** — `SYSTEM_PROMPT` rewritten to request persuasion-engine content (culturalShift, realProblem, costOfInaction, coreInsight, proofPoints, customPlan, industryInsights); LLM now receives `PROOF_POINTS_DATABASE` and `INDUSTRY_INSIGHTS_MAP` as context; `LLMResponse` interface extended; response parsing extracts new fields; iterate function preserves persuasion fields
+- **`src/utils/googleSlides.ts`** — `orderedSlides` arrays for both `paramount-rfp` and generic consulting deck paths replaced with the 11-slide persuasion arc: Cover → Cultural Shift → Real Problem → Cost of Inaction → Core Insight → Paramount Advantage → Proof → How It Works → Custom Plan → ROI Framing → Next Steps → Close
+- **`src/utils/slideBuilder.ts`** — Preview builder generates the new 11-slide persuasion structure with default fallback content for each slide; old challenge/solution/benefit/investment slides removed
+- **`src/data/slideContent.ts`** — `TMOBILE_PARAMOUNT_SLIDES` rewritten to follow the 12-slide persuasion template with T-Mobile-specific cultural shift, proof points, custom plan, and ROI framing
+
+### Removed
+- **`src/utils/googleSlides.ts`** — Old slide builders removed: `challengeSlide`, `problemDeepDive`, `problemsCombined`, `solutionSlide`, `approachSlide`, `benefitsCombined`, `investmentSlide`, `opportunitySlide`, `tierInvestmentSlide`, `decorativeNumber`
+
+---
+
 ## [2026-03-20] — Fix Slide Text Overlap & Add Paramount Advertising Logo
 
 ### Fixed

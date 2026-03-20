@@ -14,7 +14,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 | BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
 | ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides |
-| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (10 base + any additional); inline title editing on slides 1–4, 7–8, 11+; inline bullet editing on slides 2–4, 7–8, 11+ |
+| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (11 base persuasion arc + any additional); inline title/bullet editing on editable slides |
 | GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → template copy → populate; accepts `preGeneratedContent`, `onSuccess` |
 | ProgressStepper | `src/components/ProgressStepper.tsx` | 3-step stepper (Draft/Refine/Export); only backward navigation to completed steps |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
@@ -79,7 +79,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 ---
 
 ### GoogleSlidesButton.tsx
-**Purpose:** Direct Google Slides API integration — creates a presentation (10–13 slides) in the user's Google Drive and provides a link to open/edit it.
+**Purpose:** Direct Google Slides API integration — creates a presentation (11-slide persuasion arc + optional extras) in the user's Google Drive and provides a link to open/edit it.
 
 **Props:**
 - `data: Partial<ProposalData> | null` — Parsed brief data
@@ -112,18 +112,19 @@ Auto-generated documentation for all React components in the Paramount applicati
 ---
 
 ### SlidePreview.tsx
-**Purpose:** Renders slide cards (10+ when approach/next steps are present) from live `ProposalData` in Step 2; applies the active color theme to the HTML preview.
+**Purpose:** Renders slide cards (11 base persuasion arc + optional next steps + any additional) from live `ProposalData` in Step 2; applies the active color theme to the HTML preview.
 
 **Props:**
 - `fileName?: string` — Presentation title shown in header
 - `data?: Partial<ProposalData> | null` — Proposal content; shows an empty state when null
 - `designConfig?: DesignConfig` — Active color theme; resolved to `ThemeTokens` via `THEME_MAP`
 - `isUpdating?: boolean` — Shows a shimmer overlay while Gemini is rewriting content
-- `onSlideEdit?: (slideNumber: number, bulletIndex: number, newText: string) => void` — Inline edit callback; only `EDITABLE_SLIDES = Set([3, 4, 7, 8])` fire this
+- `onSlideEdit?: (slideNumber: number, bulletIndex: number, newText: string) => void` — Inline edit callback for editable slides
+- `onSlideTitleEdit?: (slideNumber: number, newTitle: string) => void` — Inline title edit callback
 
-**Theme system:** `ThemeTokens` interface maps 6 Tailwind slot names (`accentBar`, `badgeBg`, `badgeText`, `title`, `subtitle`, `bullet`) to class strings. `THEME_MAP` provides token objects for all three `ColorTheme` values (navy-gold, slate-blue, forest-green). Defaults to navy-gold when no `designConfig` is provided.
+**Theme system:** `ThemeTokens` interface maps 6 Tailwind slot names (`accentBar`, `badgeBg`, `badgeText`, `title`, `subtitle`, `bullet`) to class strings. `THEME_MAP` provides token objects for all `ColorTheme` values. Defaults to navy-gold when no `designConfig` is provided.
 
-**Slide data:** Calls `buildSlidesFromData()` from `src/utils/slideBuilder.ts` to convert `ProposalData` into 10 `SlideData` cards; uses `'—'` as placeholder for missing fields.
+**Slide data:** Calls `buildSlidesFromData()` from `src/utils/slideBuilder.ts` to convert `ProposalData` into the 11-slide persuasion arc: Cover → Cultural Shift → Real Problem → Cost of Inaction → Core Insight → Paramount Advantage → Proof → How It Works → Custom Plan → ROI Framing → Close (+ optional Next Steps, additional slides).
 
 **`hasRealData` guard:** `true` when any of `client.company`, `project.title`, `content.problems[0]`, or `data.expanded` is present. The `data.expanded` check is critical for short-prompt flows where `parsedData` is null but AI-generated `ExpandedContent` is set.
 
@@ -176,7 +177,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `CreateSlidesResult` — Interface: `{ presentationId, presentationUrl, title }`
 
 **Phase 1:** `POST /v1/presentations` — create empty presentation (wrapped in `withBackoff` with token refresh on 401)
-**Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all slides (10–13) in one atomic request; `orderedSlides` array filters out optional slides; wrapped in `withBackoff` with 401 retry
+**Phase 2:** `POST /v1/presentations/{id}:batchUpdate` — build all slides (11-slide persuasion arc + optional) in one atomic request; `orderedSlides` array filters out optional slides; wrapped in `withBackoff` with 401 retry
 **Phase 3:** `POST /v1/presentations/{id}:batchUpdate` — insert logos (best-effort, failures silently caught); uses fresh token from `getToken()`
 
 **Brand:** Montserrat headings, Inter body text. Brand colors are driven by `designConfig`. Logos auto-fetched via Google Favicon API (`google.com/s2/favicons?sz=128`).
@@ -191,7 +192,7 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 2. Company name auto-detection → `getBrandPalette(data.client.company)` (skipped if `disableBrandDetection`)
 3. Preset theme → `PALETTE_MAP[colorTheme]` (fallback)
 
-**Slide builders:** `titleSlide`, `challengeSlide`, `problemDeepDive`, `problemsCombined`, `solutionSlide`, `approachSlide`, `benefitsCombined`, `nextStepsSlide`, `investmentSlide`, `closingSlide`
+**Slide builders (persuasion arc):** `titleSlide`, `culturalShiftSlide`, `realProblemSlide`, `costSlide`, `coreInsightSlide`, `paramountAdvantageSlide`, `proofSlide`, `howItWorksSlide`, `customPlanSlide`, `roiFramingSlide`, `nextStepsSlide`, `closingSlide`
 
 **Logo URL:** `faviconV2?size=256` (Google's higher-res endpoint, no redirects)
 
@@ -216,14 +217,15 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 | Utility | Location | Purpose |
 |---------|----------|---------|
 | fetchWithRetry | `src/utils/fetchWithRetry.ts` | Drop-in `fetch()` replacement with exponential backoff, configurable timeout via `AbortController`, auto-retry on 429/500/502/503. Exports `FetchTimeoutError` and `FetchRetryExhaustedError` for typed catch blocks. |
-| slideBuilder | `src/utils/slideBuilder.ts` | `buildSlidesFromData()` — converts `ProposalData` into `SlideData` cards for preview (10+ when approach/next steps present) |
+| slideBuilder | `src/utils/slideBuilder.ts` | `buildSlidesFromData()` — converts `ProposalData` into the 11-slide persuasion arc `SlideData` cards for preview (+ optional next steps and additional slides) |
 | contentExpander | `src/utils/contentExpander.ts` | Template-based content expansion for problems and benefits |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | Gemini 3 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()`, `iterateDesign()`, `extractBrandVoice()`. All calls use `fetchWithRetry` + `validateGeminiBody()`. Exports `GeminiBlockedError` for typed error handling. |
+| llmService | `src/utils/llmService.ts` | Gemini 3 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()`, `iterateDesign()`, `extractBrandVoice()`. SYSTEM_PROMPT generates the 11-slide persuasion arc with dynamic client personalization, automated proof insertion (PROOF_POINTS_DATABASE), and industry-specific insights (INDUSTRY_INSIGHTS_MAP). All calls use `fetchWithRetry` + `validateGeminiBody()`. Exports `GeminiBlockedError` for typed error handling. |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS; `ensureFreshToken(bufferMs)` for long-running flows |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system; `withBackoff` retries on 429 + 401 |
 | googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies template via Drive API, auto-discovers roles, clear-and-fill from SlideData[]; `withBackoff` retries on 429 + 401 |
+| trainingContext | `src/utils/trainingContext.ts` | Pre-seeded training context for LLM: `PARAMOUNT_TRAINING_CONTEXT`, `PROOF_POINTS_DATABASE` (case study stats for automated proof insertion), `INDUSTRY_INSIGHTS_MAP` (category-specific trend insights for QSR, telecom, etc.) |
 | brandColors | `src/utils/brandColors.ts` | Brand palette derivation: `getBrandPalette(company)` for ~50 known brands; `derivePaletteFromHex(hex)` derives a full 4-stop `SlidePalette` from any hex color |
 
 ---
