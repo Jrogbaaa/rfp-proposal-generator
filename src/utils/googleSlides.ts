@@ -254,7 +254,7 @@ function paragraphSpacing(id: string, opts: {
   lineSpacing?: number
   spaceAbove?: number
   spaceBelow?: number
-}) {
+}): object {
   const style: Record<string, unknown> = {}
   const fields: string[] = []
   if (opts.lineSpacing != null) {
@@ -269,7 +269,6 @@ function paragraphSpacing(id: string, opts: {
     style.spaceBelow = { magnitude: opts.spaceBelow, unit: 'PT' }
     fields.push('spaceBelow')
   }
-  if (fields.length === 0) return null
   return {
     updateParagraphStyle: {
       objectId: id,
@@ -412,7 +411,7 @@ const LOGO_X         = PANEL_X + Math.round(PANEL_W / 2) - Math.round(LOGO_SIZE 
 const COVER_CLABEL_Y = 1286350             // client company label (e.g. "STARBUCKS")
 const COVER_CLOGO_Y  = 1526350             // client logo image
 const COVER_DIV_Y    = 2590750             // thin orange rule between logos
-const COVER_PLABEL_Y = 2682750             // "PARAMOUNT" label
+const _COVER_PLABEL_Y = 2682750            // "PARAMOUNT" label (unused — logo includes wordmark)
 const COVER_PLOGO_Y  = 2922750             // Paramount logo image
 
 /** Slide 1: Title / Cover */
@@ -421,7 +420,6 @@ function titleSlide(slideId: string, data: ProposalData, palette: SlidePalette):
   const vlineId       = `${slideId}_vline`
   const clientLblId   = `${slideId}_clbl`
   const panelDivId    = `${slideId}_pdiv`
-  const partnerLblId  = `${slideId}_plbl`
   const eyebrowId     = `${slideId}_eyebrow`
   const heroId        = `${slideId}_hero`
   const titleId       = `${slideId}_title`
@@ -1149,7 +1147,7 @@ function additionalContentSlide(
         },
       },
       paragraphSpacing(bodyId, { lineSpacing: 140, spaceBelow: 6 }),
-    ].filter(Boolean) : []),
+    ] : []),
   )
 
   return reqs
@@ -1623,7 +1621,6 @@ function appendixSlide(slideId: string, pm: ParamountMediaContent, palette: Slid
 // Logo helpers
 // ---------------------------------------------------------------------------
 
-const PARAMOUNT_DOMAIN = 'paramount.com'
 const PARAMOUNT_AD_LOGO_URL = 'https://rfp-proposal-generator-kappa.vercel.app/paramount-advertising-logo.png'
 // Google faviconV2 returns direct PNG at up to 256px — no redirects, reliable with Google Slides API.
 // The older s2/favicons maxed at 128px. faviconV2 doubles the resolution at the same zero-auth cost.
