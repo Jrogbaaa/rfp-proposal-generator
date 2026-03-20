@@ -74,6 +74,25 @@ export interface InvestmentTier {
   inclusions: string[];   // 3-5 bullet points of what's included
 }
 
+export interface ProofPoint {
+  stat: string;          // e.g. "+102% brand preference lift"
+  source: string;        // e.g. "Dunkin' × Big Brother S27"
+  context?: string;      // optional elaboration
+}
+
+export interface CustomClientPlan {
+  recommendedProperties: string[];   // specific shows/events for this client
+  formats: string[];                 // integration format types
+  audienceMatch: string;             // why this audience aligns
+  timeline?: string;                 // recommended activation window
+}
+
+export interface IndustryInsight {
+  trend: string;         // e.g. "QSR delivery app usage up 34% among Gen Z"
+  implication: string;   // what it means for this brand
+  category: string;      // industry vertical (QSR, telecom, retail, etc.)
+}
+
 export interface ParamountMediaContent {
   opportunityStatement: string;
   paramountIPAlignments: IPAlignment[];
@@ -85,6 +104,8 @@ export interface ParamountMediaContent {
   investmentTiers: InvestmentTier[];
   nextSteps: string[];
   appendixItems: string[];
+  proofPoints?: ProofPoint[];
+  industryInsights?: IndustryInsight[];
 }
 
 export interface ExpandedContent {
@@ -106,6 +127,14 @@ export interface ExpandedContent {
   deckType?: DeckType;
   showcaseContent?: ShowcaseContent;   // paramount-showcase path
   flexibleSlides?: FlexibleSlide[];    // generic path
+  // Persuasion-engine slide content
+  culturalShift?: string[];            // media fragmentation, Gen Z behavior, attention crisis
+  realProblem?: string[];              // why most brand campaigns fail today
+  costOfInaction?: string[];           // lost attention, low recall, weak connection
+  coreInsight?: string;                // the reframe — "Winning brands don't buy media — they join culture"
+  proofPoints?: ProofPoint[];          // case study stats with sources
+  customPlan?: CustomClientPlan;       // client-specific shows/events/formats/audience
+  industryInsights?: IndustryInsight[];// industry-specific trends and implications
 }
 
 export interface GeneratedContent {
