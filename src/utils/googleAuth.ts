@@ -7,17 +7,17 @@
  *
  * Scopes requested:
  *   - presentations: create & write Google Slides presentations
- *   - drive: full Drive access (required to copy shared templates)
+ *   - drive.file: per-file Drive access (app-created files + shared template copy)
  */
 
 const SCOPES = [
   'https://www.googleapis.com/auth/presentations',
-  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/drive.file',
 ].join(' ')
 
 const TOKEN_STORAGE_KEY = 'gis_access_token'
 const TOKEN_EXPIRY_KEY = 'gis_token_expires_at'
-const SCOPE_VERSION = 'v3'
+const SCOPE_VERSION = 'v4'
 const SCOPE_VERSION_KEY = 'gis_scope_version'
 const CONSENTED_KEY = 'gis_has_consented'
 

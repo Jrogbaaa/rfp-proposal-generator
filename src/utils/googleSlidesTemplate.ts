@@ -555,7 +555,7 @@ export async function createTemplatePresentation(
       if (!copyResp.ok) {
         const baseErr = await toApiError(copyResp)
         if (baseErr.message.startsWith('FORBIDDEN')) {
-          throw new Error(`${baseErr.message} (If "insufficientPermissions", ensure 'drive' scope is active in googleAuth.ts)`)
+          throw new Error(`${baseErr.message} (If "insufficientPermissions", ensure 'drive.file' scope is active and template is shared as "Anyone with the link")`)
         }
         throw baseErr
       }
