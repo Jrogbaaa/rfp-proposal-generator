@@ -5,10 +5,10 @@ function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-const MAX_BULLETS = 5
-const MAX_BULLET_CHARS = 120
+const MAX_BULLETS = 8
+const MAX_BULLET_CHARS = 300
 const MAX_STEPS = 6
-const MAX_STEP_CHARS = 100
+const MAX_STEP_CHARS = 250
 
 function truncate(text: string, max: number): string {
   if (!text || text.length <= max) return text

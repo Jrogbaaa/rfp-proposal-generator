@@ -192,6 +192,8 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 2. Company name auto-detection → `getBrandPalette(data.client.company)` (skipped if `disableBrandDetection`)
 3. Preset theme → `PALETTE_MAP[colorTheme]` (fallback)
 
+**Text fitting:** All slide builders use adaptive font sizing to avoid text truncation. `fitBullets(bullets, width, height, targetPt, minPt, maxBullets)` shrinks font from `targetPt` down to `minPt` (default 10pt) in 1pt steps until the full text fits; truncates individual bullets only at the floor size. `fitText(text, width, height, targetPt, minPt)` does the same for single text blocks (cost cards, step descriptions, integration mechanics). Both return `{ text, fontSize }`.
+
 **Slide builders (persuasion arc):** `titleSlide`, `culturalShiftSlide`, `realProblemSlide`, `costSlide`, `coreInsightSlide`, `paramountAdvantageSlide`, `proofSlide`, `howItWorksSlide`, `customPlanSlide`, `roiFramingSlide`, `nextStepsSlide`, `closingSlide`
 
 **Logo URL:** `faviconV2?size=256` (Google's higher-res endpoint, no redirects)

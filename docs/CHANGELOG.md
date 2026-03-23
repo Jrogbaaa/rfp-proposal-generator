@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-03-23] — Fix Slide Text Truncation (Ellipsis Cutoff)
+
+### Fixed
+- **`src/utils/googleSlides.ts`** — Bullet and body text on Google Slides was being hard-truncated with "..." at fixed character limits (80-200 chars) before any font sizing was attempted. Replaced `truncateBullets()` calls across all 15+ slide builder functions with new `fitBullets()` / `fitText()` helpers that shrink font size first (stepping down 1pt at a time to a 10pt floor) and only truncate as a last resort at the minimum readable size. Affected slides: additionalContentSlide, culturalShiftSlide, realProblemSlide, costSlide, coreInsightSlide, paramountAdvantageSlide, howItWorksSlide, customPlanSlide, roiFramingSlide, integrationConceptSlide, appendixSlide.
+- **`src/utils/slideBuilder.ts`** — Preview builder character limits raised from 120/100 to 300/250 chars, and max bullet count raised from 5 to 8, so in-app preview no longer clips content that will appear in full on the final slides.
+
+### Added
+- **`src/utils/googleSlides.ts`** — `fitBullets()` helper: takes bullet array + text box dimensions, tries full untruncated text at target font size, steps down by 1pt to a minimum (default 10pt), only truncates at the floor. Returns `{ text, fontSize }`.
+- **`src/utils/googleSlides.ts`** — `fitText()` helper: same adaptive approach for single text blocks (used in cost cards, how-it-works steps, integration concept mechanics).
+
+---
+
 ## [2026-03-20] — Persuasion-Engine Presentation Template Overhaul
 
 ### Added

@@ -208,7 +208,7 @@ function paragraphAlign(id: string, alignment: 'START' | 'CENTER' | 'END' = 'STA
 // any updateShapeProperties with fields: 'autofit' returns a 400.
 // Text boxes are sized generously at creation time instead.
 
-/** Truncate a string to maxChars at a word boundary. */
+/** Truncate a string to maxChars at a word boundary (last-resort only). */
 function truncate(text: string, maxChars: number, suffix = '…'): string {
   if (!text || text.length <= maxChars) return text
   const cut = text.slice(0, maxChars - suffix.length)
@@ -216,13 +216,9 @@ function truncate(text: string, maxChars: number, suffix = '…'): string {
   return (lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut) + suffix
 }
 
-/** Limit bullet list length and truncate each bullet to avoid text box overflow. */
-function truncateBullets(bullets: string[], maxBullets = 5, maxBulletChars = 120): string[] {
-  return bullets.slice(0, maxBullets).map(b => truncate(b, maxBulletChars))
-}
-
 // ---------------------------------------------------------------------------
-// Adaptive font sizing — prevents text overflow in dynamically-sized titles
+// Adaptive font sizing — prevents text overflow by shrinking font first,
+// truncating only as a last resort at the minimum readable size.
 // ---------------------------------------------------------------------------
 
 const EMU_PER_PT = 12700
@@ -247,6 +243,60 @@ function adaptiveFontSize(
     if (text.length <= estimateMaxChars(heightEmu, widthEmu, pt)) return pt
   }
   return minPt
+}
+
+interface FitResult { text: string; fontSize: number }
+
+/**
+ * Fit a block of bullet text into a text box by first shrinking the font,
+ * then truncating individual bullets only at the minimum font size.
+ */
+function fitBullets(
+  bullets: string[],
+  widthEmu: number,
+  heightEmu: number,
+  targetPt: number,
+  minPt: number = 10,
+  maxBullets: number = 8,
+): FitResult {
+  const safe = bullets.filter(b => b.trim()).slice(0, maxBullets)
+  if (safe.length === 0) return { text: '', fontSize: targetPt }
+
+  const fullText = safe.join('\n')
+
+  for (let pt = targetPt; pt >= minPt; pt -= 1) {
+    if (fullText.length <= estimateMaxChars(heightEmu, widthEmu, pt)) {
+      return { text: fullText, fontSize: pt }
+    }
+  }
+
+  const capacity = estimateMaxChars(heightEmu, widthEmu, minPt)
+  const perBullet = Math.max(40, Math.floor((capacity - safe.length + 1) / safe.length))
+  const trimmed = safe.map(b => truncate(b, perBullet))
+  return { text: trimmed.join('\n'), fontSize: minPt }
+}
+
+/**
+ * Fit a single block of text into a text box by shrinking font first,
+ * truncating only at the minimum font size.
+ */
+function fitText(
+  text: string,
+  widthEmu: number,
+  heightEmu: number,
+  targetPt: number,
+  minPt: number = 10,
+): FitResult {
+  if (!text) return { text: '', fontSize: targetPt }
+
+  for (let pt = targetPt; pt >= minPt; pt -= 1) {
+    if (text.length <= estimateMaxChars(heightEmu, widthEmu, pt)) {
+      return { text, fontSize: pt }
+    }
+  }
+
+  const capacity = estimateMaxChars(heightEmu, widthEmu, minPt)
+  return { text: truncate(text, capacity), fontSize: minPt }
 }
 
 /** Build an updateParagraphStyle request for spacing / line height. */
@@ -631,7 +681,10 @@ function additionalContentSlide(
   const isDark    = opts.boldAgency || opts.minimal
   const textColor = isDark ? WHITE : palette.primary
   const accentW   = opts.minimal ? 6000 : 12000
-  const safeBullets = truncateBullets(bullets.filter(b => b.trim()), 5, 100)
+
+  const BODY_W = FULL_W - 80000
+  const BODY_H = 2900000
+  const fit = fitBullets(bullets, BODY_W, BODY_H, 18, 10, 8)
 
   const reqs: object[] = [
     bgFill(slideId, isDark ? palette.primary : WHITE),
@@ -658,10 +711,10 @@ function additionalContentSlide(
       styleText(headId, { color: textColor, fontSize: headFontSize, fontFamily: 'Montserrat', bold: true }),
     ] : []),
 
-    createTextBox(bodyId, slideId, MARGIN_X + 80000, 1700000, FULL_W - 80000, 2900000),
-    ...(safeBullets.length ? [
-      insertText(bodyId, safeBullets.join('\n')),
-      styleText(bodyId, { color: isDark ? LTGRAY : palette.primary, fontSize: 18, fontFamily: 'Inter' }),
+    createTextBox(bodyId, slideId, MARGIN_X + 80000, 1700000, BODY_W, BODY_H),
+    ...(fit.text ? [
+      insertText(bodyId, fit.text),
+      styleText(bodyId, { color: isDark ? LTGRAY : palette.primary, fontSize: fit.fontSize, fontFamily: 'Inter' }),
       {
         createParagraphBullets: {
           objectId: bodyId,
@@ -708,16 +761,21 @@ function culturalShiftSlide(slideId: string, data: ProposalData, palette: SlideP
     styleText(headId, { color: WHITE, fontSize: 40, fontFamily: 'Montserrat', bold: true }),
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1300000, FULL_W - 80000, 3200000),
-    insertText(bodyId, truncateBullets(bullets, 4, 140).join('\n')),
-    styleText(bodyId, { color: LTGRAY, fontSize: 18, fontFamily: 'Inter' }),
-    {
-      createParagraphBullets: {
-        objectId: bodyId,
-        textRange: { type: 'ALL' },
-        bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
-      },
-    },
-    paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+    ...(() => {
+      const fit = fitBullets(bullets, FULL_W - 80000, 3200000, 18, 10, 6)
+      return fit.text ? [
+        insertText(bodyId, fit.text),
+        styleText(bodyId, { color: LTGRAY, fontSize: fit.fontSize, fontFamily: 'Inter' }),
+        {
+          createParagraphBullets: {
+            objectId: bodyId,
+            textRange: { type: 'ALL' },
+            bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+          },
+        },
+        paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+      ] : []
+    })(),
   )
 
   if (!opts.minimal) {
@@ -754,16 +812,21 @@ function realProblemSlide(slideId: string, data: ProposalData, palette: SlidePal
     ...createRect(`${slideId}_rule`, slideId, MARGIN_X, 1300000, FULL_W, 6000, palette.accent),
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1450000, FULL_W - 80000, 3000000),
-    insertText(bodyId, truncateBullets(bullets, 4, 140).join('\n')),
-    styleText(bodyId, { color: LTGRAY, fontSize: 20, fontFamily: 'Inter' }),
-    {
-      createParagraphBullets: {
-        objectId: bodyId,
-        textRange: { type: 'ALL' },
-        bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
-      },
-    },
-    paragraphSpacing(bodyId, { lineSpacing: 180, spaceBelow: 10 }),
+    ...(() => {
+      const fit = fitBullets(bullets, FULL_W - 80000, 3000000, 20, 10, 6)
+      return fit.text ? [
+        insertText(bodyId, fit.text),
+        styleText(bodyId, { color: LTGRAY, fontSize: fit.fontSize, fontFamily: 'Inter' }),
+        {
+          createParagraphBullets: {
+            objectId: bodyId,
+            textRange: { type: 'ALL' },
+            bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+          },
+        },
+        paragraphSpacing(bodyId, { lineSpacing: 180, spaceBelow: 10 }),
+      ] : []
+    })(),
 
     ...paramountFooter(slideId, palette),
   ]
@@ -801,13 +864,16 @@ function costSlide(slideId: string, data: ProposalData, palette: SlidePalette, _
     const cardX = MARGIN_X + i * (cardW + 100000)
     const cardId = `${slideId}_card${i}`
     const textId = `${slideId}_ctext${i}`
+    const textW = cardW - 160000
+    const textH = cardH - 200000
+    const costFit = fitText(cost, textW, textH, 16, 10)
 
     reqs.push(
       ...createRect(cardId, slideId, cardX, cardY, cardW, cardH, palette.primaryLighter),
       ...createRect(`${slideId}_crule${i}`, slideId, cardX, cardY, cardW, 8000, palette.accent),
-      createTextBox(textId, slideId, cardX + 80000, cardY + 120000, cardW - 160000, cardH - 200000),
-      insertText(textId, truncate(cost, 180)),
-      styleText(textId, { color: LTGRAY, fontSize: 16, fontFamily: 'Inter' }),
+      createTextBox(textId, slideId, cardX + 80000, cardY + 120000, textW, textH),
+      insertText(textId, costFit.text),
+      styleText(textId, { color: LTGRAY, fontSize: costFit.fontSize, fontFamily: 'Inter' }),
     )
   })
 
@@ -844,16 +910,21 @@ function coreInsightSlide(slideId: string, data: ProposalData, palette: SlidePal
     ...createRect(`${slideId}_rule`, slideId, MARGIN_X, 2000000, Math.round(FULL_W * 0.4), 8000, palette.primary),
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 2200000, FULL_W - 80000, 2400000),
-    insertText(bodyId, truncateBullets(examples, 4, 140).join('\n')),
-    styleText(bodyId, { color: palette.primaryDarker, fontSize: 16, fontFamily: 'Inter' }),
-    {
-      createParagraphBullets: {
-        objectId: bodyId,
-        textRange: { type: 'ALL' },
-        bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
-      },
-    },
-    paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+    ...(() => {
+      const fit = fitBullets(examples, FULL_W - 80000, 2400000, 16, 10, 6)
+      return fit.text ? [
+        insertText(bodyId, fit.text),
+        styleText(bodyId, { color: palette.primaryDarker, fontSize: fit.fontSize, fontFamily: 'Inter' }),
+        {
+          createParagraphBullets: {
+            objectId: bodyId,
+            textRange: { type: 'ALL' },
+            bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+          },
+        },
+        paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+      ] : []
+    })(),
 
     ...createRect(`${slideId}_fbar`, slideId, 0, H - 60000, W, 60000, palette.primary),
     ...(() => {
@@ -895,16 +966,22 @@ function paramountAdvantageSlide(slideId: string, pm: ParamountMediaContent | un
     ...createRect(`${slideId}_rule`, slideId, MARGIN_X, 1320000, FULL_W, 6000, palette.accent),
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1450000, FULL_W - 80000, 3000000),
-    insertText(bodyId, truncateBullets(pm?.opportunityStatement ? [pm.opportunityStatement, ...advantages] : advantages, 5, 140).join('\n')),
-    styleText(bodyId, { color: LTGRAY, fontSize: 17, fontFamily: 'Inter' }),
-    {
-      createParagraphBullets: {
-        objectId: bodyId,
-        textRange: { type: 'ALL' },
-        bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
-      },
-    },
-    paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+    ...(() => {
+      const allBullets = pm?.opportunityStatement ? [pm.opportunityStatement, ...advantages] : advantages
+      const fit = fitBullets(allBullets, FULL_W - 80000, 3000000, 17, 10, 6)
+      return fit.text ? [
+        insertText(bodyId, fit.text),
+        styleText(bodyId, { color: LTGRAY, fontSize: fit.fontSize, fontFamily: 'Inter' }),
+        {
+          createParagraphBullets: {
+            objectId: bodyId,
+            textRange: { type: 'ALL' },
+            bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+          },
+        },
+        paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+      ] : []
+    })(),
   ]
 
   reqs.push(...paramountFooter(slideId, palette))
@@ -1006,6 +1083,9 @@ function howItWorksSlide(slideId: string, data: ProposalData, palette: SlidePale
     const numId = `${slideId}_num${i}`
     const cardId = `${slideId}_step${i}`
     const textId = `${slideId}_stext${i}`
+    const stepTextW = stepW - 160000
+    const stepTextH = stepH - 600000
+    const stepFit = fitText(step, stepTextW, stepTextH, 14, 10)
 
     reqs.push(
       ...createRect(cardId, slideId, stepX, stepY, stepW, stepH, palette.primaryLighter),
@@ -1015,9 +1095,9 @@ function howItWorksSlide(slideId: string, data: ProposalData, palette: SlidePale
       insertText(numId, String(i + 1).padStart(2, '0')),
       styleText(numId, { color: palette.accent, fontSize: 32, fontFamily: 'Montserrat', bold: true }),
 
-      createTextBox(textId, slideId, stepX + 80000, stepY + 500000, stepW - 160000, stepH - 600000),
-      insertText(textId, truncate(step, 200)),
-      styleText(textId, { color: LTGRAY, fontSize: 14, fontFamily: 'Inter' }),
+      createTextBox(textId, slideId, stepX + 80000, stepY + 500000, stepTextW, stepTextH),
+      insertText(textId, stepFit.text),
+      styleText(textId, { color: LTGRAY, fontSize: stepFit.fontSize, fontFamily: 'Inter' }),
     )
   })
 
@@ -1064,16 +1144,21 @@ function customPlanSlide(slideId: string, data: ProposalData, palette: SlidePale
     ...createRect(`${slideId}_rule`, slideId, MARGIN_X, 1320000, FULL_W, 6000, palette.accent),
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1450000, FULL_W - 80000, 3000000),
-    insertText(bodyId, truncateBullets(bullets, 5, 140).join('\n')),
-    styleText(bodyId, { color: LTGRAY, fontSize: 18, fontFamily: 'Inter' }),
-    {
-      createParagraphBullets: {
-        objectId: bodyId,
-        textRange: { type: 'ALL' },
-        bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
-      },
-    },
-    paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+    ...(() => {
+      const fit = fitBullets(bullets, FULL_W - 80000, 3000000, 18, 10, 6)
+      return fit.text ? [
+        insertText(bodyId, fit.text),
+        styleText(bodyId, { color: LTGRAY, fontSize: fit.fontSize, fontFamily: 'Inter' }),
+        {
+          createParagraphBullets: {
+            objectId: bodyId,
+            textRange: { type: 'ALL' },
+            bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+          },
+        },
+        paragraphSpacing(bodyId, { lineSpacing: 160, spaceBelow: 8 }),
+      ] : []
+    })(),
 
     ...paramountFooter(slideId, palette),
   ]
@@ -1133,18 +1218,23 @@ function roiFramingSlide(slideId: string, data: ProposalData, pm: ParamountMedia
       )
 
       if (tier.inclusions && tier.inclusions.length > 0) {
-        reqs.push(
-          createTextBox(inclId, slideId, cardX + 80000, cardYpos + 920000, cardW - 160000, cardHt - 1000000),
-          insertText(inclId, truncateBullets(tier.inclusions, 5, 80).join('\n')),
-          styleText(inclId, { color: textColor, fontSize: 12, fontFamily: 'Inter' }),
-          {
-            createParagraphBullets: {
-              objectId: inclId,
-              textRange: { type: 'ALL' },
-              bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+        const inclW = cardW - 160000
+        const inclH = cardHt - 1000000
+        const inclFit = fitBullets(tier.inclusions, inclW, inclH, 12, 8, 6)
+        if (inclFit.text) {
+          reqs.push(
+            createTextBox(inclId, slideId, cardX + 80000, cardYpos + 920000, inclW, inclH),
+            insertText(inclId, inclFit.text),
+            styleText(inclId, { color: textColor, fontSize: inclFit.fontSize, fontFamily: 'Inter' }),
+            {
+              createParagraphBullets: {
+                objectId: inclId,
+                textRange: { type: 'ALL' },
+                bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+              },
             },
-          },
-        )
+          )
+        }
       }
     })
   } else {
@@ -1333,10 +1423,14 @@ function integrationConceptSlide(slideId: string, concept: IntegrationConcept, i
     styleText(rightLblId, { color: palette.accent, fontSize: 10, fontFamily: 'Inter', bold: true }),
 
     createTextBox(rightMechId, slideId, splitX + MARGIN_X + 12000, 500000, W - splitX - MARGIN_X * 2 - 12000, 2500000),
-    ...(concept.mechanic ? [
-      insertText(rightMechId, truncate(concept.mechanic, 450)),
-      styleText(rightMechId, { color: palette.primary, fontSize: 17, fontFamily: 'Inter' }),
-    ] : []),
+    ...(concept.mechanic ? (() => {
+      const mechW = W - splitX - MARGIN_X * 2 - 12000
+      const mechFit = fitText(concept.mechanic, mechW, 2500000, 17, 10)
+      return [
+        insertText(rightMechId, mechFit.text),
+        styleText(rightMechId, { color: palette.primary, fontSize: mechFit.fontSize, fontFamily: 'Inter' }),
+      ]
+    })() : []),
 
     ...createRect(`${slideId}_outrule`, slideId, splitX + MARGIN_X + 12000, 3200000, W - splitX - MARGIN_X * 2 - 12000, 4000, palette.primary),
 
@@ -1516,17 +1610,20 @@ function appendixSlide(slideId: string, pm: ParamountMediaContent, palette: Slid
     styleText(headId, { color: WHITE, fontSize: 34, fontFamily: 'Montserrat', bold: true }),
 
     createTextBox(bodyId, slideId, MARGIN_X + 80000, 1200000, FULL_W - 80000, 3400000),
-    ...(items.length ? [
-      insertText(bodyId, truncateBullets(items, 6, 140).join('\n')),
-      styleText(bodyId, { color: LTGRAY, fontSize: 16, fontFamily: 'Inter' }),
-      {
-        createParagraphBullets: {
-          objectId: bodyId,
-          textRange: { type: 'ALL' },
-          bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+    ...(() => {
+      const fit = fitBullets(items, FULL_W - 80000, 3400000, 16, 10, 8)
+      return fit.text ? [
+        insertText(bodyId, fit.text),
+        styleText(bodyId, { color: LTGRAY, fontSize: fit.fontSize, fontFamily: 'Inter' }),
+        {
+          createParagraphBullets: {
+            objectId: bodyId,
+            textRange: { type: 'ALL' },
+            bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE',
+          },
         },
-      },
-    ] : []),
+      ] : []
+    })(),
 
     ...paramountFooter(slideId, palette),
   ]

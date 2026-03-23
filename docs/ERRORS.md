@@ -37,6 +37,19 @@ When you encounter an error:
 
 ## Google Slides / OAuth Errors
 
+### Slide text cut off with "..." — bullets and body text truncated mid-sentence
+**Error:** Generated Google Slides presentations show "..." at the end of bullet points and body text, cutting off content mid-sentence. Visible on content slides, cost cards, how-it-works steps, and ROI tier inclusions.
+
+**Cause:** `truncateBullets()` and `truncate()` in `googleSlides.ts` hard-cut text at fixed character limits (80-200 chars depending on slide type) and appended an ellipsis `…` — BEFORE attempting any font size reduction. The `adaptiveFontSize()` system existed but was only applied to title/heading text, never to body/bullet text.
+
+**Solution:** Replaced all `truncateBullets()` / `truncate()` calls in slide builder functions with two new adaptive helpers:
+1. `fitBullets(bullets, width, height, targetPt, minPt, maxBullets)` — tries full untruncated text at target font, steps down by 1pt to a 10pt floor, only truncates individual bullets at the minimum font size if text still overflows. Returns `{ text, fontSize }`.
+2. `fitText(text, width, height, targetPt, minPt)` — same approach for single text blocks (cost cards, step descriptions, integration mechanics).
+
+Each slide builder function now passes its actual text box EMU dimensions to these helpers, so font reduction is box-aware. Preview limits in `slideBuilder.ts` also raised (120→300 chars, 100→250 for steps) to avoid clipping in the in-app preview.
+
+---
+
 ### Programmatic slides have overlapping text — headings overflow into body content
 **Error:** Generated Google Slides presentations show heading text overlapping with bullet content below. Visible on content slides with long LLM-generated titles (e.g. "Live Sports: The Ultimate Reach Vehicle") and on the title slide when the project title wraps to 2+ lines.
 
