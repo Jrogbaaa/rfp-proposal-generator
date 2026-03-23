@@ -32,7 +32,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Workflow Steps:**
 1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content chat, sticky sidebar, slide preview with inline editing, export) → 3. Export (success screen with Google Slides link and mailto)
 
-**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing "Refine Content" label, `ChatInterface` (flex-1, overflow-y-auto wrapper), and `GoogleSlidesButton` pinned at the bottom. Brand color picker was removed from this panel. Does not scroll with the slide preview.
+**Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing `ChatInterface` in a cream rounded container (flex-1, overflow-hidden — chat handles its own scrolling) and `GoogleSlidesButton` pinned at the bottom. The "Refine Content" label was removed; the ChatInterface header ("AI Copywriter") now self-identifies. Does not scroll with the slide preview.
 
 **Brand Color / Design Config:** `designConfig.customBrandHex` is still respected by `googleSlides.ts` (palette priority: custom hex → company auto-detect → preset theme), but the hex input UI was removed from the Refine sidebar to reduce crowding.
 
@@ -59,7 +59,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 ---
 
 ### ChatInterface.tsx
-**Purpose:** Step 2 AI chat interface for multi-turn content iteration on the generated proposal.
+**Purpose:** Step 2 AI chat interface for multi-turn content iteration on the generated proposal. Designed to be immediately recognizable as a chatbot/AI assistant.
 
 **Props:**
 - `briefText: string` — Raw brief text passed to Gemini as context
@@ -67,12 +67,17 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `onExpansionsUpdated` — Callback fired when Gemini returns updated `problemExpansions` and/or `benefitExpansions`; `App.tsx` stores these for passing to `GoogleSlidesButton` as `preGeneratedContent`
 - `brandVoice?: BrandVoiceProfile` — Optional structured brand voice profile; forwarded to `iterateProposalContent()` as typed constraints ensuring refinements maintain the client's writing style
 
+**UI Structure:**
+- **Chat header** — "AI Copywriter" label with gold-gradient bot avatar (`BotAvatar` component), live status indicator (green "Ready" or amber pulsing "Writing"), and subtitle "Edits update slides in real time"
+- **Message list** — Scrollable area with bot avatar on each assistant message; white bg + border for assistant bubbles, navy bg for user bubbles
+- **Suggested prompts** — Horizontal scroll strip (hidden scrollbar) with 6 emoji-prefixed pills; only visible before first user message. Prompts: More concise, Stronger ROI, Formal tone, More persuasive, Add urgency, Add metrics
+- **Input area** — Single-row auto-expanding textarea (max 120px height) with inline send button inside the input container border; placeholder "Tell me how to change the slides..."
+
 **Features:**
 - Multi-turn conversation history preserved across messages
-- Suggested prompt chips for common requests (tone changes, language adjustments, focus shifts)
+- Auto-resize textarea grows with content up to 120px then scrolls
 - Calls `iterateProposalContent()` from `llmService.ts`
 - Displays Gemini reply text; silently updates expansions in the background via callback
-- **Textarea** `rows={3}` with visible thin scrollbar on the messages area
 
 **LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history, brandVoice?: BrandVoiceProfile)` → `{reply, updatedExpansions?}`
 
@@ -313,5 +318,5 @@ The Express backend (`server/`) runs locally in dev. For production on Vercel, e
 ---
 
 ## Last Updated
-- Date: 2026-03-18
-- Changes: Short-prompt slide preview fix (hasRealData guard), app branding alignment (Paramount Proj), legal pages (privacy/terms), Google OAuth verification files
+- Date: 2026-03-23
+- Changes: Chatbot UI redesign — AI Copywriter header, horizontal scroll prompts, auto-expanding input, removed "Refine Content" label

@@ -626,15 +626,10 @@ export default function App() {
                   </div>
                 </section>
 
-                {/* Right: Content/Design Chat + Export — sticky so it stays in viewport while slides scroll */}
+                {/* Right: AI Chat + Export — sticky so it stays in viewport while slides scroll */}
                 <section className="bg-navy-800 flex flex-col lg:sticky lg:top-[8.5rem] lg:h-[calc(100vh-8.5rem)] overflow-hidden">
-                  <div className="flex flex-col h-full p-6 lg:p-8">
-                    {/* Section label */}
-                    <div className="mb-4">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-navy-400">Refine Content</p>
-                    </div>
-
-                    <div className="flex-1 min-h-0 bg-cream-50 rounded-xl p-4 overflow-y-auto">
+                  <div className="flex flex-col h-full p-4 lg:p-5">
+                    <div className="flex-1 min-h-0 bg-cream-50 rounded-xl p-3.5 overflow-hidden">
                       <ChatInterface
                         briefText={briefText}
                         parsedData={parsedData || {}}
@@ -648,7 +643,7 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="mt-3 pt-3 border-t border-white/10">
                       <GoogleSlidesButton
                         data={parsedData}
                         briefText={briefText}

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-03-23] — Chatbot UI Redesign
+
+### Changed
+- **`src/components/ChatInterface.tsx`** — Complete redesign of the Refine step chat panel to make it unmistakably a chatbot. Added a dedicated "AI Copywriter" header bar with gold-gradient bot avatar, status indicator (Ready/Writing), and subtitle "Edits update slides in real time". Suggested prompts redesigned from wrapped flex buttons to a compact horizontal scroll strip with emoji-prefixed labels and no-scrollbar overflow. Input area changed from 3-row textarea + adjacent send button to a single-row auto-expanding textarea (max 120px) with inline send button inside the input container. Message bubbles now use white bg with subtle border for assistant messages. Bot avatar reused as a reusable `BotAvatar` component with `sm`/`md` sizes.
+- **`src/App.tsx`** — Removed redundant "Refine Content" section label from the iterate step sidebar (the ChatInterface header now self-identifies). Tightened sidebar padding from `p-6 lg:p-8` to `p-4 lg:p-5` and chat container from `p-4` to `p-3.5` to maximize vertical space. Changed chat container from `overflow-y-auto` to `overflow-hidden` (ChatInterface handles its own scrolling). Reduced GoogleSlidesButton spacing from `mt-4 pt-4` to `mt-3 pt-3`.
+
+---
+
 ## [2026-03-23] — Fix Slide Text Truncation (Ellipsis Cutoff)
 
 ### Fixed
