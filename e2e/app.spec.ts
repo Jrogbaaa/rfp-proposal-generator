@@ -195,7 +195,7 @@ async function goToIterateStep(page: Page) {
   await page.locator('textarea').fill(SAMPLE_BRIEF)
   await page.getByRole('button', { name: 'Continue to Refine' }).click()
   await expect(
-    page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
   ).toBeVisible({ timeout: 10000 })
 }
 
@@ -209,7 +209,7 @@ async function goToShareStep(page: Page) {
   await page.locator('textarea').fill(SAMPLE_BRIEF)
   await page.getByRole('button', { name: 'Continue to Refine' }).click()
   await expect(
-    page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
   ).toBeVisible({ timeout: 10000 })
   await page.getByLabel('Create Google Slides presentation').click()
   await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
@@ -377,10 +377,10 @@ test.describe('Step 2 – Slide Preview', () => {
     await expect(page.getByText('Slide Preview')).toBeVisible()
   })
 
-  test('right sidebar shows Refine Content label and chat input', async ({ page }) => {
+  test('right sidebar shows AI Copywriter header and chat input', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByText('Refine Content', { exact: true })).toBeVisible()
-    await expect(page.locator('textarea[placeholder*="Ask for changes"]')).toBeVisible()
+    await expect(page.getByText('AI Copywriter')).toBeVisible()
+    await expect(page.locator('textarea[placeholder*="Tell me how to change"]')).toBeVisible()
   })
 
   test('export button is visible in the sidebar', async ({ page }) => {
@@ -395,25 +395,25 @@ test.describe('Step 2 – Chat Interface', () => {
   test('shows AI greeting message on load', async ({ page }) => {
     await goToIterateStep(page)
     // Find the first assistant message bubble
-    const greeting = page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    const greeting = page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     await expect(greeting).toBeVisible()
   })
 
   test('greeting references the client company name', async ({ page }) => {
     await goToIterateStep(page)
-    const greeting = page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+    const greeting = page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     await expect(greeting).toContainText('Starbucks')
   })
 
   test('shows all 6 suggested prompts on first load', async ({ page }) => {
     await goToIterateStep(page)
     for (const prompt of [
-      'Make it more concise',
-      'Add stronger ROI focus',
-      'Use a more formal tone',
-      'Make it more persuasive',
-      'Highlight urgency',
-      'Add specific metrics',
+      'Suggest: More concise',
+      'Suggest: Stronger ROI',
+      'Suggest: Formal tone',
+      'Suggest: More persuasive',
+      'Suggest: Add urgency',
+      'Suggest: Add metrics',
     ]) {
       await expect(page.getByRole('button', { name: prompt })).toBeVisible()
     }
@@ -422,22 +422,20 @@ test.describe('Step 2 – Chat Interface', () => {
   test('chat textarea has correct placeholder text', async ({ page }) => {
     await goToIterateStep(page)
     await expect(
-      page.locator('textarea[placeholder*="Ask for changes"]')
+      page.locator('textarea[placeholder*="Tell me how to change"]')
     ).toBeVisible()
   })
 
   test('clicking a suggested prompt sends the message', async ({ page }) => {
     await goToIterateStep(page)
-    await page.getByRole('button', { name: 'Make it more concise' }).click()
-    // User message bubble appears
-    const userBubble = page.locator('[class*="bg-navy-700"]').filter({ hasText: 'Make it more concise' })
+    await page.getByRole('button', { name: 'Suggest: More concise' }).click()
+    const userBubble = page.locator('[class*="bg-navy-700"]').filter({ hasText: 'More concise' })
     await expect(userBubble).toBeVisible()
   })
 
   test('AI responds after a suggested prompt is sent', async ({ page }) => {
     await goToIterateStep(page)
-    await page.getByRole('button', { name: 'Make it more concise' }).click()
-    // AI reply from mock — wait for the assistant bubble
+    await page.getByRole('button', { name: 'Suggest: More concise' }).click()
     const replyBubble = page.locator('[class*="rounded-2xl"]').filter({
       hasText: "I've tightened the language across all sections"
     }).first()
@@ -446,7 +444,7 @@ test.describe('Step 2 – Chat Interface', () => {
 
   test('typing a custom message and pressing Enter sends it', async ({ page }) => {
     await goToIterateStep(page)
-    const chatTextarea = page.locator('textarea[placeholder*="Ask for changes"]')
+    const chatTextarea = page.locator('textarea[placeholder*="Tell me how to change"]')
     await chatTextarea.fill('Focus more on cost savings')
     await chatTextarea.press('Enter')
     const userBubble = page.locator('[class*="bg-navy-700"]').filter({ hasText: 'Focus more on cost savings' })
@@ -459,14 +457,12 @@ test.describe('Step 2 – Chat Interface', () => {
 
   test('suggested prompts disappear after first exchange', async ({ page }) => {
     await goToIterateStep(page)
-    await page.getByRole('button', { name: 'Make it more concise' }).click()
-    // Wait for AI reply
+    await page.getByRole('button', { name: 'Suggest: More concise' }).click()
     await expect(page.locator('[class*="rounded-2xl"]').filter({
       hasText: "I've tightened the language across all sections"
     }).first()).toBeVisible({ timeout: 10000 })
-    // Prompts should now be hidden (messages.length > 1)
     await expect(
-      page.getByRole('button', { name: 'Add stronger ROI focus' })
+      page.getByRole('button', { name: 'Suggest: Stronger ROI' })
     ).not.toBeVisible()
   })
 })
@@ -642,7 +638,7 @@ test.describe('Step 2 – Slide Preview Structure', () => {
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     await expect(page.getByText('Next Steps')).toBeVisible({ timeout: 10000 })
@@ -665,7 +661,7 @@ test.describe('Step 2 – Slide Preview Structure', () => {
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     await expect(page.getByText('Next Steps')).toBeVisible({ timeout: 10000 })
@@ -714,7 +710,7 @@ test.describe('Error and auth failure scenarios', () => {
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     await page.getByLabel('Create Google Slides presentation').click()
@@ -756,7 +752,7 @@ test.describe('Error and auth failure scenarios', () => {
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     await page.getByLabel('Create Google Slides presentation').click()
@@ -777,7 +773,7 @@ test.describe('Error and auth failure scenarios', () => {
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     // First attempt — fails with auth error
@@ -924,7 +920,7 @@ test.describe('Resilience Hardening', () => {
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     await page.getByLabel('Create Google Slides presentation').click()
@@ -1013,7 +1009,7 @@ test.describe('Resilience Hardening', () => {
     await page.locator('textarea').fill(SAMPLE_BRIEF)
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     await page.getByLabel('Create Google Slides presentation').click()
@@ -1035,11 +1031,11 @@ test.describe('Resilience Hardening', () => {
     // Step 2: Navigate to Refine
     await page.getByRole('button', { name: 'Continue to Refine' }).click()
     await expect(
-      page.locator('[class*="rounded-2xl"]').filter({ hasText: "Hi! I've reviewed the brief for" }).first()
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
     // Step 3: Chat interaction
-    await page.getByRole('button', { name: 'Make it more concise' }).click()
+    await page.getByRole('button', { name: 'Suggest: More concise' }).click()
     const replyBubble = page.locator('[class*="rounded-2xl"]').filter({
       hasText: "I've tightened the language across all sections"
     }).first()
