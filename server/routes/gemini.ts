@@ -31,17 +31,29 @@ router.post('/generate-content', express.json({ limit: '2mb' }), async (req: Req
   if (!GEMINI_API_KEY) return missingKey(res)
 
   try {
+    const body = { ...req.body }
+    if (body.generationConfig?.thinkingConfig) {
+      const tc = body.generationConfig.thinkingConfig
+      if ('thinkingBudget' in tc && !('thinkingLevel' in tc)) {
+        body.generationConfig = {
+          ...body.generationConfig,
+          thinkingConfig: { thinkingLevel: tc.thinkingBudget === 0 ? 'low' : 'medium' },
+        }
+      }
+    }
+
     const geminiRes = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(body),
     })
 
     const data = await geminiRes.json()
     return res.status(geminiRes.status).json(data)
-  } catch (err) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
     console.error('[Gemini proxy] generate-content error:', err)
-    return res.status(502).json({ error: 'Failed to reach Gemini API' })
+    return res.status(502).json({ error: 'Failed to reach Gemini API', detail: message })
   }
 })
 

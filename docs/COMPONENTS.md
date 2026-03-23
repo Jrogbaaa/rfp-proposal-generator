@@ -317,6 +317,12 @@ The Express backend (`server/`) runs locally in dev. For production on Vercel, e
 
 ---
 
+## Backend Parity
+
+The Express dev server (`server/routes/gemini.ts`) and Vercel serverless functions (`api/gemini/generate-content.ts`) both normalize Gemini 2.5-style `thinkingConfig.thinkingBudget` to Gemini 3-style `thinkingConfig.thinkingLevel`. Both return error `detail` fields in 502 responses. This ensures identical behavior between local development and production.
+
+---
+
 ## Last Updated
 - Date: 2026-03-23
-- Changes: Chatbot UI redesign — AI Copywriter header, horizontal scroll prompts, auto-expanding input, removed "Refine Content" label
+- Changes: Backend parity fix — Express generate-content route now normalizes thinkingConfig and includes error detail, matching Vercel serverless function

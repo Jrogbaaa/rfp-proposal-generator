@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-03-23] — Backend Parity Fix (Express ↔ Vercel)
+
+### Fixed
+- **`server/routes/gemini.ts`** — Express `generate-content` proxy now normalizes Gemini 2.5-style `thinkingConfig.thinkingBudget` to Gemini 3-style `thinkingConfig.thinkingLevel`, matching the Vercel serverless function (`api/gemini/generate-content.ts`). Previously, dev (Express) forwarded the request body as-is while prod (Vercel) performed the normalization, causing inconsistent behavior between environments. Error responses now include a `detail` field with the upstream error message, also matching the Vercel function.
+
+### Verified
+- Full QA pass on `http://localhost:5173/`: Step 1 (Prompt tab text input, brief parsing, "Continue to refine" button), Step 2 (AI content generation via Gemini, slide preview with 11+ persuasion arc slides, ChatInterface refinement with real-time slide updates), backend API endpoints (`/api/health`, `/api/brand-voice`, `/api/proposals`, `/api/gemini/generate-content`), static pages (`/privacy.html`, `/terms.html`). All features working correctly.
+
+---
+
 ## [2026-03-23] — Chatbot UI Redesign
 
 ### Changed

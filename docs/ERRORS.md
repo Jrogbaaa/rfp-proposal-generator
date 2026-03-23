@@ -482,6 +482,18 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 | 2026-03-17 | OAuth token expires during multi-step generation | src/utils/googleAuth.ts | Added ensureFreshToken(bufferMs=120000) + token-getter callbacks | Fixed |
 | 2026-03-17 | Google Slides 401 mid-batch not retried | src/utils/googleSlides.ts | Extended withBackoff to handle AUTH_EXPIRED with token refresh | Fixed |
 | 2026-03-17 | Initial presentation creation has no retry | src/utils/googleSlides.ts | Wrapped POST create + Drive copy in withBackoff | Fixed |
+| 2026-03-23 | Express/Vercel thinkingConfig format mismatch | server/routes/gemini.ts | Added thinkingBudget→thinkingLevel normalization to Express route | Fixed |
+
+---
+
+### Express vs Vercel behavior mismatch — thinkingConfig format
+**Error:** Gemini API returns errors or unexpected behavior in local dev but works in production (or vice versa).
+
+**Cause:** The Express dev server (`server/routes/gemini.ts`) was forwarding the Gemini request body as-is, while the Vercel serverless function (`api/gemini/generate-content.ts`) normalized `thinkingConfig.thinkingBudget` (Gemini 2.5 format) to `thinkingConfig.thinkingLevel` (Gemini 3 format). When the client sent `{ thinkingBudget: 0 }`, production converted it to `{ thinkingLevel: 'low' }` but dev passed it through unchanged.
+
+**Solution:** Added the same normalization logic to the Express route: if `thinkingBudget` is present without `thinkingLevel`, convert `thinkingBudget: 0` to `thinkingLevel: 'low'` and any other value to `thinkingLevel: 'medium'`.
+
+**Fix applied:** `server/routes/gemini.ts` — `generate-content` handler now shallow-clones `req.body` and normalizes `thinkingConfig` before forwarding to Gemini.
 
 ---
 
