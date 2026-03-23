@@ -447,6 +447,17 @@ generationConfig: {
 
 ---
 
+### CI E2E tests show "The operation was canceled" with 0 tests completing
+**Error:** `Running 54 tests using 1 worker → Error: The operation was canceled.`
+
+**Cause:** After UI component redesigns (e.g., ChatInterface), test selectors become stale. With `retries: 2` and 1 worker, failing tests retry 3× each with 30s timeouts, easily exceeding the CI `timeout-minutes`. GitHub Actions cancels the job, producing "operation was canceled" instead of individual test failures.
+
+**Solution:** Update stale selectors in `e2e/app.spec.ts` to match current component output. Common drift: greeting text, button aria-labels, input placeholders, section headings. Also ensure CI timeout is generous enough (25+ min) for resilience tests that use backoff delays.
+
+**Prevention:** After any component redesign, run `npx playwright test --retries=0` locally before pushing. Zero-retry mode surfaces failures fast.
+
+---
+
 ### E2E tests pass locally but fail in CI (12 failures in Step 2 Chat + Step 3 Share)
 **Error:** Tests that require AI responses or Google Slides creation fail in GitHub Actions with timeout or "Sorry, something went wrong" errors. Locally all tests pass.
 
@@ -483,6 +494,7 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 | 2026-03-17 | Google Slides 401 mid-batch not retried | src/utils/googleSlides.ts | Extended withBackoff to handle AUTH_EXPIRED with token refresh | Fixed |
 | 2026-03-17 | Initial presentation creation has no retry | src/utils/googleSlides.ts | Wrapped POST create + Drive copy in withBackoff | Fixed |
 | 2026-03-23 | Express/Vercel thinkingConfig format mismatch | server/routes/gemini.ts | Added thinkingBudget→thinkingLevel normalization to Express route | Fixed |
+| 2026-03-23 | CI E2E "operation was canceled" (stale selectors + 15m timeout) | e2e/app.spec.ts | Updated 12 selectors (greeting, prompts, placeholder, heading); bumped CI timeout to 25m | Fixed |
 
 ---
 

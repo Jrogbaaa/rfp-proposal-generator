@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-03-23] — Fix E2E Test Selectors for ChatInterface Redesign
+
+### Fixed
+- **`e2e/app.spec.ts`** — Updated 12 stale selectors after the ChatInterface redesign: greeting text (`"Hi! I've reviewed"` → `"I've reviewed"`), suggested prompt aria-labels (`"Make it more concise"` → `"Suggest: More concise"` etc.), chat placeholder (`"Ask for changes"` → `"Tell me how to change"`), sidebar heading (`"Refine Content"` → `"AI Copywriter"`). These mismatches caused every Step 2+ test to fail, and with 2 retries × 1 worker the total runtime exceeded the 15-minute CI timeout, resulting in "The operation was canceled."
+- **`.github/workflows/e2e.yml`** — Bumped CI job `timeout-minutes` from 15 to 25, giving resilience tests (429 backoff, token refresh) sufficient headroom.
+
+### Verified
+- All 54 E2E tests pass locally (2.1 minutes, 0 retries needed).
+
+---
+
 ## [2026-03-23] — Backend Parity Fix (Express ↔ Vercel)
 
 ### Fixed
