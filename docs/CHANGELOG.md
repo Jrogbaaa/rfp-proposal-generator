@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-04-03] — Custom Domain: rfpparamount.com
+
+### Changed
+- **Production URL** updated to `rfpparamount.com` — custom domain now live on Vercel (SSL cert provisioning in progress; app also available at `rfp-proposal-generator-kappa.vercel.app`)
+- **`docs/CHANGELOG.md`** — Updated all references from `rfp-proposal-generator-kappa.vercel.app` to `rfpparamount.com`
+
+### Verified
+- Homepage loads correctly; Step 1 (Draft) brief parsing confirmed working
+- No JS console errors on production
+
+---
+
 ## [2026-03-23] — Fix E2E Test Selectors for ChatInterface Redesign
 
 ### Fixed
@@ -83,7 +95,7 @@
 - **`public/terms.html`** — Page title corrected from "RFP Proposal Generator" to "Paramount Proj" for consistency with OAuth consent screen app name
 
 ### Verified (Production)
-- Full 3-step flow confirmed working on `rfp-proposal-generator-kappa.vercel.app`: prompt input → Gemini generation → Refine step with chat interface and Google Slides button
+- Full 3-step flow confirmed working on `rfpparamount.com` (custom domain; also available at `rfp-proposal-generator-kappa.vercel.app`): prompt input → Gemini generation → Refine step with chat interface and Google Slides button
 - `/privacy.html` and `/terms.html` both return 200 and are linked in footer
 - Google Search Console domain verification file live at root
 - "Google hasn't verified this app" OAuth warning is expected — app is in Production mode pending Google manual review (3–7 business days)
@@ -104,7 +116,7 @@
 ### Added
 - **`public/privacy.html`** — Privacy Policy page at `/privacy.html`; covers data collection, Google API scopes, data retention, user rights, and contact info. Required for Google OAuth app verification.
 - **`public/terms.html`** — Terms of Service page at `/terms.html`; covers acceptable use, AI-generated content disclaimer, Google Services integration, IP ownership, and governing law. Required for Google OAuth app verification.
-- **`public/google574603289c4a64bf.html`** — Google Search Console domain ownership verification file for `rfp-proposal-generator-kappa.vercel.app`
+- **`public/google574603289c4a64bf.html`** — Google Search Console domain ownership verification file for `rfpparamount.com`
 
 ---
 
