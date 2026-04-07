@@ -6,13 +6,5 @@
     "api/**/*.ts": {
       "maxDuration": 60
     }
-  },
-  "redirects": [
-    {
-      "source": "/:path(.*)",
-      "has": [{ "type": "host", "value": "www.rfpparamount.com" }],
-      "destination": "https://rfpparamount.com/:path",
-      "permanent": true
-    }
-  ]
+  }
 }
