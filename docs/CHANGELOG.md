@@ -1,5 +1,43 @@
 # Changelog
 
+## [2026-04-07] — Ship-Day Hardening (Security, Performance, UX, Stability)
+
+### Security
+- **Strict CORS** — All 7 Vercel serverless handlers and the Express server now use an explicit origin allowlist instead of reflecting the request origin
+- **API key cleanup** — Removed stale `VITE_GEMINI_API_KEY` from `vite-env.d.ts` and CI; Gemini key is server-only
+- **Upstream timeouts** — All Gemini proxy `fetch()` calls (server + Vercel) now use `AbortController` with 55 s timeout; returns 504 on timeout
+- **Rate limiting** — In-memory rate limiter (20 req/min per IP) on Express Gemini proxy routes
+- **Input validation** — `fileId` regex guard against path traversal; `NaN` guard on proposal IDs; PDF-only MIME check on upload
+- **CORS utility** — New `api/_lib/cors.ts` shared across all serverless handlers
+
+### Performance
+- **Code splitting** — `framer-motion` chunked separately (122 KB); `DevTools` lazy-loaded via `React.lazy` (only in dev)
+- **Vite build config** — Added `rollupOptions.output.manualChunks` for framer-motion
+- **Server compression** — `compression()` middleware added to Express server
+- **Auth polling removed** — Replaced `setInterval` polling with event-driven `visibilitychange`/`focus` listeners
+- **React memoization** — `useCallback` for `handleReset`, `handleSlidesSuccess`; `useMemo` for `STEP_ORDER`
+
+### Stability
+- **State persistence** — Wizard state (`currentStep`, `briefText`, `expansions`, `slidesUrl`) persisted to `sessionStorage`; survives page refresh
+- **Lazy DB init** — `server/db.ts` refactored to lazy singleton; prevents crash on DB-unreachable startup
+- **Schema unification** — `api/_lib/schema.ts` re-exports from `server/schema.ts`; eliminates drift risk
+- **Express error handling** — Added global 404 + 500 middleware; prevents stack trace leaks
+- **Pagination** — `GET /api/proposals` limited to 100 results
+- **Brand voice upsert** — Added `UNIQUE` constraint handling for brand voice profiles
+
+### UX
+- **Reset confirmation** — `window.confirm` dialog before discarding work on "New Proposal"
+- **Share via Email** — Renamed from "Share via Outlook" (generic `mailto:` link)
+- **Clipboard fallback** — `BriefEditor` falls back to `execCommand('paste')` when `navigator.clipboard` is denied
+- **Color contrast** — `navy-400` adjusted to `#7b93c0` for WCAG AA compliance
+- **Empty state** — `ParsedField` displays italic "Pending" instead of blank
+- **Button validation** — "Continue to Refine" disabled when brief < 10 characters
+
+### Tests
+- **E2E fixes** — Tests now bypass landing page gate via `sessionStorage`; updated "Share via Email" assertions; dialog handling for reset confirmation
+
+---
+
 ## [2026-04-07] — Fix OAuth redirect_uri_mismatch + redirect loop
 
 ### Fixed

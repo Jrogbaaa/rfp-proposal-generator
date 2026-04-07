@@ -31,7 +31,6 @@ jobs:
       - name: Build app
         run: npm run build
         env:
-          VITE_GEMINI_API_KEY: test-api-key
           VITE_GOOGLE_CLIENT_ID: test-client-id.apps.googleusercontent.com
 
       - name: Run E2E tests

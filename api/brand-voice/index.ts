@@ -2,19 +2,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../_lib/db.js'
 import { brandVoiceProfiles } from '../_lib/schema.js'
 import { eq, sql } from 'drizzle-orm'
+import { setCors } from '../_lib/cors.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.status(204).end()
+  if (setCors(req, res)) return
 
   const db = getDb()
 
   if (req.method === 'GET') {
     try {
       const rows = await db.select().from(brandVoiceProfiles).where(eq(brandVoiceProfiles.name, 'default')).limit(1)
-      if (rows.length === 0) return res.status(404).json(null)
+      if (rows.length === 0) return res.status(404).json({ error: 'Not found' })
       return res.json(rows[0])
     } catch (err) {
       console.error(err)
@@ -24,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     try {
-      const { tone, sentenceStyle, perspective, forbiddenPhrases, preferredVocabulary, ctaStyle, proseSummary } = req.body
+      const { tone, sentenceStyle, perspective, forbiddenPhrases, preferredVocabulary, ctaStyle, proseSummary } = req.body ?? {}
 
       const existing = await db.select({ id: brandVoiceProfiles.id })
         .from(brandVoiceProfiles)

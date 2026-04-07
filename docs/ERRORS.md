@@ -520,6 +520,24 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 
 ---
 
+### Gemini proxy hanging indefinitely (no timeout)
+**Error:** Server-side Gemini proxy requests hang forever when the upstream API is slow or unresponsive. No timeout or abort signal.
+
+**Cause:** `fetch()` calls to the Gemini API had no timeout configured. If Gemini stalled, the request would hang until the client disconnected.
+
+**Solution:** Added `AbortController` with a 55-second timeout to all Gemini proxy `fetch()` calls in both Express routes (`server/routes/gemini.ts`) and Vercel serverless functions (`api/gemini/generate-content.ts`, `api/gemini/upload-file.ts`). Returns 504 with `"Gemini API request timed out"` when aborted.
+
+---
+
+### E2E tests fail — landing page blocks all test interactions
+**Error:** All Playwright E2E tests fail with "element(s) not found" for basic elements like `header`, `getByText('Draft')`, etc.
+
+**Cause:** The landing page gate (`sessionStorage.getItem('rfp_app_entered')`) blocks the main app on first visit. Tests navigate to `/` but never see the main app UI.
+
+**Solution:** Added `test.beforeEach` with `page.addInitScript(() => sessionStorage.setItem('rfp_app_entered', '1'))` to bypass the landing page in all E2E tests.
+
+---
+
 ## Adding New Errors
 
 When you fix a new error, add it using this template:

@@ -2,12 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../_lib/db.js'
 import { proposals } from '../_lib/schema.js'
 import { eq, sql } from 'drizzle-orm'
+import { setCors } from '../_lib/cors.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.status(204).end()
+  if (setCors(req, res)) return
 
   const id = Number(req.query.id)
   if (isNaN(id)) {
@@ -32,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const allowed = ['company', 'projectTitle', 'briefText', 'clientData', 'projectData', 'contentData', 'expandedData', 'designConfig', 'slidesUrl']
       const patch: Record<string, unknown> = {}
       for (const key of allowed) {
-        if (key in req.body) patch[key] = req.body[key]
+        if (key in (req.body ?? {})) patch[key] = req.body[key]
       }
       patch.updatedAt = sql`now()`
 
@@ -50,7 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'DELETE') {
     try {
-      await db.delete(proposals).where(eq(proposals.id, id))
+      const deleted = await db.delete(proposals).where(eq(proposals.id, id)).returning({ id: proposals.id })
+      if (deleted.length === 0) return res.status(404).json({ error: 'Not found' })
       return res.json({ ok: true })
     } catch (err) {
       console.error(err)

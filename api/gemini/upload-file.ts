@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { setCors } from '../_lib/cors.js'
+
+const ALLOWED_MIME_TYPES = new Set(['application/pdf'])
+const UPSTREAM_TIMEOUT_MS = 55_000
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.status(204).end()
+  if (setCors(req, res)) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -25,6 +26,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'base64Data, mimeType, and fileName are required' })
   }
 
+  if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    return res.status(400).json({ error: 'Only PDF files are supported' })
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
+
   try {
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2)}`
     const metadata = JSON.stringify({ file: { display_name: fileName } })
@@ -41,6 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
       body,
+      signal: controller.signal,
     })
 
     if (!uploadRes.ok) {
@@ -54,7 +63,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!fileUri) return res.status(502).json({ error: 'Files API did not return a file URI' })
     return res.json({ fileUri })
   } catch (err: unknown) {
+    if (controller.signal.aborted) {
+      return res.status(504).json({ error: 'File upload timed out' })
+    }
     const message = err instanceof Error ? err.message : String(err)
-    return res.status(502).json({ error: 'Failed to upload file to Gemini Files API', detail: message })
+    console.error('[Gemini proxy] upload-file error:', message)
+    return res.status(502).json({ error: 'Failed to upload file to Gemini Files API' })
+  } finally {
+    clearTimeout(timeout)
   }
 }

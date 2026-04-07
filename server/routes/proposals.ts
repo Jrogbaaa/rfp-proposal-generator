@@ -1,20 +1,25 @@
 import { Router } from 'express'
-import { db } from '../db.js'
+import { getDb } from '../db.js'
 import { proposals } from '../schema.js'
 import { eq, sql } from 'drizzle-orm'
 
 const router = Router()
 
-// GET /api/proposals — list all (summary fields only)
+function parseId(raw: string): number | null {
+  const id = Number(raw)
+  return isNaN(id) ? null : id
+}
+
 router.get('/', async (_req, res) => {
   try {
+    const db = getDb()
     const rows = await db.select({
       id: proposals.id,
       company: proposals.company,
       projectTitle: proposals.projectTitle,
       slidesUrl: proposals.slidesUrl,
       createdAt: proposals.createdAt,
-    }).from(proposals).orderBy(sql`${proposals.createdAt} desc`)
+    }).from(proposals).orderBy(sql`${proposals.createdAt} desc`).limit(100)
     return res.json(rows)
   } catch (err) {
     console.error(err)
@@ -22,10 +27,13 @@ router.get('/', async (_req, res) => {
   }
 })
 
-// GET /api/proposals/:id — full record
 router.get('/:id', async (req, res) => {
+  const id = parseId(req.params.id)
+  if (id === null) return res.status(400).json({ error: 'Invalid proposal ID' })
+
   try {
-    const rows = await db.select().from(proposals).where(eq(proposals.id, Number(req.params.id))).limit(1)
+    const db = getDb()
+    const rows = await db.select().from(proposals).where(eq(proposals.id, id)).limit(1)
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' })
     return res.json(rows[0])
   } catch (err) {
@@ -34,9 +42,9 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-// POST /api/proposals — create
 router.post('/', async (req, res) => {
   try {
+    const db = getDb()
     const { company, projectTitle, briefText, clientData, projectData, contentData, expandedData, designConfig, slidesUrl } = req.body
     const inserted = await db.insert(proposals)
       .values({ company, projectTitle, briefText, clientData, projectData, contentData, expandedData, designConfig, slidesUrl })
@@ -48,9 +56,12 @@ router.post('/', async (req, res) => {
   }
 })
 
-// PATCH /api/proposals/:id — partial update
 router.patch('/:id', async (req, res) => {
+  const id = parseId(req.params.id)
+  if (id === null) return res.status(400).json({ error: 'Invalid proposal ID' })
+
   try {
+    const db = getDb()
     const allowed = ['company', 'projectTitle', 'briefText', 'clientData', 'projectData', 'contentData', 'expandedData', 'designConfig', 'slidesUrl']
     const patch: Record<string, unknown> = {}
     for (const key of allowed) {
@@ -59,8 +70,8 @@ router.patch('/:id', async (req, res) => {
     patch.updatedAt = sql`now()`
 
     const updated = await db.update(proposals)
-      .set(patch as Parameters<typeof db.update>[0] extends infer T ? T : never)
-      .where(eq(proposals.id, Number(req.params.id)))
+      .set(patch as never)
+      .where(eq(proposals.id, id))
       .returning({ id: proposals.id })
     if (updated.length === 0) return res.status(404).json({ error: 'Not found' })
     return res.json(updated[0])
@@ -70,10 +81,14 @@ router.patch('/:id', async (req, res) => {
   }
 })
 
-// DELETE /api/proposals/:id
 router.delete('/:id', async (req, res) => {
+  const id = parseId(req.params.id)
+  if (id === null) return res.status(400).json({ error: 'Invalid proposal ID' })
+
   try {
-    await db.delete(proposals).where(eq(proposals.id, Number(req.params.id)))
+    const db = getDb()
+    const deleted = await db.delete(proposals).where(eq(proposals.id, id)).returning({ id: proposals.id })
+    if (deleted.length === 0) return res.status(404).json({ error: 'Not found' })
     return res.json({ ok: true })
   } catch (err) {
     console.error(err)

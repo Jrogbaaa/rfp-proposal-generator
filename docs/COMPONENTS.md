@@ -19,7 +19,8 @@ Auto-generated documentation for all React components in the Paramount applicati
 | GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → template copy → populate; accepts `preGeneratedContent`, `onSuccess` |
 | ProgressStepper | `src/components/ProgressStepper.tsx` | 3-step stepper (Draft/Refine/Export); only backward navigation to completed steps |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
-| DevTools | `src/components/DevTools.tsx` | Floating dev panel for error viewing (dev only) |
+| DevTools | `src/components/DevTools.tsx` | Floating dev panel for error viewing (dev only, lazy-loaded) |
+| setCors | `api/_lib/cors.ts` | Shared CORS utility for Vercel serverless handlers (strict origin allowlist) |
 
 ---
 
@@ -28,7 +29,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 ### App.tsx
 **Purpose:** Main application component that orchestrates the 3-step proposal workflow.
 
-**State Management:** Uses inline `useState` hooks for all state (brief text, expansions, design config, loading, errors, Google auth).
+**State Management:** Core wizard state (`currentStep`, `briefText`, `expansions`, `slidesUrl`) persisted to `sessionStorage` and restored on mount. Google auth state is event-driven via `visibilitychange`/`focus` listeners. `DevTools` is lazy-loaded via `React.lazy` (dev-only). Key handlers (`handleReset`, `handleSlidesSuccess`) are memoized with `useCallback`.
 
 **Workflow Steps:**
 1. Draft (brief input via paste or PDF upload) → 2. Refine (AI content chat, sticky sidebar, slide preview with inline editing, export) → 3. Export (success screen with Google Slides link and mailto)

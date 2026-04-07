@@ -1,5 +1,11 @@
 import { test, expect, type Page } from '@playwright/test'
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('rfp_app_entered', '1')
+  })
+})
+
 const SAMPLE_BRIEF = `Project: Digital Customer Experience Transformation
 Client: Sarah Martinez, sarah.martinez@starbucks.com, Starbucks
 Timeline: 4 months
@@ -499,15 +505,15 @@ test.describe('Step 3 – Share Screen', () => {
     expect(href).toContain('fake-presentation-id')
   })
 
-  test('shows "Share via Outlook" mailto link', async ({ page }) => {
+  test('shows "Share via Email" mailto link', async ({ page }) => {
     await goToShareStep(page)
-    await expect(page.getByRole('link', { name: 'Share via Outlook' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Share via Email' })).toBeVisible()
   })
 
   test('email body says "Hey team" not "Hi FirstName" or "Hi there"', async ({ page }) => {
     await goToShareStep(page)
     const mailtoHref = await page
-      .getByRole('link', { name: 'Share via Outlook' })
+      .getByRole('link', { name: 'Share via Email' })
       .getAttribute('href')
     expect(mailtoHref).toBeTruthy()
     const decoded = decodeURIComponent(mailtoHref!)
@@ -519,7 +525,7 @@ test.describe('Step 3 – Share Screen', () => {
   test('email body contains the client company name', async ({ page }) => {
     await goToShareStep(page)
     const mailtoHref = await page
-      .getByRole('link', { name: 'Share via Outlook' })
+      .getByRole('link', { name: 'Share via Email' })
       .getAttribute('href')
     const decoded = decodeURIComponent(mailtoHref!)
     expect(decoded).toContain('Starbucks')
@@ -528,7 +534,7 @@ test.describe('Step 3 – Share Screen', () => {
   test('email body contains the slides URL', async ({ page }) => {
     await goToShareStep(page)
     const mailtoHref = await page
-      .getByRole('link', { name: 'Share via Outlook' })
+      .getByRole('link', { name: 'Share via Email' })
       .getAttribute('href')
     const decoded = decodeURIComponent(mailtoHref!)
     expect(decoded).toContain('fake-presentation-id')
@@ -537,7 +543,7 @@ test.describe('Step 3 – Share Screen', () => {
   test('email To: field is blank (intended for internal team, not the client)', async ({ page }) => {
     await goToShareStep(page)
     const mailtoHref = await page
-      .getByRole('link', { name: 'Share via Outlook' })
+      .getByRole('link', { name: 'Share via Email' })
       .getAttribute('href')
     // mailto: with no recipient — href should start with "mailto:?" not "mailto:someone@..."
     expect(mailtoHref).toMatch(/^mailto:\?/)
@@ -552,6 +558,7 @@ test.describe('Step 3 – Share Screen', () => {
 
   test('"Start new proposal" button resets to Draft step', async ({ page }) => {
     await goToShareStep(page)
+    page.on('dialog', (d) => d.accept())
     await page.getByRole('button', { name: 'Start new proposal' }).click()
     await expect(page.getByRole('heading', { name: 'Upload your brief here' })).toBeVisible()
     await expect(page.getByText('Step 1 · Draft')).toBeVisible()

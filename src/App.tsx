@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './components/Header'
 import LandingPage from './components/LandingPage'
@@ -11,12 +11,13 @@ import ProgressStepper from './components/ProgressStepper'
 import BrandVoicePanel from './components/BrandVoicePanel'
 import { useBriefParser } from './hooks/useBriefParser'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import DevTools from './components/DevTools'
 import type { Step, ExpandedContent, DesignConfig, BrandVoiceProfile } from './types/proposal'
 import { DEFAULT_DESIGN_CONFIG } from './types/proposal'
 import { generateProposalContent, GeminiBlockedError } from './utils/llmService'
 import { FetchTimeoutError, FetchRetryExhaustedError } from './utils/fetchWithRetry'
 import { getAuthState, clearExpiredToken } from './utils/googleAuth'
+
+const DevTools = lazy(() => import('./components/DevTools'))
 
 function humanizeGenerationError(err: unknown): string {
   if (err instanceof FetchTimeoutError) {
@@ -56,20 +57,39 @@ export default function App() {
     setShowLanding(false)
   }
 
-  // Step flow
-  const [currentStep, setCurrentStep] = useState<Step>('draft')
-  const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
+  // Step flow — restore from session if available
+  const [currentStep, setCurrentStep] = useState<Step>(() => {
+    const saved = sessionStorage.getItem('rfp_step')
+    return (saved === 'draft' || saved === 'iterate' || saved === 'share') ? saved : 'draft'
+  })
+  const [slidesUrl, setSlidesUrl] = useState<string | null>(() => sessionStorage.getItem('rfp_slides_url'))
 
-  // Brief input
-  const [briefText, setBriefText] = useState('')
+  // Brief input — restore from session
+  const [briefText, setBriefText] = useState(() => sessionStorage.getItem('rfp_brief') ?? '')
   const [inputMode, setInputMode] = useState<InputMode>('pdf')
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
 
-  // AI-refined expansions from chatbot
-  const [expansions, setExpansions] = useState<ExpandedContent | null>(null)
+  // AI-refined expansions from chatbot — restore from session
+  const [expansions, setExpansions] = useState<ExpandedContent | null>(() => {
+    const saved = sessionStorage.getItem('rfp_expansions')
+    if (!saved) return null
+    try { return JSON.parse(saved) } catch { return null }
+  })
 
   // Design config
-  const [designConfig, _setDesignConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
+  const [designConfig] = useState<DesignConfig>(DEFAULT_DESIGN_CONFIG)
+
+  // Persist wizard state to sessionStorage
+  useEffect(() => { sessionStorage.setItem('rfp_step', currentStep) }, [currentStep])
+  useEffect(() => { sessionStorage.setItem('rfp_brief', briefText) }, [briefText])
+  useEffect(() => {
+    if (expansions) sessionStorage.setItem('rfp_expansions', JSON.stringify(expansions))
+    else sessionStorage.removeItem('rfp_expansions')
+  }, [expansions])
+  useEffect(() => {
+    if (slidesUrl) sessionStorage.setItem('rfp_slides_url', slidesUrl)
+    else sessionStorage.removeItem('rfp_slides_url')
+  }, [slidesUrl])
 
   // Brand voice training
   const [brandVoice, setBrandVoice] = useState<BrandVoiceProfile | null>(() => {
@@ -110,24 +130,26 @@ export default function App() {
   const [lastChatUpdate, setLastChatUpdate] = useState<number>(0)
   const [showUpdateBanner, setShowUpdateBanner] = useState(false)
 
-  // Google auth state — poll periodically so badge updates after OAuth
+  // Google auth state — event-driven via visibilitychange + manual update
   const [isGoogleConnected, setIsGoogleConnected] = useState(() => getAuthState().isSignedIn)
-  useEffect(() => {
-    const id = setInterval(() => setIsGoogleConnected(getAuthState().isSignedIn), 3000)
-    return () => clearInterval(id)
-  }, [])
+  const refreshAuthState = useCallback(() => setIsGoogleConnected(getAuthState().isSignedIn), [])
 
   // Proactively clear expired tokens when user returns to the tab after idle
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         clearExpiredToken()
-        setIsGoogleConnected(getAuthState().isSignedIn)
+        refreshAuthState()
       }
     }
+    const handleFocus = () => refreshAuthState()
     document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [refreshAuthState])
 
   useEffect(() => {
     if (lastChatUpdate > 0) {
@@ -155,13 +177,17 @@ export default function App() {
     setBriefText(text)
   }
 
-  const handleSlidesSuccess = (url: string) => {
+  const handleSlidesSuccess = useCallback((url: string) => {
     setSlidesUrl(url)
     setCurrentStep('share')
     scrollToTop()
-  }
+    refreshAuthState()
+  }, [refreshAuthState])
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
+    if (briefText.trim() || expansions) {
+      if (!window.confirm('Start a new proposal? Current progress will be lost.')) return
+    }
     setBriefText('')
     setUploadedFile(null)
     setExpansions(null)
@@ -169,16 +195,20 @@ export default function App() {
     setIsGenerating(false)
     setIsSlideUpdating(false)
     setCurrentStep('draft')
-  }
+    sessionStorage.removeItem('rfp_step')
+    sessionStorage.removeItem('rfp_brief')
+    sessionStorage.removeItem('rfp_expansions')
+    sessionStorage.removeItem('rfp_slides_url')
+  }, [briefText, expansions])
 
-  const STEP_ORDER: Step[] = ['draft', 'iterate', 'share']
+  const STEP_ORDER: Step[] = useMemo(() => ['draft', 'iterate', 'share'], [])
   const currentStepIndex = STEP_ORDER.indexOf(currentStep)
 
   const handleStepClick = useCallback((stepIndex: number) => {
     if (stepIndex >= currentStepIndex) return
     setCurrentStep(STEP_ORDER[stepIndex])
     scrollToTop()
-  }, [currentStepIndex])
+  }, [currentStepIndex, STEP_ORDER])
 
   const handleContinueToIteration = async () => {
     setCurrentStep('iterate')
@@ -498,7 +528,8 @@ export default function App() {
                       <div className="shrink-0 pt-4 mt-auto border-t border-cream-300">
                         <button
                           onClick={handleContinueToIteration}
-                          className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-navy-800 text-cream-100 font-semibold text-base hover:bg-navy-700 transition-colors shadow-md"
+                          disabled={isGenerating || briefText.trim().length < 10}
+                          className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-navy-800 text-cream-100 font-semibold text-base hover:bg-navy-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-md"
                           aria-label="Continue to refine your proposal"
                           tabIndex={0}
                         >
@@ -522,7 +553,7 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -16 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="grid grid-cols-1 lg:grid-cols-[1fr_420px] min-h-[calc(100vh-8.5rem)]"
+                className="grid grid-cols-1 lg:grid-cols-[1fr_420px] min-h-[calc(100vh-8.5rem)] relative"
               >
                 {/* Left: Full slide preview */}
                 <section className="bg-cream-50 flex flex-col border-r border-cream-300 min-h-[60vh] lg:min-h-0">
@@ -738,7 +769,7 @@ export default function App() {
                           <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                           <polyline points="22,6 12,13 2,6" />
                         </svg>
-                        Share via Outlook
+                        Share via Email
                       </a>
                     )}
 
@@ -756,7 +787,11 @@ export default function App() {
           </AnimatePresence>
         </main>
 
-        <DevTools />
+        {import.meta.env.DEV && (
+          <Suspense fallback={null}>
+            <DevTools />
+          </Suspense>
+        )}
 
         {/* Legal footer */}
         <footer className="text-center py-4 text-xs text-navy-400 border-t border-cream-300 bg-cream-100">
@@ -773,11 +808,12 @@ export default function App() {
 // ─── Helper components ────────────────────────────────────────────────────────
 
 function ParsedField({ label, value }: { label: string; value?: string }) {
-  if (!value) return null
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-xs font-semibold text-navy-400 w-20 flex-shrink-0">{label}</span>
-      <span className="text-sm text-navy-700 font-medium truncate">{value}</span>
+      <span className={`text-sm font-medium truncate ${value ? 'text-navy-700' : 'text-navy-300 italic'}`}>
+        {value || 'Pending'}
+      </span>
     </div>
   )
 }

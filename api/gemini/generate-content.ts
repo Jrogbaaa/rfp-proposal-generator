@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { setCors } from '../_lib/cors.js'
+
+const UPSTREAM_TIMEOUT_MS = 55_000
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.status(204).end()
+  if (setCors(req, res)) return
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -18,7 +18,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const model = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
-  // Normalise thinking config: convert 2.5-style thinkingBudget to 3-style thinkingLevel
   const body = { ...req.body }
   if (body.generationConfig?.thinkingConfig) {
     const tc = body.generationConfig.thinkingConfig
@@ -30,17 +29,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
+
   try {
     const upstream = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: controller.signal,
     })
 
     const data = await upstream.json()
     return res.status(upstream.status).json(data)
   } catch (err: unknown) {
+    if (controller.signal.aborted) {
+      return res.status(504).json({ error: 'Gemini API request timed out' })
+    }
     const message = err instanceof Error ? err.message : String(err)
-    return res.status(502).json({ error: 'Failed to reach Gemini API', detail: message })
+    console.error('[Gemini proxy] generate-content error:', message)
+    return res.status(502).json({ error: 'Failed to reach Gemini API' })
+  } finally {
+    clearTimeout(timeout)
   }
 }

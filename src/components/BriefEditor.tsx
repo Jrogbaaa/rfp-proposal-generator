@@ -37,8 +37,9 @@ export default function BriefEditor({ value, onChange, onClear }: BriefEditorPro
       const text = await navigator.clipboard.readText()
       onChange(text)
       textareaRef.current?.focus()
-    } catch (err) {
-      console.error('Failed to read clipboard:', err)
+    } catch {
+      textareaRef.current?.focus()
+      document.execCommand('paste')
     }
   }
 

@@ -2,12 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getDb } from '../_lib/db.js'
 import { proposals } from '../_lib/schema.js'
 import { sql } from 'drizzle-orm'
+import { setCors } from '../_lib/cors.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.status(204).end()
+  if (setCors(req, res)) return
 
   const db = getDb()
 
@@ -19,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         projectTitle: proposals.projectTitle,
         slidesUrl: proposals.slidesUrl,
         createdAt: proposals.createdAt,
-      }).from(proposals).orderBy(sql`${proposals.createdAt} desc`)
+      }).from(proposals).orderBy(sql`${proposals.createdAt} desc`).limit(100)
       return res.json(rows)
     } catch (err) {
       console.error(err)
@@ -29,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'POST') {
     try {
-      const { company, projectTitle, briefText, clientData, projectData, contentData, expandedData, designConfig, slidesUrl } = req.body
+      const { company, projectTitle, briefText, clientData, projectData, contentData, expandedData, designConfig, slidesUrl } = req.body ?? {}
       const inserted = await db.insert(proposals)
         .values({ company, projectTitle, briefText, clientData, projectData, contentData, expandedData, designConfig, slidesUrl })
         .returning({ id: proposals.id })

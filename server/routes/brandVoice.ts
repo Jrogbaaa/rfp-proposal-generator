@@ -1,15 +1,15 @@
 import { Router } from 'express'
-import { db } from '../db.js'
+import { getDb } from '../db.js'
 import { brandVoiceProfiles } from '../schema.js'
 import { eq, sql } from 'drizzle-orm'
 
 const router = Router()
 
-// GET /api/brand-voice — return the default profile, or 404
 router.get('/', async (_req, res) => {
   try {
+    const db = getDb()
     const rows = await db.select().from(brandVoiceProfiles).where(eq(brandVoiceProfiles.name, 'default')).limit(1)
-    if (rows.length === 0) return res.status(404).json(null)
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' })
     return res.json(rows[0])
   } catch (err) {
     console.error(err)
@@ -17,9 +17,9 @@ router.get('/', async (_req, res) => {
   }
 })
 
-// POST /api/brand-voice — upsert the default profile
 router.post('/', async (req, res) => {
   try {
+    const db = getDb()
     const { tone, sentenceStyle, perspective, forbiddenPhrases, preferredVocabulary, ctaStyle, proseSummary } = req.body
 
     const existing = await db.select({ id: brandVoiceProfiles.id })
@@ -45,9 +45,9 @@ router.post('/', async (req, res) => {
   }
 })
 
-// DELETE /api/brand-voice — clear the profile
 router.delete('/', async (_req, res) => {
   try {
+    const db = getDb()
     await db.delete(brandVoiceProfiles).where(eq(brandVoiceProfiles.name, 'default'))
     return res.json({ ok: true })
   } catch (err) {
