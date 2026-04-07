@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-04-07] — Landing Page for Google OAuth Verification
+
+### Added
+- **`src/components/LandingPage.tsx`** — New homepage component that satisfies Google's OAuth app verification requirement ("homepage does not explain the purpose of your application"). Includes: hero section explaining the app purpose, 3-step "How it works" flow, transparent "How we use Google APIs" section detailing Slides and Drive scopes with rationale, data privacy banner, and CTA to enter the app.
+- **`src/App.tsx`** — Added `showLanding` state (session-gated via `sessionStorage`) so first-time visitors see the landing page; clicking "Get Started" or "Launch App" enters the proposal workflow. Returning visitors within the same session skip straight to the app.
+
+### Changed
+- **`src/App.tsx`** — Import `LandingPage`; early return renders landing page when `showLanding` is true.
+
+---
+
 ## [2026-04-03] — Custom Domain: rfpparamount.com
 
 ### Changed

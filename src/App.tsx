@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Header from './components/Header'
+import LandingPage from './components/LandingPage'
 import BriefEditor from './components/BriefEditor'
 import PdfUploader from './components/PdfUploader'
 import SlidePreview from './components/SlidePreview'
@@ -45,6 +46,16 @@ const scrollToTop = () => {
 }
 
 export default function App() {
+  // Landing page vs app workflow
+  const [showLanding, setShowLanding] = useState(() => {
+    return !sessionStorage.getItem('rfp_app_entered')
+  })
+
+  const handleEnterApp = () => {
+    sessionStorage.setItem('rfp_app_entered', '1')
+    setShowLanding(false)
+  }
+
   // Step flow
   const [currentStep, setCurrentStep] = useState<Step>('draft')
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
@@ -297,6 +308,14 @@ export default function App() {
       ...expansions,
       customTitles: { ...(expansions.customTitles ?? {}), [slideKey]: newTitle },
     })
+  }
+
+  if (showLanding) {
+    return (
+      <ErrorBoundary componentName="LandingPage">
+        <LandingPage onGetStarted={handleEnterApp} />
+      </ErrorBoundary>
+    )
   }
 
   return (

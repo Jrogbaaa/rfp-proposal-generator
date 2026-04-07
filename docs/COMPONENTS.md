@@ -8,7 +8,8 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| App | `src/App.tsx` | 3-step flow orchestrator: Draft → Refine → Export |
+| App | `src/App.tsx` | Landing gate + 3-step flow orchestrator: Landing → Draft → Refine → Export |
+| LandingPage | `src/components/LandingPage.tsx` | Public homepage explaining app purpose, workflow, Google API usage, and data privacy |
 | Header | `src/components/Header.tsx` | Application header with logo, "Paramount Proj" app name label, auth badge, and New button |
 | BriefEditor | `src/components/BriefEditor.tsx` | Free-form brief text input (Step 1 paste mode) |
 | BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
@@ -35,6 +36,20 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Refine Step Sidebar:** Sticky panel (`lg:sticky lg:top-[8.5rem]`) containing `ChatInterface` in a cream rounded container (flex-1, overflow-hidden — chat handles its own scrolling) and `GoogleSlidesButton` pinned at the bottom. The "Refine Content" label was removed; the ChatInterface header ("AI Copywriter") now self-identifies. Does not scroll with the slide preview.
 
 **Brand Color / Design Config:** `designConfig.customBrandHex` is still respected by `googleSlides.ts` (palette priority: custom hex → company auto-detect → preset theme), but the hex input UI was removed from the Refine sidebar to reduce crowding.
+
+---
+
+### LandingPage.tsx
+**Purpose:** Public-facing homepage that explains the application's purpose, workflow, and Google API usage. Created to satisfy Google OAuth verification requirements.
+
+**Props:** `onGetStarted: () => void` — callback to transition from landing page into the app workflow.
+
+**Sections:**
+1. **Hero** — Left-aligned headline, description of the app, and "Get Started" CTA
+2. **How It Works** — 3-step cards (Upload brief → Refine with AI → Export to Google Slides)
+3. **Data & Permissions** — Transparent explanation of Google Slides and Drive scopes with rationale
+4. **CTA** — Bottom call-to-action to launch the app
+5. **Footer** — Links to Privacy Policy, Terms of Service, and contact
 
 ---
 
