@@ -104,11 +104,11 @@ Long-term: `strictPort: true` added to `vite.config.ts` so the server fails fast
 ### `redirect_uri_mismatch` — www subdomain (production)
 **Error:** `Error 400: redirect_uri_mismatch` with `origin=https://www.rfpparamount.com` when clicking "Export to Google Slides" on the live site.
 
-**Cause:** Google Cloud Console only has `https://rfpparamount.com` (non-www) in Authorized JavaScript Origins. Users visiting `https://www.rfpparamount.com` send OAuth requests from a different origin, which Google rejects.
+**Cause:** Vercel's domain config has `www.rfpparamount.com` as the primary domain — `rfpparamount.com` 307-redirects to `www`. But the GCP OAuth client only had `https://rfpparamount.com` (non-www) in Authorized JavaScript Origins. Since the app actually runs on the `www` origin, Google rejects the OAuth request.
 
-**Solution (two-pronged):**
-1. **Vercel redirect (code):** Added a permanent 301 redirect in `vercel.json` from `www.rfpparamount.com` to `rfpparamount.com` so all traffic canonicalizes to the registered origin.
-2. **GCP Console (belt-and-suspenders):** Also add `https://www.rfpparamount.com` to the OAuth client's Authorized JavaScript Origins as a fallback. Navigate to: Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Edit → Add `https://www.rfpparamount.com` to Authorized JavaScript origins.
+**Solution:** Add `https://www.rfpparamount.com` to the OAuth client's Authorized JavaScript Origins in Google Cloud Console: APIs & Services → Credentials → OAuth 2.0 Client IDs → Edit → add `https://www.rfpparamount.com`.
+
+**Anti-pattern (causes ERR_TOO_MANY_REDIRECTS):** Do NOT add a `www` → non-www redirect in `vercel.json` when Vercel's domain settings already redirect non-www → www. That creates an infinite loop.
 
 ---
 

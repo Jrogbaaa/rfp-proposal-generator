@@ -1,9 +1,10 @@
 # Changelog
 
-## [2026-04-07] — Fix OAuth redirect_uri_mismatch on www subdomain
+## [2026-04-07] — Fix OAuth redirect_uri_mismatch + redirect loop
 
 ### Fixed
-- **`vercel.json`** — Added permanent redirect from `www.rfpparamount.com` to `rfpparamount.com`. Users accessing the `www` variant triggered Google OAuth `redirect_uri_mismatch` because only the non-www origin is registered in the GCP OAuth client's Authorized JavaScript Origins.
+- **OAuth `redirect_uri_mismatch`** — Vercel's primary domain is `www.rfpparamount.com` (non-www 307-redirects to it), but the GCP OAuth client only had the non-www origin registered. Fix: add `https://www.rfpparamount.com` to Authorized JavaScript Origins in GCP Console.
+- **`vercel.json`** — Removed a www→non-www redirect that conflicted with Vercel's non-www→www domain redirect, causing `ERR_TOO_MANY_REDIRECTS`.
 
 ---
 
