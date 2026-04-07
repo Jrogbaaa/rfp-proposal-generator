@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-04-07] — Fix OAuth redirect_uri_mismatch on www subdomain
+
+### Fixed
+- **`vercel.json`** — Added permanent redirect from `www.rfpparamount.com` to `rfpparamount.com`. Users accessing the `www` variant triggered Google OAuth `redirect_uri_mismatch` because only the non-www origin is registered in the GCP OAuth client's Authorized JavaScript Origins.
+
+---
+
 ## [2026-04-07] — Landing Page for Google OAuth Verification
 
 ### Added

@@ -87,8 +87,8 @@ autofit: { autofitType: 'TEXT_AUTOFIT' }
 
 ---
 
-### `redirect_uri_mismatch` — wrong port
-**Error:** `Error 400: redirect_uri_mismatch` when OAuth popup attempts to authenticate.
+### `redirect_uri_mismatch` — wrong port (dev)
+**Error:** `Error 400: redirect_uri_mismatch` when OAuth popup attempts to authenticate locally.
 
 **Cause:** The app started on a port other than the one registered in Google Cloud Console Authorized JavaScript Origins (e.g. port 5177 instead of 5173 because other Vite instances held earlier ports).
 
@@ -98,6 +98,17 @@ lsof -ti :5173,:5174,:5175,:5176 | xargs kill -9
 # Then restart: npm run dev
 ```
 Long-term: `strictPort: true` added to `vite.config.ts` so the server fails fast if 5173 is taken rather than silently bumping to another port.
+
+---
+
+### `redirect_uri_mismatch` — www subdomain (production)
+**Error:** `Error 400: redirect_uri_mismatch` with `origin=https://www.rfpparamount.com` when clicking "Export to Google Slides" on the live site.
+
+**Cause:** Google Cloud Console only has `https://rfpparamount.com` (non-www) in Authorized JavaScript Origins. Users visiting `https://www.rfpparamount.com` send OAuth requests from a different origin, which Google rejects.
+
+**Solution (two-pronged):**
+1. **Vercel redirect (code):** Added a permanent 301 redirect in `vercel.json` from `www.rfpparamount.com` to `rfpparamount.com` so all traffic canonicalizes to the registered origin.
+2. **GCP Console (belt-and-suspenders):** Also add `https://www.rfpparamount.com` to the OAuth client's Authorized JavaScript Origins as a fallback. Navigate to: Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Edit → Add `https://www.rfpparamount.com` to Authorized JavaScript origins.
 
 ---
 
