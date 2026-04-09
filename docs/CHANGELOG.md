@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-04-09] — Narrow OAuth Scope: drop `presentations`, keep `drive.file`
+
+### Changed
+- **`src/utils/googleAuth.ts`** — Removed `https://www.googleapis.com/auth/presentations` scope. The app only creates new presentations and copies its own shared template — it never reads the user's existing slides — so `drive.file` alone is sufficient. Scope version bumped from `v4` → `v5`; existing users will be prompted to re-consent with the narrower scope on next sign-in.
+- **Cloud Console** — `presentations` scope removed from the OAuth consent screen. Only `drive.file` (non-sensitive, no verification required) remains.
+
+### Why
+Google's Third Party Data Safety Team flagged `presentations` as a sensitive scope requiring a CASA security assessment and annual recertification. The narrower `drive.file` scope covers everything the app needs and requires no verification.
+
+---
+
 ## [2026-04-07] — Ship-Day Hardening (Security, Performance, UX, Stability)
 
 ### Security

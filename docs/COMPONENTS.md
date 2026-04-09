@@ -183,6 +183,8 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `clearExpiredToken(): void` — Clears in-memory + localStorage token if expired (used by visibilitychange handler)
 - `revokeToken(): void` — Clears cached token and revokes with Google
 
+**Scopes:** `https://www.googleapis.com/auth/drive.file` only (non-sensitive). The `presentations` scope was removed after Google verification review — `drive.file` is sufficient because the app only creates new presentations and copies its own shared template; it never accesses the user's existing slides. Scope version `v5` — users on `v4` are prompted to re-consent.
+
 **Notes:** Token persisted to `localStorage` (`gis_access_token` + `gis_token_expires_at`) on sign-in and restored on page load. Survives refreshes for the ~1-hour token lifetime. After first consent, `prompt: ''` is used for faster/silent re-auth (tracked via `gis_has_consented` localStorage key). `App.tsx` has a `visibilitychange` handler that calls `clearExpiredToken()` when the user returns to the tab after idle.
 
 ---
