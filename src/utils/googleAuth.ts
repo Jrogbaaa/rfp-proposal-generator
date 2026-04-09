@@ -6,18 +6,16 @@
  * (~1 hour). After expiry, GIS re-authenticates via popup.
  *
  * Scopes requested:
- *   - presentations: create & write Google Slides presentations
  *   - drive.file: per-file Drive access (app-created files + shared template copy)
+ *     This is sufficient because the app only creates new presentations and
+ *     copies its own shared template — it never accesses the user's existing slides.
  */
 
-const SCOPES = [
-  'https://www.googleapis.com/auth/presentations',
-  'https://www.googleapis.com/auth/drive.file',
-].join(' ')
+const SCOPES = 'https://www.googleapis.com/auth/drive.file'
 
 const TOKEN_STORAGE_KEY = 'gis_access_token'
 const TOKEN_EXPIRY_KEY = 'gis_token_expires_at'
-const SCOPE_VERSION = 'v4'
+const SCOPE_VERSION = 'v5'
 const SCOPE_VERSION_KEY = 'gis_scope_version'
 const CONSENTED_KEY = 'gis_has_consented'
 
