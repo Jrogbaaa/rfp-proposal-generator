@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-04-13] — Fix Google Search Console duplicate-page indexing errors
+
+### Added
+- **`index.html`** — Canonical tag (`<link rel="canonical">`), meta description, and robots meta tag
+- **`public/privacy.html`** — Canonical tag, meta description, and robots meta tag
+- **`public/terms.html`** — Canonical tag, meta description, and robots meta tag
+- **`public/robots.txt`** — Blocks `/api/` from crawlers, references sitemap
+- **`public/sitemap.xml`** — Lists all three indexable pages with priority and change frequency
+
+### Changed
+- **`vercel.json`** — Added 301 redirect from Vercel subdomain (`rfp-proposal-generator-kappa.vercel.app`) to `rfpparamount.com`; set `trailingSlash: false` to prevent duplicate `/` vs `/index.html` URLs; added `X-Robots-Tag` headers (noindex on `/api/` routes)
+
+### Why
+Google Search Console flagged "Duplicate without user-selected canonical" — the site had no canonical tags, no robots.txt, no sitemap, and the Vercel subdomain was live alongside the custom domain. Google was seeing multiple URLs for the same content and couldn't determine the authoritative version.
+
+---
+
 ## [2026-04-09] — Narrow OAuth Scope: drop `presentations`, keep `drive.file`
 
 ### Changed
