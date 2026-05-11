@@ -1044,7 +1044,12 @@ User request: ${userInstruction}`;
     ITERATE_SYSTEM_PROMPT,
   ].filter(Boolean).join('\n\n');
 
+  // #region agent log
+  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',hypothesisId:'C',location:'llmService.ts:iterate-entry',message:'iterate entry',data:{activeDeckType,userInstruction:userInstruction.slice(0,200),hasShowcase:!!currentExpansions?.showcaseContent,hasFlexibleSlides:!!currentExpansions?.flexibleSlides,briefLen:briefText.length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
   let content: string | undefined;
+  let lastFinishReason: string | undefined;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const response = await fetchWithRetry(GEMINI_PROXY, {
       method: 'POST',
@@ -1069,6 +1074,8 @@ User request: ${userInstruction}`;
 
     const result = await response.json();
     validateGeminiBody(result);
+    const cand = (result.candidates as Record<string, unknown>[] | undefined)?.[0];
+    lastFinishReason = cand?.finishReason as string | undefined;
     content = result.candidates?.[0]?.content?.parts?.[0]?.text;
     if (content) break;
 
@@ -1076,6 +1083,10 @@ User request: ${userInstruction}`;
       console.warn(`[LLM Service] Empty iterate response, retrying (${attempt + 1}/${MAX_RETRIES})…`);
     }
   }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',hypothesisId:'A,B,E',location:'llmService.ts:iterate-raw-content',message:'raw content from Gemini',data:{finishReason:lastFinishReason,contentLen:content?.length??0,prefix:content?.slice(0,400)??null,suffix:content?.slice(-200)??null,hasMarkdownFence:typeof content==='string'&&/```/.test(content),startsWithBrace:typeof content==='string'&&content.trim().startsWith('{'),endsWithBrace:typeof content==='string'&&content.trim().endsWith('}')},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   if (!content) {
     throw new Error('No content returned from Gemini iterate after retries');
@@ -1112,9 +1123,17 @@ User request: ${userInstruction}`;
   };
   try {
     parsed = JSON.parse(content);
-  } catch {
+  } catch (e) {
+    // #region agent log
+    const errMsg = e instanceof Error ? e.message : String(e);
+    fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',hypothesisId:'A,B,E',location:'llmService.ts:iterate-parse-fail',message:'JSON.parse failed',data:{errMsg,contentLen:content.length,fullContent:content.slice(0,4000),tail:content.slice(-500)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     throw new Error('Failed to parse iterate response as JSON');
   }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',hypothesisId:'C,D',location:'llmService.ts:iterate-parsed-shape',message:'parsed JSON shape',data:{activeDeckType,parsedKeys:Object.keys(parsed||{}),hasUpdatedContent:!!parsed.updatedContent,hasUpdatedExpansions:!!parsed.updatedExpansions,updatedContentKeys:parsed.updatedContent?Object.keys(parsed.updatedContent):null,additionalSlidesCount:Array.isArray(parsed.additionalSlides)?parsed.additionalSlides.length:0,reply:typeof parsed.reply==='string'?parsed.reply.slice(0,200):null,offSchemaTopKeys:Object.keys(parsed||{}).filter(k=>!['reply','updatedContent','updatedExpansions','additionalSlides'].includes(k))},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   const output: { reply: string; updatedExpansions?: ExpandedContent } = { reply: parsed.reply };
 
@@ -1178,6 +1197,10 @@ User request: ${userInstruction}`;
       };
     }
   }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',hypothesisId:'C,D',location:'llmService.ts:iterate-output',message:'iterate output ready',data:{activeDeckType,hasUpdatedExpansions:!!output.updatedExpansions,updatedKeys:output.updatedExpansions?Object.keys(output.updatedExpansions):null,replyPreview:output.reply?.slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   return output;
 }
