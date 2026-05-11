@@ -29,6 +29,7 @@ interface Window {
         initTokenClient: (config: {
           client_id: string
           scope: string
+          include_granted_scopes?: boolean
           callback: (response: GISTokenResponse) => void
         }) => GISTokenClient
         revoke: (token: string, callback: () => void) => void

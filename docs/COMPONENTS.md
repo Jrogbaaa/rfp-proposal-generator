@@ -190,7 +190,9 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `clearExpiredToken(): void` — Clears in-memory + localStorage token if expired (used by visibilitychange handler)
 - `revokeToken(): void` — Clears cached token and revokes with Google
 
-**Scopes:** `https://www.googleapis.com/auth/drive.file` only (non-sensitive). The `presentations` scope was removed after Google verification review — `drive.file` is sufficient because the app only creates new presentations and copies its own shared template; it never accesses the user's existing slides. Scope version `v5` — users on `v4` are prompted to re-consent.
+**Scopes:** `https://www.googleapis.com/auth/drive.file` only (non-sensitive). The `presentations` scope was removed after Google verification review — `drive.file` is sufficient because the app only creates new presentations and copies its own shared template; it never accesses the user's existing slides. Scope version `v6` — users on any earlier version are prompted to re-consent.
+
+**`include_granted_scopes: false`** is set on `initTokenClient` (overrides the GIS default of `true`). This disables incremental authorization: each token request is evaluated strictly against the scopes listed in this config, not the union with any scopes the user has previously granted to this client. Required because pre-2026-04-09 users granted the (then-required, since-removed) sensitive `presentations` scope; with incremental auth on, Google's consent service would treat those historical grants as still part of the request and surface the "unverified app" warning even though the project is verified for the currently-registered scope set.
 
 **Notes:** Token persisted to `localStorage` (`gis_access_token` + `gis_token_expires_at`) on sign-in and restored on page load. Survives refreshes for the ~1-hour token lifetime. After first consent, `prompt: ''` is used for faster/silent re-auth (tracked via `gis_has_consented` localStorage key). `App.tsx` has a `visibilitychange` handler that calls `clearExpiredToken()` when the user returns to the tab after idle.
 

@@ -252,6 +252,21 @@ declare global { interface Window { google?: { ... } } }
 
 ---
 
+### "Google hasn't verified this app" warning shown even though Cloud Console says verified
+**Error:** Users see the "Google hasn't verified this app — the app is requesting access to **sensitive info** in your Google Account" warning on the consent screen. Cloud Console reports the app as verified (green check in Verification Center), only `drive.file` (non-sensitive) is listed under the project's scopes, no sensitive or restricted scopes are present, and publishing status is "In production." OAuth client ID in the popup URL exactly matches the verified project. Verification flipped over a week ago — not a propagation delay. `scope=` in the popup URL only ever contains `drive.file`.
+
+**Cause:** GIS's `initTokenClient` defaults `include_granted_scopes` to `true`. If a user previously granted a sensitive scope (in this codebase: `presentations`, removed 2026-04-09) to this OAuth client, that grant is sticky on their account forever until they revoke. With incremental auth on, Google's consent service evaluates the **union** of currently-requested scopes plus the user's historical grants against this client_id — so a user who once granted `presentations` is treated as still requesting `presentations` even when the runtime request asks only for `drive.file`. The verification only covers the currently-registered scope set (`drive.file`), so the historical sensitive scope appears unverified and the warning fires. Nothing is wrong with the verification itself, the project, the client, or the env vars — the bug is entirely in the GIS request flags.
+
+**Solution:**
+1. Set `include_granted_scopes: false` in `initTokenClient` config in `src/utils/googleAuth.ts`. This disables incremental authorization and scopes each request strictly to what's listed.
+2. Add the new field to the ambient `initTokenClient` type in `src/vite-env.d.ts` so TypeScript accepts it.
+3. Bump `SCOPE_VERSION` so every browser drops its cached token/consent flag and re-runs consent against the clean request.
+4. For already-affected users, also revoke at <https://myaccount.google.com/permissions> ("Remove access") to clear the historical grant. After step 1 is deployed, future consents will be clean automatically and revoke isn't strictly necessary — but it's the only way to remove the warning for a user on this Google account if they need access before the deploy lands.
+
+**Anti-pattern:** Re-submitting for Google verification, re-publishing the app, removing+re-adding `drive.file` from the consent screen, or recreating the OAuth client. None of these address the historical-grant + incremental-auth interaction; they just churn Cloud Console state.
+
+---
+
 ### "Google sign-in failed: access_denied"
 **Cause:** User clicked "Cancel" on the OAuth consent screen, or the OAuth app is in "Testing" mode and the user's email isn't added as a test user.
 **Solution:**

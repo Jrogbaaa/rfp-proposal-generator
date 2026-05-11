@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-05-11] — Fix lingering "Google hasn't verified this app" warning post-verification
+
+### Fixed
+- **`src/utils/googleAuth.ts`** — Added `include_granted_scopes: false` to `initTokenClient` config. Pre-2026-04-09, the app requested the sensitive `presentations` scope; any user who consented then has a sticky grant on their Google account for that scope against this OAuth client. With GIS's default `include_granted_scopes: true` (incremental authorization), Google's consent service rolls those historical sensitive grants into the current `drive.file`-only request — making the "Google hasn't verified this app" warning appear even though the project is fully verified (green check in Cloud Console → APIs & Services → Verification Center, only `drive.file` listed under non-sensitive scopes, no sensitive/restricted scopes, status In Production). Setting this to `false` scopes each request strictly to the currently-requested scope set.
+- **`src/utils/googleAuth.ts`** — Bumped `SCOPE_VERSION` from `v5` → `v6`. Every browser will drop its cached token + consent flag on next load and re-run consent against the now-clean request, completing the fix end-to-end.
+- **`src/vite-env.d.ts`** — Added `include_granted_scopes?: boolean` to the ambient `initTokenClient` config type so TypeScript accepts the new field.
+
+### Why
+Project + consent screen on Google's side were correctly verified weeks ago, OAuth client ID at runtime matched the verified project (`1077225057398-juibh7lmevfjot7qin4hkaio2v4vlhfe.apps.googleusercontent.com`), and the popup auth URL only ever requested `scope=https://www.googleapis.com/auth/drive.file`. The warning persisted because each test user's account still had a historical grant for `presentations` against this client — Google's consent UX evaluates the **effective** scope set under incremental auth, not just what the current request asks for, and the verification only covers the currently-registered scopes. This was invisible from Cloud Console because nothing on Google's side was misconfigured; the bug lived in the GIS request flags.
+
+### User-facing remediation for already-affected users
+Any user who consented to a previous version (with `presentations`) may need to revoke once at <https://myaccount.google.com/permissions> (find the app, "Remove access") so Google clears the sticky `presentations` grant. After this fix is deployed, all new consents (and re-consents) will be clean and the warning won't re-appear.
+
+---
+
 ## [2026-05-11] — Fix PDF brief upload 504 / `Gemini API request timed out`
 
 ### Fixed

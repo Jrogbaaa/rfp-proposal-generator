@@ -9,13 +9,21 @@
  *   - drive.file: per-file Drive access (app-created files + shared template copy)
  *     This is sufficient because the app only creates new presentations and
  *     copies its own shared template — it never accesses the user's existing slides.
+ *
+ * `include_granted_scopes: false` is critical. Pre-2026-04-09, the app requested
+ * `presentations` (sensitive). Any user who consented then has a sticky grant for
+ * `presentations` on their account. With incremental auth enabled (the GIS default),
+ * Google's consent service rolls those historical sensitive grants into the current
+ * request — which makes the consent screen show the "unverified app" warning even
+ * though the project is verified for `drive.file` only. Setting this to `false`
+ * scopes each request strictly to what's listed below.
  */
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file'
 
 const TOKEN_STORAGE_KEY = 'gis_access_token'
 const TOKEN_EXPIRY_KEY = 'gis_token_expires_at'
-const SCOPE_VERSION = 'v5'
+const SCOPE_VERSION = 'v6'
 const SCOPE_VERSION_KEY = 'gis_scope_version'
 const CONSENTED_KEY = 'gis_has_consented'
 
@@ -77,6 +85,7 @@ export function requestGoogleToken(): Promise<string> {
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: SCOPES,
+      include_granted_scopes: false,
       callback: (response) => {
         clearTimeout(timeoutId)
         if (response.error) {
