@@ -171,23 +171,31 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
     pdfPart = { file_data: { mime_type: 'application/pdf', file_uri: uploadedFileUri } };
   } else {
     const base64Data = await fileToBase64(file);
+    // #region agent log
+    fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9210d'},body:JSON.stringify({sessionId:'e9210d',location:'llmService.ts:analyzeBriefPdf-inline',message:'building inline_data part for PDF',hypothesisId:'A',data:{fileSize:file.size,base64Length:base64Data.length,strategy:'inline_data',largePdfThreshold:LARGE_PDF_THRESHOLD},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     pdfPart = { inline_data: { mime_type: 'application/pdf', data: base64Data } };
   }
 
-  const makeRequest = (withResponseMimeType: boolean) =>
-    fetchWithRetry(GEMINI_PROXY, {
+  const makeRequest = (withResponseMimeType: boolean) => {
+    const bodyStr = JSON.stringify({
+      contents: [{ role: 'user', parts: [pdfPart, { text: PDF_EXTRACTION_PROMPT }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        ...NO_THINKING,
+        ...(withResponseMimeType ? { responseMimeType: 'application/json' } : {}),
+      },
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9210d'},body:JSON.stringify({sessionId:'e9210d',location:'llmService.ts:analyzeBriefPdf-makeRequest',message:'about to POST generate-content',hypothesisId:'A',data:{bodyBytes:bodyStr.length,withResponseMimeType,strategy:uploadedFileUri?'file_data':'inline_data'},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return fetchWithRetry(GEMINI_PROXY, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [pdfPart, { text: PDF_EXTRACTION_PROMPT }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-          ...NO_THINKING,
-          ...(withResponseMimeType ? { responseMimeType: 'application/json' } : {}),
-        },
-      }),
+      body: bodyStr,
     }, { timeoutMs: 90_000 });
+  };
 
   try {
     let response = await makeRequest(true);
