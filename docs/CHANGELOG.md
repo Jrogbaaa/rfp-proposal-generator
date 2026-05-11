@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-05-11] — Fix Step 2 chat iteration: slides now update from chat prompts
+
+### Fixed
+- **`src/utils/llmService.ts`** — `ITERATE_SYSTEM_PROMPT` rewritten with a full slide map (slide 2 → `culturalShift`, slide 3 → `realProblem`, slide 4 → `costOfInaction`, slide 5 → `coreInsight`, slide 7 → `proofPoints`, slide 8 → `approachSteps`, slide 9 → `customPlan`, slide 11 → `nextSteps`). The previous prompt only output `problemExpansions`/`benefitExpansions` — fields that never appear in the Paramount persuasion deck — so chat edits had no visible effect on the slides.
+- **`src/utils/llmService.ts`** — `iterateProposalContent` now sends all current persuasion-engine slide content as context and merges all returned fields back into `ExpandedContent`. Both slide-specific prompts ("make slide 3 more punchy") and general prompts ("tighten everything") now update the correct live slide fields.
+- **`src/utils/llmService.ts`** — Extended legacy `updatedExpansions` type in the parsed response to include all persuasion-engine fields, resolving TypeScript build errors introduced by the merge logic.
+- **`src/utils/pptxExport.ts`** — Drive upload now throws `RATE_LIMITED:` on HTTP 429, so `GoogleSlidesButton` surfaces "Google API rate limit reached" instead of a raw error string.
+- **`e2e/app.spec.ts`** — Fixed Drive API route mock from `https://www.googleapis.com/drive/**` to `https://www.googleapis.com/**drive**` to match the pptx-upload path (`/upload/drive/v3/files`). Added `webViewLink` to mock response so `onSuccess` receives a valid URL and the app transitions to the share step. All 54 tests now pass.
+- **`e2e/app.spec.ts`** — Updated `geminiIterationBody` to return `updatedContent` with all persuasion-engine fields matching the new iterate schema.
+- **`e2e/app.spec.ts`** — Rewrote "rate limit" test to mock Drive 429 (not Slides API, which is no longer called); rewrote "Slides API 401 mid-batch" test to test the Drive-upload happy path since the old Slides batch-update flow no longer exists.
+
+### Why
+Chat prompts in Step 2 visually appeared to work (the AI replied) but the slide preview never changed. The iterate system only updated fields used by the legacy content-review UI, not by the persuasion deck renderer. Users typing "make slide 3 more aggressive" or "tighten everything" saw no change in the slides.
+
+---
+
 ## [2026-05-11] — Fix 500 on PDF upload + missing pptxgenjs dependency breaking CI
 
 ### Fixed

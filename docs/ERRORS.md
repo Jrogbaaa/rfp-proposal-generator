@@ -13,6 +13,34 @@ When you encounter an error:
 
 ---
 
+## LLM / Chat Iteration Errors
+
+### Chat prompts appear to work but slide preview never changes
+
+**Symptom:** User types in the Step 2 chat (e.g. "make slide 3 more concise", "tighten everything"). The AI replies with a confirmation message, the "Writing" indicator appears, but the slide cards in the preview do not visibly update.
+
+**Cause:** The `ITERATE_SYSTEM_PROMPT` response schema only included `problemExpansions` and `benefitExpansions`. These fields are used by the legacy content-review UI but are **not rendered in the Paramount persuasion deck**. The actual deck slides are driven by `culturalShift`, `realProblem`, `costOfInaction`, `coreInsight`, `proofPoints`, `customPlan`, `approachSteps`, and `nextSteps`. Any chat edit silently updated invisible fields.
+
+**Solution:** Ensure `ITERATE_SYSTEM_PROMPT` lists a slide map and the response schema covers all slide-driving fields. `iterateProposalContent` must also pass current values for all fields as context (so the LLM knows what to edit) and merge all returned fields back into `ExpandedContent`. See `src/utils/llmService.ts` — `ITERATE_SYSTEM_PROMPT` and the `uc` merge block.
+
+**Diagnostic tip:** If chat edits seem to have no effect, log `output.updatedExpansions` after the iterate call and check which fields are non-null. Cross-reference with `slideBuilder.ts` to confirm those fields actually drive any slide cards.
+
+---
+
+### E2E tests: `goToShareStep` times out waiting for "Presentation created!"
+
+**Symptom:** Tests that call `goToShareStep()` fail at `expect(page.getByText('Presentation created!')).toBeVisible()`.
+
+**Cause (1):** Drive mock uses `'https://www.googleapis.com/drive/**'` which only matches paths starting with `/drive/`. The pptx-upload path is `https://www.googleapis.com/upload/drive/v3/files` (note `/upload/` prefix). The mock never fires, the real request fails or is blocked, and `onSuccess` is never called.
+
+**Solution:** Use `'https://www.googleapis.com/**drive**'` as the Playwright route pattern — `**` matches across slashes so it catches both `/drive/...` and `/upload/drive/...`.
+
+**Cause (2):** Mock response returns `{ id: 'fake-presentation-id' }` without `webViewLink`. `uploadPptxToDrive` returns `result.webViewLink` which is `undefined`, so `onSuccess(undefined)` is called. `slidesUrl` becomes falsy and the share screen's "Open in Google Slides" link never renders — but more critically `handleSlidesSuccess` still calls `setCurrentStep('share')` so the heading appears. **However**, if `onSuccess` is not called at all (e.g. because the mock doesn't match), the entire step 3 transition never happens.
+
+**Solution:** Always include `webViewLink` in the Drive mock response: `{ id: 'fake-presentation-id', webViewLink: 'https://docs.google.com/presentation/d/fake-presentation-id/edit' }`.
+
+---
+
 ## Build / CI Errors
 
 ### `TS2307: Cannot find module 'pptxgenjs' or its corresponding type declarations`
