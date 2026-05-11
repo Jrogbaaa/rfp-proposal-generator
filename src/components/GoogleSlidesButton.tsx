@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ProposalData, ExpandedContent, DesignConfig, BrandVoiceProfile } from '../types/proposal'
 import { ensureFreshToken } from '../utils/googleAuth'
-import { createGoogleSlidesPresentation } from '../utils/googleSlides'
+import { exportPresentationViaDrive } from '../utils/pptxExport'
 import { generateProposalContent } from '../utils/llmService'
 import { GeminiBlockedError } from '../utils/llmService'
 import { FetchTimeoutError, FetchRetryExhaustedError } from '../utils/fetchWithRetry'
@@ -23,8 +23,8 @@ type Stage = 'idle' | 'authenticating' | 'generating' | 'creating' | 'done' | 'e
 const PROGRESS_STEPS = [
   'Connecting to Google...',
   'Generating slide content...',
-  'Building slides...',
-  'Populating slides...',
+  'Designing slides...',
+  'Uploading to Google Drive...',
   'Finalising...',
 ]
 
@@ -99,9 +99,9 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
       setStage('creating')
       setProgressStep(3)
 
-      // Step 4: Re-validate token right before Slides creation (generation may have consumed time)
+      // Step 4: Re-validate token right before export (generation may have consumed time)
       const tokenGetter = () => ensureFreshToken()
-      const result = await createGoogleSlidesPresentation(proposalData, tokenGetter, designConfig)
+      const result = await exportPresentationViaDrive(proposalData, designConfig ?? { colorTheme: 'navy-gold' }, tokenGetter)
       setProgressStep(4)
 
       setSlidesUrl(result.presentationUrl)
