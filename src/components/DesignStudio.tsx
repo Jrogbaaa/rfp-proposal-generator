@@ -104,7 +104,7 @@ export default function DesignStudio({
   const isDone = phase === 'done' || phase === 'exported'
 
   return (
-    <div className="min-h-[calc(100vh-8.5rem)] bg-cream-50 flex flex-col">
+    <div className="h-[calc(100vh-8.5rem)] bg-cream-50 flex flex-col">
       {/* Header bar */}
       <div className="bg-navy-800 text-cream-100 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -177,7 +177,7 @@ export default function DesignStudio({
                 slide={slides[focusedSlide]}
                 designConfig={designConfig}
                 overrides={overrides[focusedSlide]}
-                scale={0.78}
+                scale={0.60}
               />
             </motion.div>
           )}
@@ -324,14 +324,14 @@ export default function DesignStudio({
         </div>
       </div>
 
-      {/* Hidden full-res slides for html2canvas — absolutely off-screen but in layout */}
-      <div style={{ position: 'relative', width: 0, height: 0, overflow: 'visible' }}>
+      {/* Hidden full-res slides for html2canvas — fixed so they never affect scroll height */}
       <div
         style={{
-          position: 'absolute',
+          position: 'fixed',
           left: -9999,
           top: 0,
           pointerEvents: 'none',
+          zIndex: -1,
         }}
         aria-hidden
       >
@@ -345,7 +345,6 @@ export default function DesignStudio({
             scale={1}
           />
         ))}
-      </div>
       </div>
     </div>
   )
