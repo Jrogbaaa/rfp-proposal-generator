@@ -32,8 +32,17 @@ app.use((_req, res) => {
 })
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const e = err as Error & { status?: number; statusCode?: number; length?: number; limit?: number }
   console.error('[server] Unhandled error:', err.message)
-  res.status(500).json({ error: 'Internal server error' })
+  const status = typeof e.status === 'number' ? e.status
+    : typeof e.statusCode === 'number' ? e.statusCode
+    : 500
+  const message = status === 413
+    ? `Request payload too large (limit: ${e.limit ?? 'unknown'} bytes, got: ${e.length ?? 'unknown'} bytes)`
+    : status >= 400 && status < 500
+      ? err.message || 'Bad request'
+      : 'Internal server error'
+  res.status(status).json({ error: message })
 })
 
 const PORT = process.env.PORT || 3001

@@ -13,6 +13,24 @@ When you encounter an error:
 
 ---
 
+## Build / CI Errors
+
+### `TS2307: Cannot find module 'pptxgenjs' or its corresponding type declarations`
+**Error (Vercel / GitHub Actions):**
+```
+src/utils/pptxExport.ts(19,21): error TS2307: Cannot find module 'pptxgenjs' or its corresponding type declarations.
+Error: Process completed with exit code 2.
+```
+Local `npm run build` succeeds; CI fails.
+
+**Cause:** `src/utils/pptxExport.ts` imports `pptxgenjs`, but the package was never declared in `package.json`. The local `node_modules` happened to have it (likely from an interactive `npm install pptxgenjs` that ran without `--save`), so local builds pass. CI does a fresh `npm install` driven by `package.json` / `package-lock.json`, which omits the package, and `tsc` then can't resolve the import.
+
+**Solution:** Declare the dependency. `npm install pptxgenjs@^4.0.1 --save-exact=false` (or hand-edit `package.json`) so both `package.json` and `package-lock.json` capture it, then commit both. CI's next `npm install` will fetch it and `tsc` will be happy.
+
+**Diagnostic tip:** When `tsc` says `TS2307` for a package that "obviously" exists locally, run `git show origin/main:package.json | grep <pkg>` — if it's missing there, that's the entire bug. Always declare deps via `npm install <pkg>` (not by manually dropping things into `node_modules`).
+
+---
+
 ## Express / API Server Errors
 
 ### PDF upload returns 500 / `GEMINI_500: Internal server error` (PayloadTooLargeError masked)

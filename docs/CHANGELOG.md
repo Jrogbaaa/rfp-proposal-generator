@@ -1,13 +1,16 @@
 # Changelog
 
-## [2026-05-11] — Fix 500 error on PDF brief upload (PayloadTooLargeError masked as 500)
+## [2026-05-11] — Fix 500 on PDF upload + missing pptxgenjs dependency breaking CI
 
 ### Fixed
 - **`server/routes/gemini.ts`** — Raised `express.json` limit on `/generate-content` from `2mb` to `25mb`. The client sends PDFs up to 15 MB inline as base64 (≈ 1.33× overhead → ~20 MB JSON bodies), which exceeded the previous limit and caused body-parser to throw `PayloadTooLargeError` before the route handler ran.
-- **`server/index.ts`** — Global error handler now respects `err.status` / `err.statusCode` instead of unconditionally returning 500. Payload-too-large errors now surface as 413, with a descriptive message including the limit and actual length; other 4xx errors propagate their original status. This also stops `fetchWithRetry` from retrying non-retryable client errors three times.
+- **`server/index.ts`** — Global error handler now respects `err.status` / `err.statusCode` instead of unconditionally returning 500. Payload-too-large errors now surface as 413 with a descriptive message including the limit and actual length; other 4xx errors propagate their original status. This also stops `fetchWithRetry` from retrying non-retryable client errors three times.
+- **`package.json` / `package-lock.json`** — Added `pptxgenjs@^4.0.1` as a declared dependency. `src/utils/pptxExport.ts` has been importing `pptxgenjs` for some time, but the dependency was never declared in `package.json`, so `npm install` on Vercel/GitHub CI didn't fetch it and `tsc` failed with `TS2307: Cannot find module 'pptxgenjs' or its corresponding type declarations`. Local dev worked only because the package happened to be present in the local `node_modules`.
 
 ### Why
 PDF upload on the main dashboard returned `500 GEMINI_500: Internal server error` (visible in `PdfUploader` console log). Runtime instrumentation proved body-parser was rejecting a ~4 MB request body against a 2 MB limit and the global handler was masking the real 413 as 500. Text-only prompting was unaffected because its body is tiny.
+
+The `pptxgenjs` CI failure was an undeclared-dependency drift surfaced by the same session's `npm install` on a fresh CI cache.
 
 ---
 

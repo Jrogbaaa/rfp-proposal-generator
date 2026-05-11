@@ -37,7 +37,7 @@ function missingKey(res: Response) {
   return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server' })
 }
 
-router.post('/generate-content', express.json({ limit: '2mb' }), async (req: Request, res: Response) => {
+router.post('/generate-content', express.json({ limit: '25mb' }), async (req: Request, res: Response) => {
   if (checkRate(req, res)) return
   if (!GEMINI_API_KEY) return missingKey(res)
 
