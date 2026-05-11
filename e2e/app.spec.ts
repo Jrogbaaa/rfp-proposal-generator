@@ -248,8 +248,14 @@ async function goToShareStep(page: Page) {
   await expect(
     page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
   ).toBeVisible({ timeout: 10000 })
+  // Enter AI Design Studio
+  await page.getByRole('button', { name: /Design & Export/i }).click()
+  // Wait for AI design review to complete
+  await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
+  // Export via the GoogleSlidesButton inside DesignStudio
   await page.getByLabel('Create Google Slides presentation').click()
-  await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
+  // Wait for export to complete (Open in Google Slides link appears)
+  await expect(page.getByRole('link', { name: 'Open in Google Slides' })).toBeVisible({ timeout: 20000 })
 }
 
 function geminiContentWithApproachBody() {
@@ -422,7 +428,7 @@ test.describe('Step 2 – Slide Preview', () => {
 
   test('export button is visible in the sidebar', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByLabel('Create Google Slides presentation')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Design & Export/i })).toBeVisible()
   })
 })
 
@@ -509,23 +515,23 @@ test.describe('Step 2 – Chat Interface', () => {
 test.describe('Step 2 – Export Button', () => {
   test('is enabled when brief is present', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(page.getByLabel('Create Google Slides presentation')).toBeEnabled()
+    await expect(page.getByRole('button', { name: /Design & Export/i })).toBeEnabled()
   })
 
-  test('shows helper hint about creating a presentation', async ({ page }) => {
+  test('transitions to AI Design Studio when clicked', async ({ page }) => {
     await goToIterateStep(page)
-    await expect(
-      page.getByText('Creates a professional presentation in your Google Drive')
-    ).toBeVisible()
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText('AI Design Studio')).toBeVisible({ timeout: 5000 })
   })
 })
 
 // ─── Step 3: Share Screen ─────────────────────────────────────────────────────
 
 test.describe('Step 3 – Share Screen', () => {
-  test('shows "Presentation created!" success heading', async ({ page }) => {
+  test('shows "AI Design Studio" header and "Open in Google Slides" after export', async ({ page }) => {
     await goToShareStep(page)
-    await expect(page.getByText('Presentation created!')).toBeVisible()
+    // goToShareStep already confirms "Open in Google Slides" is visible after export
+    await expect(page.getByRole('link', { name: 'Open in Google Slides' })).toBeVisible()
   })
 
   test('shows "Open in Google Slides" link pointing to the fake presentation', async ({ page }) => {
@@ -582,7 +588,7 @@ test.describe('Step 3 – Share Screen', () => {
 
   test('description names the client company', async ({ page }) => {
     await goToShareStep(page)
-    // The description paragraph on the share screen
+    // The description in DesignStudio's exported state
     const desc = page.locator('p').filter({ hasText: 'is live in Google Drive' })
     await expect(desc).toContainText('Starbucks')
   })
@@ -751,6 +757,9 @@ test.describe('Error and auth failure scenarios', () => {
       page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
+    // Enter Design Studio, wait for review, then click export
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
     await page.getByLabel('Create Google Slides presentation').click()
 
     // Error UI must appear — auth was denied
@@ -785,6 +794,9 @@ test.describe('Error and auth failure scenarios', () => {
       page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
+    // Enter Design Studio, wait for review, then click export
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
     await page.getByLabel('Create Google Slides presentation').click()
 
     // Rate limit message should appear
@@ -805,6 +817,10 @@ test.describe('Error and auth failure scenarios', () => {
     await expect(
       page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
+
+    // Enter Design Studio, wait for review
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
 
     // First attempt — fails with auth error
     await page.getByLabel('Create Google Slides presentation').click()
@@ -832,7 +848,7 @@ test.describe('Error and auth failure scenarios', () => {
     // Second attempt via "Try again" — should now succeed
     await page.getByRole('button', { name: /try again/i }).click()
     await page.getByLabel('Create Google Slides presentation').click()
-    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('link', { name: 'Open in Google Slides' })).toBeVisible({ timeout: 15000 })
   })
 })
 
@@ -953,8 +969,11 @@ test.describe('Resilience Hardening', () => {
       page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
+    // Enter Design Studio, wait for review, then export
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
     await page.getByLabel('Create Google Slides presentation').click()
-    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole('link', { name: 'Open in Google Slides' })).toBeVisible({ timeout: 15000 })
 
     tokenCallCount = await page.evaluate(() => (window as any).__tokenCallCount)
     expect(tokenCallCount).toBeGreaterThanOrEqual(2)
@@ -1013,8 +1032,11 @@ test.describe('Resilience Hardening', () => {
       page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
     ).toBeVisible({ timeout: 10000 })
 
+    // Enter Design Studio, wait for review, then export
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
     await page.getByLabel('Create Google Slides presentation').click()
-    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 20000 })
+    await expect(page.getByRole('link', { name: 'Open in Google Slides' })).toBeVisible({ timeout: 20000 })
 
     // Auth was requested at least once during the export flow
     const tokenCallCount = await page.evaluate(() => (window as any).__tokenCallCount)
@@ -1046,13 +1068,15 @@ test.describe('Resilience Hardening', () => {
     }).first()
     await expect(replyBubble).toBeVisible({ timeout: 10000 })
 
-    // Step 4: Export to Google Slides
+    // Step 4: Enter AI Design Studio and export
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText('AI Design Studio')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
     await page.getByLabel('Create Google Slides presentation').click()
 
-    // Step 5: Verify Share screen
-    await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 15000 })
+    // Step 5: Verify exported state in DesignStudio
     const link = page.getByRole('link', { name: 'Open in Google Slides' })
-    await expect(link).toBeVisible()
+    await expect(link).toBeVisible({ timeout: 15000 })
     const href = await link.getAttribute('href')
     expect(href).toContain('fake-presentation-id')
   })

@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-05-11] — Feature: AI Design Studio (Step 3)
+
+### Added
+- **`src/components/DesignStudio.tsx`** — New Step 3 component replacing the static success card. Renders slides as a live 16:9 visual presentation, runs a Gemini vision design review loop, shows real-time AI commentary and design score improvement (e.g. 7/10 → 9/10), then unlocks the Google Slides export button.
+- **`src/components/SlideCanvasRenderer.tsx`** — React component that renders a single `SlideData` as a properly designed 16:9 HTML/CSS slide. Supports five layout variants (`title`, `section`, `content`, `impact`, `closing`) using the active `DesignConfig` colour palette. Forwards a ref for html2canvas screenshotting.
+- **`src/utils/designReview.ts`** — Gemini vision feedback loop. Captures slide screenshots via `html2canvas`, sends them to the existing `/api/gemini/generate-content` proxy, parses structured design improvements (font sizes, bullet counts, title rewrites), and extrapolates results across slides of the same type.
+- **`html2canvas@^1.4.1`** added to `package.json` for client-side slide screenshotting.
+
+### Changed
+- **`src/App.tsx`** — Step 3 (`share`) now renders `<DesignStudio>` instead of the static "Presentation created!" success card. The GoogleSlidesButton in Step 2 is replaced with a "Design & Export Presentation" button that transitions to Step 3 immediately; the actual export button lives inside DesignStudio.
+- **`e2e/app.spec.ts`** — All 54 tests updated to reflect the new Step 3 flow: `goToShareStep` navigates through DesignStudio (waits for "Design optimized", clicks the embedded GoogleSlidesButton, waits for "Open in Google Slides" link). Step 2 export button tests updated to match the new button label. Step 3 share screen tests updated to assert against DesignStudio's exported state.
+
+### Why
+Step 3 was a static success card that just confirmed export was done. The new AI Design Studio makes the presentation generation feel live — slides render visually, the AI reviews each slide screenshot and suggests improvements (font sizes, bullet density, title length), and the user watches the design score improve before exporting. Uses Gemini Flash (already integrated) for vision, so no new API keys needed.
+
+---
+
 ## [2026-05-11] — Fix Step 2 chat iteration: slides now update from chat prompts
 
 ### Fixed

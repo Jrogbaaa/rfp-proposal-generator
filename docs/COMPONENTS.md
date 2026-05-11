@@ -16,7 +16,9 @@ Auto-generated documentation for all React components in the Paramount applicati
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
 | ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides. Slide-specific ("make slide 3 more punchy") and general ("tighten everything") prompts both update live slide fields via `iterateProposalContent`. |
 | SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (11 base persuasion arc + any additional); inline title/bullet editing on editable slides |
-| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → template copy → populate; accepts `preGeneratedContent`, `onSuccess` |
+| DesignStudio | `src/components/DesignStudio.tsx` | Step 3 — renders slides visually, runs Gemini vision design review loop, shows AI commentary and score improvement, then unlocks the Google Slides export |
+| SlideCanvasRenderer | `src/components/SlideCanvasRenderer.tsx` | Renders a single `SlideData` as a 16:9 HTML/CSS slide; 5 layout variants (title/section/content/impact/closing); forwardRef for html2canvas capture |
+| GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → template copy → populate; accepts `preGeneratedContent`, `onSuccess`; now embedded inside DesignStudio |
 | ProgressStepper | `src/components/ProgressStepper.tsx` | 3-step stepper (Draft/Refine/Export); only backward navigation to completed steps |
 | ErrorBoundary | `src/components/ErrorBoundary.tsx` | React error boundary with fallback UI |
 | DevTools | `src/components/DevTools.tsx` | Floating dev panel for error viewing (dev only, lazy-loaded) |

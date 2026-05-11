@@ -6,7 +6,7 @@ import BriefEditor from './components/BriefEditor'
 import PdfUploader from './components/PdfUploader'
 import SlidePreview from './components/SlidePreview'
 import ChatInterface from './components/ChatInterface'
-import GoogleSlidesButton from './components/GoogleSlidesButton'
+import DesignStudio from './components/DesignStudio'
 import ProgressStepper from './components/ProgressStepper'
 import BrandVoicePanel from './components/BrandVoicePanel'
 import { useBriefParser } from './hooks/useBriefParser'
@@ -177,12 +177,10 @@ export default function App() {
     setBriefText(text)
   }
 
-  const handleSlidesSuccess = useCallback((url: string) => {
-    setSlidesUrl(url)
+  const handleGoToDesignStudio = useCallback(() => {
     setCurrentStep('share')
     scrollToTop()
-    refreshAuthState()
-  }, [refreshAuthState])
+  }, [])
 
   const handleReset = useCallback(() => {
     if (briefText.trim() || expansions) {
@@ -694,93 +692,47 @@ export default function App() {
                     </div>
 
                     <div className="mt-3 pt-3 border-t border-white/10">
-                      <GoogleSlidesButton
-                        data={parsedData}
-                        briefText={briefText}
-                        isEmpty={!briefText.trim()}
-                        preGeneratedContent={expansions}
-                        onSuccess={handleSlidesSuccess}
-                        designConfig={designConfig}
-                        brandVoice={brandVoice}
-                      />
+                      <motion.button
+                        onClick={handleGoToDesignStudio}
+                        disabled={!briefText.trim()}
+                        whileHover={{ scale: 1.01, y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-navy-900 font-semibold text-sm shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <path d="M3 9h18M9 21V9" />
+                        </svg>
+                        Design &amp; Export Presentation
+                        <svg className="w-3.5 h-3.5 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                      </motion.button>
                     </div>
                   </div>
                 </section>
               </motion.div>
             )}
 
-            {/* ── STEP 3: EXPORT & SHARE ────────────────────────────────── */}
+            {/* ── STEP 3: AI DESIGN STUDIO ──────────────────────────────── */}
             {currentStep === 'share' && (
               <motion.div
                 key="share"
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.97 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                className="flex items-center justify-center min-h-[calc(100vh-8.5rem)] p-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
               >
-                <div className="w-full max-w-lg text-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200, damping: 18, delay: 0.1 }}
-                    className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6"
-                  >
-                    <svg className="w-10 h-10 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                      <polyline points="22 4 12 14.01 9 11.01" />
-                    </svg>
-                  </motion.div>
-
-                  <h1 className="font-display text-3xl text-navy-800 mb-2">
-                    Presentation created!
-                  </h1>
-                  <p className="text-navy-400 mb-8">
-                    Your proposal deck for{' '}
-                    <span className="font-semibold text-navy-700">
-                      {parsedData?.client?.company || 'your client'}
-                    </span>{' '}
-                    is live in Google Drive.
-                  </p>
-
-                  <div className="space-y-3">
-                    {slidesUrl && (
-                      <a
-                        href={slidesUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-3 w-full px-6 py-4 rounded-xl bg-navy-800 text-cream-100 font-semibold text-base hover:bg-navy-700 transition-colors shadow-md"
-                      >
-                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                          <polyline points="15 3 21 3 21 9" />
-                          <line x1="10" y1="14" x2="21" y2="3" />
-                        </svg>
-                        Open in Google Slides
-                      </a>
-                    )}
-
-                    {slidesUrl && (
-                      <a
-                        href={`mailto:?subject=${encodeURIComponent(`RFP: ${parsedData?.project?.title || 'Proposal'}`)}&body=${encodeURIComponent(`Hey team,\n\nHere's the first draft for ${parsedData?.client?.company || 'the proposal'}:\n${slidesUrl}\n\nLet me know what you think.`)}`}
-                        className="flex items-center justify-center gap-3 w-full px-6 py-4 rounded-xl border-2 border-navy-200 bg-white text-navy-800 font-semibold text-base hover:border-navy-300 hover:shadow-sm transition-all"
-                      >
-                        <svg className="w-5 h-5 text-navy-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                          <polyline points="22,6 12,13 2,6" />
-                        </svg>
-                        Share via Email
-                      </a>
-                    )}
-
-                    <button
-                      onClick={handleReset}
-                      className="w-full px-6 py-3 rounded-xl text-navy-500 text-sm font-medium hover:text-navy-700 hover:bg-cream-200 transition-colors"
-                    >
-                      Start new proposal
-                    </button>
-                  </div>
-                </div>
+                <DesignStudio
+                  parsedData={parsedData}
+                  briefText={briefText}
+                  expansions={expansions}
+                  designConfig={designConfig}
+                  brandVoice={brandVoice}
+                  clientCompany={parsedData?.client?.company ?? ''}
+                  projectTitle={parsedData?.project?.title ?? ''}
+                  onReset={handleReset}
+                />
               </motion.div>
             )}
 
