@@ -58,25 +58,27 @@ export default function DesignStudio({
     setPhase('reviewing')
     addLog('AI is scanning your slides for design issues...')
 
-    let firstScore: number | null = null
-    let lastScore: number | null = null
+    // Track per-slide before/after scores; report the average of each at the end.
+    const beforeScores: number[] = []
+    const afterScores: number[] = []
 
     const result = await runDesignLoop(
       builtSlides,
       (i) => slideRefs.current[i] ?? null,
-      ({ slideIndex, commentary, score }) => {
-        if (firstScore === null) firstScore = score
-        lastScore = score
-        setScoreStart(prev => prev ?? score)
-        setScoreFinal(Math.min(10, score + 2))
+      ({ slideIndex, commentary, score, scoreAfter }) => {
+        beforeScores.push(score)
+        afterScores.push(scoreAfter)
         addLog(`→ ${commentary}`, slideIndex)
         setFocusedSlide(slideIndex)
       },
     )
 
     setOverrides(result)
-    if (firstScore !== null) setScoreStart(firstScore)
-    if (lastScore !== null) setScoreFinal(Math.min(10, lastScore + 2))
+    if (beforeScores.length > 0) {
+      const avg = (arr: number[]) => Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+      setScoreStart(avg(beforeScores))
+      setScoreFinal(avg(afterScores))
+    }
 
     addLog('Design optimization complete.')
     setPhase('done')
@@ -146,7 +148,7 @@ export default function DesignStudio({
                   slide={slide}
                   designConfig={designConfig}
                   overrides={overrides[i]}
-                  scale={0.165}
+                  scale={0.0825}
                 />
                 {isReviewing && focusedSlide === i && (
                   <motion.div
@@ -177,7 +179,7 @@ export default function DesignStudio({
                 slide={slides[focusedSlide]}
                 designConfig={designConfig}
                 overrides={overrides[focusedSlide]}
-                scale={0.60}
+                scale={0.30}
               />
             </motion.div>
           )}

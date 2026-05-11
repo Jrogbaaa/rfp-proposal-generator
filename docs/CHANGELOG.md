@@ -1,5 +1,33 @@
 # Changelog
 
+## [2026-05-11] — Step 3 Design Studio overhaul: real design system + intelligent vision review
+
+### Added
+- **`src/utils/design/system.ts`** (new) — Single source of truth for slide design tokens. Modular type scale (display 156 / h1 112 / h2 84 / h3 64 / h4 48 / bodyLarge 36 / body 28 / bodySmall 26 / caption 22 / eyebrow 22 / numerals 144–480), sized for a 1920×1080 internal canvas so body text clears the 24px floor at export size. 4-based spacing scale (8 / 16 / 24 / 32 / 48 / 72 / 112 / 160). Per-theme color tokens (`ink`, `paper`, `accent`, `mute`, `surface`, `accentMute`) — no gradient stops, gradients are structurally impossible. Named padding presets (`generous`, `balanced`, `tight`). Display font is **Newsreader** (editorial serif), sans is **Manrope** — both non-Inter / non-Roboto / non-Fraunces by design.
+- **`src/utils/design/vocabulary.ts`** (new) — Shared contract between the AI design reviewer and the renderer. Exports the `LayoutVariant` enum (`title-editorial`, `title-stat`, `section-numeral`, `content-list`, `content-two-up`, `content-quote`, `content-stat-grid`, `content-timeline`, `impact-statement`, `closing-cta`), `Emphasis`, `Density`, `Tone` enums, the extended `SlideOverrides` interface (now carries `layoutVariant`, `emphasis`, `density`, `tone`, `eyebrow`, `titleText`, `bulletRewrites`, `maxBullets`, `promotedStat`), and a `defaultLayoutFor(slide)` / `pickLayout(slide, override)` that selects a layout by **content shape** instead of `slideNumber % 3`.
+- **`src/components/slides/*.tsx`** (new — 11 files) — Per-variant slide components, each ≤80 lines. `SlideFrame` owns the 1920×1080 canvas, scaling, background, and ref-forwarding. `TitleEditorial`, `TitleStat`, `SectionNumeral`, `ContentList`, `ContentTwoUp`, `ContentQuote`, `ContentStatGrid`, `ContentTimeline`, `ImpactStatement`, `ClosingCta` each compose tokens from the design system. Splits the previous 780-line monolith.
+- **Google Fonts @import** — `src/index.css`; Newsreader + Manrope loaded once at app boot with the weights the type scale needs. Added `text-wrap: pretty` / `text-wrap: balance` defaults scoped to `.slide-canvas`.
+
+### Changed
+- **`src/components/SlideCanvasRenderer.tsx`** — Rewritten from 780 lines of inline-styled hardcoded layouts to a 70-line dispatcher: resolves theme, picks layout variant (AI override → content-shape fallback), wraps in `SlideFrame`, renders the chosen variant. Internal canvas now **1920×1080** (was 960×540); display scales updated proportionally in DesignStudio (filmstrip 0.165 → 0.0825, focused 0.60 → 0.30) so visual size is unchanged. Re-exports `SlideOverrides` from the shared vocabulary for backwards compatibility.
+- **`src/utils/designReview.ts`** — Rewritten end-to-end. Old prompt only adjusted `titleFontSize` / `bodyFontSize` / `maxBullets` / `titleText` — purely text tweaks. New `REVIEW_SYSTEM_PROMPT` is a senior-designer prompt enforcing a strict anti-slop rubric (no filler, less is more, no data slop, hero specific stats only, one accent gesture enforced structurally) and asks the model to pick `layout_variant`, `emphasis`, `density`, `tone` plus optional `title_text` / `bullet_rewrites` / `promoted_stat`. Scores the **current render** against five named criteria (decorative-density, type-hierarchy, whitespace-ratio, content-density, anti-trope), returns the lowest as `quality_score` plus an estimated `quality_score_after`.
+- **`src/utils/designReview.ts`** — Review loop now **reviews every slide in parallel** (concurrency cap 4) instead of serial-reviewing 5 slides and extrapolating by `slide.type`. ~6s total for a 12-slide deck vs ~25s previously. Removes the "same type → same overrides" extrapolation that was making the whole deck feel uniform.
+- **`src/utils/designReview.ts`** — `captureSlideElement` now `await`s `document.fonts.ready` before rasterizing — html2canvas was capturing fallback-font metrics when the page hadn't finished loading Newsreader/Manrope yet, so the AI saw text that didn't match what the user sees.
+- **`src/components/DesignStudio.tsx`** — Score display now shows the **average of the reviewer's actual before/after scores** instead of `min(10, score + 2)` (the old fake "+2 improvement"). Commentary log entries now stream the reviewer's structured single-sentence improvement description as each slide completes in parallel.
+
+### Removed (from `SlideCanvasRenderer.tsx`)
+- All `linear-gradient(...)` calls — six of them, on title / section / closing / accent-bar / bottom-strip / variant-A backgrounds.
+- The variant-C content layout (rounded-cards-with-left-border-accent) — exactly the AI-slop trope the rubric calls out.
+- The `paramountFooter` repeated as a structural element on every slide.
+- The dot-style accent bullets on content layouts.
+- The combined top-accent-bar + bottom-accent-strip + corner-mark stacking — layouts now use **one** accent gesture each, picked by `toneDefaults()`.
+- The `slideNumber % 3` layout cycling — replaced with content-shape selection in `defaultLayoutFor(slide)`.
+
+### Why
+The in-app Step 3 preview was generic because (a) the base layouts violated four explicit anti-slop principles (gradient backgrounds everywhere, Inter-only, body text under 24px at export size, 3-4 accent gestures stacked per slide, the rounded-card-with-left-border-accent trope), and (b) the AI "design review" had no vocabulary for layout, emphasis, or composition — it could only tweak fonts. The Google Slides export looked better because it inherits a hand-designed template. Now the in-app renderer is constrained by tokens that make slop structurally impossible, and the AI reviewer can pick from a real layout vocabulary that the renderer enforces. The rubric (no filler, less is more, no data slop, 24px floor, no decorative gradient/emoji/left-border-accent tropes, layout variation as rhythm) is encoded in two places: as the **walls** of the renderer (deterministic, free, offline) and as the **rubric** in the reviewer prompt (runtime, per-slide judgment). The Google Slides export path (`googleSlidesTemplate.ts`) is intentionally untouched — the template-based export still looks correct; this overhaul brings the in-app preview up toward it.
+
+---
+
 ## [2026-05-11] — Fix Step 2 inline slide editing on paramount-rfp deck: click-off now persists edits
 
 ### Fixed
