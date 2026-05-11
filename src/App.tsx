@@ -594,7 +594,7 @@ export default function App() {
                         {/* Progress bar + phase labels */}
                         <div className="preview-paper rounded-lg px-6 py-5">
                           <p className="text-sm font-semibold text-navy-700 mb-3">
-                            Gemini is writing your proposal…
+                            Paramount Agent is writing your proposal…
                           </p>
                           <div className="h-1.5 bg-cream-200 rounded-full overflow-hidden mb-3">
                             <div
