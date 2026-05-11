@@ -14,7 +14,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 | BriefEditor | `src/components/BriefEditor.tsx` | Free-form brief text input (Step 1 paste mode) |
 | BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
-| ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides. Slide-specific ("make slide 3 more punchy") and general ("tighten everything") prompts both update live slide fields via `iterateProposalContent`. |
+| ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides. Deck-type aware: slide-specific ("make slide 4 only three bullets") and general ("tighten everything") prompts update the live slide fields used by the active deck (paramount-rfp, paramount-showcase, or generic) via `iterateProposalContent`. |
 | SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (11 base persuasion arc + any additional); inline title/bullet editing on editable slides |
 | DesignStudio | `src/components/DesignStudio.tsx` | Step 3 — renders slides visually, runs Gemini vision design review loop, shows AI commentary and score improvement, then unlocks the Google Slides export |
 | SlideCanvasRenderer | `src/components/SlideCanvasRenderer.tsx` | Renders a single `SlideData` as a 16:9 HTML/CSS slide; 5 layout variants (title/section/content/impact/closing); forwardRef for html2canvas capture |
@@ -82,7 +82,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 **Props:**
 - `briefText: string` — Raw brief text passed to Gemini as context
 - `parsedData: Partial<ProposalData> | null` — Structured brief data for richer context
-- `onExpansionsUpdated` — Callback fired when Gemini returns updated `problemExpansions` and/or `benefitExpansions`; `App.tsx` stores these for passing to `GoogleSlidesButton` as `preGeneratedContent`
+- `onExpansionsUpdated` — Callback fired when Gemini returns any updated expansion fields (deck-type aware: persuasion-arc fields for `paramount-rfp`, `showcaseContent.slides` for `paramount-showcase`, `flexibleSlides` for `generic`); `App.tsx` stores these and the slide preview re-renders live
 - `brandVoice?: BrandVoiceProfile` — Optional structured brand voice profile; forwarded to `iterateProposalContent()` as typed constraints ensuring refinements maintain the client's writing style
 
 **UI Structure:**
@@ -96,6 +96,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 - Auto-resize textarea grows with content up to 120px then scrolls
 - Calls `iterateProposalContent()` from `llmService.ts`
 - Displays Gemini reply text; silently updates expansions in the background via callback
+- **Deck-type aware:** Works against `paramount-rfp`, `paramount-showcase`, and `generic` decks. The `iterateProposalContent` schema exposes a separate response slot per deck type (`updatedContent` / `updatedShowcaseContent` / `updatedFlexibleSlides`) so a "make slide 4 only three bullets" prompt updates the right underlying field for the active deck and the preview rerenders.
 
 **LLM function used:** `iterateProposalContent(brief, parsedData, currentExpansions, instruction, history, brandVoice?: BrandVoiceProfile)` → `{reply, updatedExpansions?}`
 
@@ -248,7 +249,7 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 | contentExpander | `src/utils/contentExpander.ts` | Template-based content expansion for problems and benefits |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | Gemini 3 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()`, `iterateDesign()`, `extractBrandVoice()`. SYSTEM_PROMPT generates the 11-slide persuasion arc with dynamic client personalization, automated proof insertion (PROOF_POINTS_DATABASE), and industry-specific insights (INDUSTRY_INSIGHTS_MAP). All calls use `fetchWithRetry` + `validateGeminiBody()`. Exports `GeminiBlockedError` for typed error handling. |
+| llmService | `src/utils/llmService.ts` | Gemini 3 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()` (deck-type aware — `updatedContent` for paramount-rfp, `updatedShowcaseContent` for paramount-showcase, `updatedFlexibleSlides` for generic), `iterateDesign()`, `extractBrandVoice()`. SYSTEM_PROMPT generates the 11-slide persuasion arc with dynamic client personalization, automated proof insertion (PROOF_POINTS_DATABASE), and industry-specific insights (INDUSTRY_INSIGHTS_MAP). All calls use `fetchWithRetry` + `validateGeminiBody()`. Exports `GeminiBlockedError` for typed error handling. |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS; `ensureFreshToken(bufferMs)` for long-running flows |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system; `withBackoff` retries on 429 + 401 |
 | googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies template via Drive API, auto-discovers roles, clear-and-fill from SlideData[]; `withBackoff` retries on 429 + 401 |
@@ -269,11 +270,18 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 
 **Retry logic:** If `JSON.parse` fails (e.g. truncated output), retries once without `responseMimeType` + strips markdown fences via `extractJsonFromText()`.
 
-**New helpers:** `uploadToFilesApi(file, apiKey)`, `deleteFilesApiFile(fileUri, apiKey)`, `extractJsonFromText(text)`, `buildBriefText(extracted)`
+**New helpers:** `uploadToFilesApi(file, apiKey)`, `deleteFilesApiFile(fileUri, apiKey)`, `extractJsonFromText(text)`, `buildBriefText(extracted)`, `mergeFlexibleSlidesByKey(current, updates)` (merges LLM-returned slide arrays by `slideKey` for showcase / generic decks)
 
 **New constants:** `FILES_API_UPLOAD`, `FILES_API_BASE`, `LARGE_PDF_THRESHOLD` (15 MB), `MAX_PDF_SIZE` (50 MB, exported)
 
 **New export:** `extractBrandVoice(files, apiKey)` — brand voice extraction from reference files; uses same Files API routing threshold
+
+**`iterateProposalContent()` — deck-type aware response schema:** The iterate prompt exposes three mutually exclusive update slots so chat edits land on the field `buildSlidesFromData` actually reads for the active deck:
+- `updatedContent` → `paramount-rfp` (`culturalShift`, `realProblem`, `costOfInaction`, `coreInsight`, `proofPoints`, `approachSteps`, `customPlan`, `nextSteps`, …)
+- `updatedShowcaseContent` → `paramount-showcase` (full `slides` array keyed by `slideKey` plus optional `showcaseTitle`, `executiveSummary`, `audienceInsights`, `measurementFramework`)
+- `updatedFlexibleSlides` → `generic` (full `slides` array keyed by `slideKey`)
+
+The deck context shown to the model surfaces each existing slide's `slideKey` and numbers slides starting at 2 (slide 1 is always the cover) so user references like "make slide 4 three bullets" align with the preview. Merge logic in `iterateProposalContent` writes the returned slots back into `output.updatedExpansions.showcaseContent` / `.flexibleSlides` via `mergeFlexibleSlidesByKey`, replacing matching `slideKey`s and appending unknown ones. `additionalSlides` continues to append new slides regardless of deck type.
 
 ---
 
@@ -344,5 +352,5 @@ The Express dev server (`server/routes/gemini.ts`) and Vercel serverless functio
 ---
 
 ## Last Updated
-- Date: 2026-03-23
-- Changes: Backend parity fix — Express generate-content route now normalizes thinkingConfig and includes error detail, matching Vercel serverless function
+- Date: 2026-05-11
+- Changes: `iterateProposalContent` is now deck-type aware — added `updatedShowcaseContent` and `updatedFlexibleSlides` response slots + `mergeFlexibleSlidesByKey` so chat edits on `paramount-showcase` and `generic` decks update the actual slide preview (previously a no-op or JSON parse failure).
