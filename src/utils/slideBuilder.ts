@@ -26,6 +26,8 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   const project = data.project
   const expanded = data.expanded
 
+  const customTitlesAll = expanded?.customTitles ?? {}
+
   // Route to flexible slide builders for non-RFP deck types
   if (expanded?.deckType === 'paramount-showcase' && expanded.showcaseContent) {
     const sc = expanded.showcaseContent
@@ -60,7 +62,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         slideKey: 'audience_insights',
         editable: true,
         type: 'content',
-        title: 'Audience Insights',
+        title: customTitlesAll['audience_insights'] ?? 'Audience Insights',
         subtitle: 'Paramount reach & demographics',
         bullets: capBullets(sc.audienceInsights, MAX_BULLETS, MAX_BULLET_CHARS),
       })
@@ -72,19 +74,20 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         slideKey: 'measurement',
         editable: true,
         type: 'content',
-        title: 'Measurement Framework',
+        title: customTitlesAll['measurement'] ?? 'Measurement Framework',
         subtitle: undefined,
         bullets: capBullets(sc.measurementFramework, MAX_BULLETS, MAX_BULLET_CHARS),
       })
     }
     // Append any user-added additional slides
     ;(expanded.additionalSlides ?? []).forEach((s, i) => {
+      const key = `additional_${i}`
       slides.push({
         slideNumber: slideNum++,
-        slideKey: `additional_${i}`,
+        slideKey: key,
         editable: true,
         type: 'content',
-        title: s.title,
+        title: customTitlesAll[key] ?? s.title,
         subtitle: undefined,
         bullets: capBullets(s.bullets, MAX_BULLETS, MAX_BULLET_CHARS),
       })
@@ -96,7 +99,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     const slides: SlideData[] = []
     let slideNum = 1
     // Cover slide from project/request context
-    const title = project?.title || (expanded.flexibleSlides[0]?.title ?? 'Presentation')
+    const title = expanded.editedProjectTitle ?? project?.title ?? (expanded.flexibleSlides[0]?.title ?? 'Presentation')
     slides.push({
       slideNumber: slideNum++,
       slideKey: 'title',
@@ -120,12 +123,13 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     })
     // Append any user-added additional slides
     ;(expanded.additionalSlides ?? []).forEach((s, i) => {
+      const key = `additional_${i}`
       slides.push({
         slideNumber: slideNum++,
-        slideKey: `additional_${i}`,
+        slideKey: key,
         editable: true,
         type: 'content',
-        title: s.title,
+        title: customTitlesAll[key] ?? s.title,
         subtitle: undefined,
         bullets: capBullets(s.bullets, MAX_BULLETS, MAX_BULLET_CHARS),
       })

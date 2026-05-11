@@ -15,6 +15,18 @@ When you encounter an error:
 
 ## LLM / Chat Iteration Errors
 
+### Inline edit (click-to-edit) on a showcase or generic slide disappears when you click off
+
+**Symptom:** On a `paramount-showcase` or `generic` deck the user clicks a bullet or title in the Step 2 preview, types a change, presses Enter or clicks outside the slide. The edit appears briefly while the input is focused, then reverts back to the original text the next render.
+
+**Cause:** `App.tsx`'s `handleSlideEdit` / `handleSlideTitleEdit` only had branches for paramount-rfp slideKeys (`challenge`, `solution`, `prob1`, `nextSteps`, …) plus `additional_*`. Showcase / generic slideKeys are LLM-generated strings like `south_park`, `comedy_overview`, etc., so the handler hit a fallthrough `return` and never called `setExpansions`. For titles, `customTitles[slideKey]` got written but `buildSlidesFromData` reads titles directly from `showcaseContent.slides[i].title` / `flexibleSlides[i].title` and ignored `customTitles` on those code paths.
+
+**Solution:** Both handlers in `App.tsx` now route by `deckType` before falling through to the paramount-rfp branches. Showcase/generic content edits mutate the slide arrays in `showcaseContent.slides` / `flexibleSlides`. `buildSlidesFromData` also now reads `customTitles[slideKey]` for the two hardcoded showcase slideKeys (`audience_insights`, `measurement`) and for `additional_*` titles, so title-edit fallbacks display correctly. See `src/App.tsx` (`handleSlideEdit`, `handleSlideTitleEdit`) and `src/utils/slideBuilder.ts` (`buildSlidesFromData`).
+
+**Diagnostic tip:** Add a `console.log` at the top of `handleSlideEdit` with `slideKey`, `bulletIndex`, `newText`, `expansions.deckType` — if the log fires but the slide doesn't update, the handler isn't matching the slideKey for that deck type.
+
+---
+
 ### `Failed to parse iterate response as JSON` (or chat says "done" but showcase/generic deck preview doesn't change)
 
 **Symptom:** On a `paramount-showcase` or `generic` deck, the Step 2 chat either:

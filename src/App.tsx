@@ -242,6 +242,59 @@ export default function App() {
 
   const handleSlideEdit = (slideKey: string, bulletIndex: number, newText: string) => {
     if (!expansions) return
+
+    // additional_* edits work for every deck type
+    if (slideKey.startsWith('additional_')) {
+      const additionalIdx = parseInt(slideKey.replace('additional_', ''), 10)
+      const additional = [...(expansions.additionalSlides ?? [])]
+      if (additional[additionalIdx]) {
+        const bullets = [...additional[additionalIdx].bullets]
+        bullets[bulletIndex] = newText
+        additional[additionalIdx] = { ...additional[additionalIdx], bullets }
+        setExpansions({ ...expansions, additionalSlides: additional })
+      }
+      return
+    }
+
+    // Showcase deck: route by slideKey into showcaseContent
+    if (expansions.deckType === 'paramount-showcase' && expansions.showcaseContent) {
+      const sc = expansions.showcaseContent
+      if (slideKey === 'audience_insights') {
+        const list = [...(sc.audienceInsights ?? [])]
+        list[bulletIndex] = newText
+        setExpansions({ ...expansions, showcaseContent: { ...sc, audienceInsights: list } })
+        return
+      }
+      if (slideKey === 'measurement') {
+        const list = [...(sc.measurementFramework ?? [])]
+        list[bulletIndex] = newText
+        setExpansions({ ...expansions, showcaseContent: { ...sc, measurementFramework: list } })
+        return
+      }
+      const idx = sc.slides.findIndex(s => s.slideKey === slideKey)
+      if (idx >= 0) {
+        const slides = sc.slides.map((s, i) =>
+          i === idx ? { ...s, bullets: s.bullets.map((b, j) => (j === bulletIndex ? newText : b)) } : s
+        )
+        setExpansions({ ...expansions, showcaseContent: { ...sc, slides } })
+        return
+      }
+      return
+    }
+
+    // Generic deck: route by slideKey into flexibleSlides
+    if (expansions.deckType === 'generic' && expansions.flexibleSlides) {
+      const idx = expansions.flexibleSlides.findIndex(s => s.slideKey === slideKey)
+      if (idx >= 0) {
+        const flex = expansions.flexibleSlides.map((s, i) =>
+          i === idx ? { ...s, bullets: s.bullets.map((b, j) => (j === bulletIndex ? newText : b)) } : s
+        )
+        setExpansions({ ...expansions, flexibleSlides: flex })
+        return
+      }
+      return
+    }
+
     // Challenge slide: edit the problem bullets (stored as editedProblems override)
     if (slideKey === 'challenge') {
       const base = expansions.editedProblems ?? parsedData?.content?.problems ?? ['', '', '', '']
@@ -302,32 +355,61 @@ export default function App() {
       }
       return
     }
-    // Deep-dive and additional slides
+    // Deep-dive slides (paramount-rfp only)
     const probs = [...expansions.problemExpansions] as [string, string, string, string]
     const bens = [...expansions.benefitExpansions] as [string, string, string, string]
     if (slideKey === 'prob1') probs[0] = newText
     else if (slideKey === 'prob2') probs[1] = newText
     else if (slideKey === 'ben1') bens[0] = newText
     else if (slideKey === 'ben2') bens[1] = newText
-    else if (slideKey.startsWith('additional_')) {
-      const additionalIdx = parseInt(slideKey.replace('additional_', ''), 10)
-      const additional = [...(expansions.additionalSlides ?? [])]
-      if (additional[additionalIdx]) {
-        const bullets = [...additional[additionalIdx].bullets]
-        bullets[bulletIndex] = newText
-        additional[additionalIdx] = { ...additional[additionalIdx], bullets }
-        setExpansions({ ...expansions, additionalSlides: additional })
-      }
-      return
-    } else {
-      return
-    }
+    else return
     setExpansions({ ...expansions, problemExpansions: probs, benefitExpansions: bens })
   }
 
   const handleSlideTitleEdit = (slideKey: string, newTitle: string) => {
     if (!expansions) return
-    // Cover slide: edit the project title (stored as editedProjectTitle override)
+
+    // Showcase deck: route title edits into showcaseContent
+    if (expansions.deckType === 'paramount-showcase' && expansions.showcaseContent) {
+      const sc = expansions.showcaseContent
+      if (slideKey === 'title') {
+        setExpansions({ ...expansions, showcaseContent: { ...sc, showcaseTitle: newTitle } })
+        return
+      }
+      const idx = sc.slides.findIndex(s => s.slideKey === slideKey)
+      if (idx >= 0) {
+        const slides = sc.slides.map((s, i) => (i === idx ? { ...s, title: newTitle } : s))
+        setExpansions({ ...expansions, showcaseContent: { ...sc, slides } })
+        return
+      }
+      // audience_insights / measurement / additional_* use customTitles (builder reads it for these keys)
+      setExpansions({
+        ...expansions,
+        customTitles: { ...(expansions.customTitles ?? {}), [slideKey]: newTitle },
+      })
+      return
+    }
+
+    // Generic deck: route title edits into flexibleSlides
+    if (expansions.deckType === 'generic' && expansions.flexibleSlides) {
+      if (slideKey === 'title') {
+        setExpansions({ ...expansions, editedProjectTitle: newTitle })
+        return
+      }
+      const idx = expansions.flexibleSlides.findIndex(s => s.slideKey === slideKey)
+      if (idx >= 0) {
+        const flex = expansions.flexibleSlides.map((s, i) => (i === idx ? { ...s, title: newTitle } : s))
+        setExpansions({ ...expansions, flexibleSlides: flex })
+        return
+      }
+      setExpansions({
+        ...expansions,
+        customTitles: { ...(expansions.customTitles ?? {}), [slideKey]: newTitle },
+      })
+      return
+    }
+
+    // paramount-rfp: cover edit goes to editedProjectTitle, everything else to customTitles
     if (slideKey === 'title') {
       setExpansions({ ...expansions, editedProjectTitle: newTitle })
       return

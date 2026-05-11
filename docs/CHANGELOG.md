@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-05-11] — Fix Step 2 inline slide editing: showcase / generic deck edits now persist
+
+### Fixed
+- **`src/App.tsx`** — `handleSlideEdit` and `handleSlideTitleEdit` were paramount-rfp only. For `paramount-showcase` and `generic` decks the slideKeys are LLM-generated (`south_park`, `daily_show`, `comedy_overview`, …) and didn't match any branch, so the handler hit a no-op `return` and the inline edit was silently dropped. Same problem for titles — `customTitles[slideKey]` was written but `buildSlidesFromData` reads titles directly from `showcaseContent.slides[i].title` / `flexibleSlides[i].title` for those decks. Both handlers now route by `deckType` first: showcase edits mutate `showcaseContent.slides[].bullets/title`, `showcaseContent.audienceInsights[]`, or `showcaseContent.measurementFramework[]`; generic edits mutate `flexibleSlides[].bullets/title`. `additional_*` continues to work uniformly across deck types.
+- **`src/utils/slideBuilder.ts`** — Showcase's two hardcoded special slides (`audience_insights`, `measurement`) and `additional_*` slides on both showcase and generic decks now honour `customTitles[slideKey]` overrides, so title edits on them actually show up in the preview. Generic cover title now also honours `editedProjectTitle` for consistency with paramount-rfp.
+
+### Why
+On showcase/generic decks the user could click a bullet or title, type a change, click off — and the edit would disappear because the App-level handler didn't recognize the slideKey and the builder didn't consult any override store for those decks. The chat-based edits worked (because the iterate response now writes back into `showcaseContent.slides` / `flexibleSlides` directly) but the click-to-edit-in-place path was still broken.
+
+---
+
 ## [2026-05-11] — Fix Step 2 chat: showcase / generic deck edits now actually update the slide preview
 
 ### Fixed

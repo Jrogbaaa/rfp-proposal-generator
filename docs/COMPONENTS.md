@@ -15,7 +15,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 | BrandVoicePanel | `src/components/BrandVoicePanel.tsx` | Step 1 right panel — upload reference proposals to extract Paramount brand voice; persists to localStorage |
 | PdfUploader | `src/components/PdfUploader.tsx` | PDF drag-drop upload; calls `analyzeBriefPdf()` for Gemini extraction |
 | ChatInterface | `src/components/ChatInterface.tsx` | Step 2 Refine Content panel — multi-turn Gemini conversation for refining proposal content and adding slides. Deck-type aware: slide-specific ("make slide 4 only three bullets") and general ("tighten everything") prompts update the live slide fields used by the active deck (paramount-rfp, paramount-showcase, or generic) via `iterateProposalContent`. |
-| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData` (11 base persuasion arc + any additional); inline title/bullet editing on editable slides |
+| SlidePreview | `src/components/SlidePreview.tsx` | Step 2 preview — renders slide cards from real `ProposalData`; inline title/bullet editing on editable slides. Edit routing in `App.tsx` is deck-type aware so showcase / generic slides (LLM-generated slideKeys) persist click-to-edit changes the same way paramount-rfp slides do. |
 | DesignStudio | `src/components/DesignStudio.tsx` | Step 3 — renders slides visually, runs Gemini vision design review loop, shows AI commentary and score improvement, then unlocks the Google Slides export |
 | SlideCanvasRenderer | `src/components/SlideCanvasRenderer.tsx` | Renders a single `SlideData` as a 16:9 HTML/CSS slide; 5 layout variants (title/section/content/impact/closing); forwardRef for html2canvas capture |
 | GoogleSlidesButton | `src/components/GoogleSlidesButton.tsx` | Export — auth → LLM → template copy → populate; accepts `preGeneratedContent`, `onSuccess`; now embedded inside DesignStudio |
@@ -143,12 +143,14 @@ Auto-generated documentation for all React components in the Paramount applicati
 - `data?: Partial<ProposalData> | null` — Proposal content; shows an empty state when null
 - `designConfig?: DesignConfig` — Active color theme; resolved to `ThemeTokens` via `THEME_MAP`
 - `isUpdating?: boolean` — Shows a shimmer overlay while Gemini is rewriting content
-- `onSlideEdit?: (slideNumber: number, bulletIndex: number, newText: string) => void` — Inline edit callback for editable slides
-- `onSlideTitleEdit?: (slideNumber: number, newTitle: string) => void` — Inline title edit callback
+- `onSlideEdit?: (slideKey: string, bulletIndex: number, newText: string) => void` — Inline bullet edit callback for editable slides; receives the slide's `slideKey` (not slideNumber) so the handler can route the update by deck type
+- `onSlideTitleEdit?: (slideKey: string, newTitle: string) => void` — Inline title edit callback; same slideKey-based routing
 
 **Theme system:** `ThemeTokens` interface maps 6 Tailwind slot names (`accentBar`, `badgeBg`, `badgeText`, `title`, `subtitle`, `bullet`) to class strings. `THEME_MAP` provides token objects for all `ColorTheme` values. Defaults to navy-gold when no `designConfig` is provided.
 
-**Slide data:** Calls `buildSlidesFromData()` from `src/utils/slideBuilder.ts` to convert `ProposalData` into the 11-slide persuasion arc: Cover → Cultural Shift → Real Problem → Cost of Inaction → Core Insight → Paramount Advantage → Proof → How It Works → Custom Plan → ROI Framing → Close (+ optional Next Steps, additional slides).
+**Slide data:** Calls `buildSlidesFromData()` from `src/utils/slideBuilder.ts` which branches on `expanded.deckType`: `paramount-rfp` → the 11-slide persuasion arc (Cover → Cultural Shift → Real Problem → Cost of Inaction → Core Insight → Paramount Advantage → Proof → How It Works → Custom Plan → ROI Framing → Close + optional Next Steps), `paramount-showcase` → cover + LLM-defined `showcaseContent.slides` + optional Audience Insights / Measurement Framework, `generic` → cover + LLM-defined `flexibleSlides`. Each path appends any `additionalSlides` last. `customTitles[slideKey]` is honoured across all paths so title edits on `audience_insights`, `measurement`, and `additional_*` slides persist.
+
+**Inline edit routing (in `App.tsx`):** `handleSlideEdit` and `handleSlideTitleEdit` first check `expansions.deckType`. For `paramount-showcase` they mutate `showcaseContent.slides[].bullets/title` (matched by `slideKey`), `showcaseContent.audienceInsights[]`, or `showcaseContent.measurementFramework[]`. For `generic` they mutate `flexibleSlides[].bullets/title`. `additional_*` updates work uniformly across deck types. paramount-rfp keeps the original `editedProblems` / `editedBenefits` / `customTitles` override mechanism.
 
 **`hasRealData` guard:** `true` when any of `client.company`, `project.title`, `content.problems[0]`, or `data.expanded` is present. The `data.expanded` check is critical for short-prompt flows where `parsedData` is null but AI-generated `ExpandedContent` is set.
 
@@ -353,4 +355,4 @@ The Express dev server (`server/routes/gemini.ts`) and Vercel serverless functio
 
 ## Last Updated
 - Date: 2026-05-11
-- Changes: `iterateProposalContent` is now deck-type aware — added `updatedShowcaseContent` and `updatedFlexibleSlides` response slots + `mergeFlexibleSlidesByKey` so chat edits on `paramount-showcase` and `generic` decks update the actual slide preview (previously a no-op or JSON parse failure).
+- Changes: Inline slide editing (click-to-edit on the Step 2 preview) is now deck-type aware. `handleSlideEdit` / `handleSlideTitleEdit` in `App.tsx` route by `deckType` and mutate `showcaseContent.slides` or `flexibleSlides` directly so showcase/generic edits persist on blur. `buildSlidesFromData` honours `customTitles` for showcase's `audience_insights` / `measurement` slides and for `additional_*` slides on both flexible deck types.
