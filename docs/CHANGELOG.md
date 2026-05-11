@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-05-11] — Password-protect the site (`PARA123`)
+
+### Added
+- **`src/components/PasswordGate.tsx`** (new) — Client-side password gate that wraps the entire app. Renders a styled lock screen on the navy backdrop with the cream card / Playfair display heading used elsewhere; submits a password form (Enter or `Unlock` button), validates against the static value `PARA123`, and on success persists `sessionStorage["rfp_site_unlocked"]="1"` and swaps in the protected children. Wrong password triggers an inline error message + a 8-keyframe horizontal shake on the card, clears the input, and re-focuses it. Auto-focuses the input on mount and uses `<input type="password" autocomplete="current-password">` so password managers behave correctly.
+- **`src/main.tsx`** — Wrapped `<App />` in `<PasswordGate>` inside the React root so the gate runs **before** any other app code (landing page, Google auth check, brief restore from `sessionStorage`, …). Session-scoped: closing the tab/browser requires re-entry.
+
+### Why
+Lightweight, in-app protection for the live deployment. Implemented as a client-side gate (not edge middleware) so it lands immediately on the existing Vercel/Vite setup with no infra changes. The password is intentionally a single shared value (`PARA123`) — this is access-control by obscurity, not real auth, but it blocks casual visitors and search-engine traffic to the staging URL. Session persistence (via `sessionStorage`) means a single unlock per browser session — refreshes don't re-prompt, but closing the tab does.
+
+---
+
 ## [2026-05-11] — Step 3 Design Studio overhaul: real design system + intelligent vision review
 
 ### Added

@@ -8,6 +8,7 @@ Auto-generated documentation for all React components in the Paramount applicati
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
+| PasswordGate | `src/components/PasswordGate.tsx` | Site-wide password gate — renders before `App`; validates against `PARA123`, persists unlocked state in `sessionStorage["rfp_site_unlocked"]` |
 | App | `src/App.tsx` | Landing gate + 3-step flow orchestrator: Landing → Draft → Refine → Export |
 | LandingPage | `src/components/LandingPage.tsx` | Public homepage explaining app purpose, workflow, Google API usage, and data privacy |
 | Header | `src/components/Header.tsx` | Application header with logo, "Paramount Proj" app name label, auth badge, and New button |
