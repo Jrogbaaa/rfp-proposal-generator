@@ -13,6 +13,30 @@ When you encounter an error:
 
 ---
 
+## Express / API Server Errors
+
+### PDF upload returns 500 / `GEMINI_500: Internal server error` (PayloadTooLargeError masked)
+**Error (browser console):**
+```
+:5173/api/gemini/generate-content:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+[fetchWithRetry] 500 on /api/gemini/generate-content — retrying in 1s (attempt 1/3)
+...
+[PdfUploader] Extraction failed: FetchRetryExhaustedError: GEMINI_500: Internal server error
+```
+Text-only prompting (no PDF) works fine.
+
+**Cause:** Two compounding bugs:
+1. `server/routes/gemini.ts` mounted `express.json({ limit: '2mb' })` on `/generate-content`. PDFs up to 15 MB are sent inline as base64 (~1.33× overhead → JSON bodies up to ~20 MB), so any PDF over ~1.4 MB tripped `PayloadTooLargeError` before the handler ran.
+2. The global error handler in `server/index.ts` always returned `res.status(500).json(...)`, ignoring `err.status`/`err.statusCode`. The real 413 was therefore masked as a 500, which `fetchWithRetry` (correctly) retries — exhausting all retries before failing.
+
+**Solution:**
+- Bump the `/generate-content` body-parser limit to `25mb` to cover the inline-PDF threshold (`LARGE_PDF_THRESHOLD = 15 MB` in `src/utils/llmService.ts`).
+- Make the global error handler respect `err.status`/`err.statusCode` and surface 413/4xx with their real status and a descriptive message.
+
+**Diagnostic tip:** When `/api/gemini/generate-content` returns 500 only for PDF requests, check whether `req.headers['content-length']` exceeds the route's `express.json` limit. The body-parser error has `err.type === 'entity.too.large'`, `err.status === 413`, and `err.length`/`err.limit` populated — none of which surface to the client unless the error handler preserves them.
+
+---
+
 ## Vercel Deployment Errors
 
 ### API routes return 404 on Vercel (`/api/gemini/generate-content` not found)
