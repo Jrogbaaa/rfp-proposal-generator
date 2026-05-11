@@ -243,6 +243,16 @@ export default function App() {
   const handleSlideEdit = (slideKey: string, bulletIndex: number, newText: string) => {
     if (!expansions) return
 
+    // Universal fallback — writes the edit into customBullets so slideBuilder
+    // can override the rendered bullet regardless of how it was originally
+    // computed. Callers that update a canonical field (e.g. culturalShift)
+    // should return BEFORE reaching this helper.
+    const saveAsCustomBullet = () => {
+      const existing = expansions.customBullets ?? {}
+      const forSlide = { ...(existing[slideKey] ?? {}), [bulletIndex]: newText }
+      setExpansions({ ...expansions, customBullets: { ...existing, [slideKey]: forSlide } })
+    }
+
     // additional_* edits work for every deck type
     if (slideKey.startsWith('additional_')) {
       const additionalIdx = parseInt(slideKey.replace('additional_', ''), 10)
@@ -279,6 +289,7 @@ export default function App() {
         setExpansions({ ...expansions, showcaseContent: { ...sc, slides } })
         return
       }
+      saveAsCustomBullet()
       return
     }
 
@@ -292,9 +303,52 @@ export default function App() {
         setExpansions({ ...expansions, flexibleSlides: flex })
         return
       }
+      saveAsCustomBullet()
       return
     }
 
+    // ── Paramount-RFP persuasion-engine slides (current default deck) ──────
+    if (slideKey === 'cultural_shift') {
+      const list = [...(expansions.culturalShift ?? [])]
+      list[bulletIndex] = newText
+      setExpansions({ ...expansions, culturalShift: list })
+      return
+    }
+    if (slideKey === 'real_problem') {
+      const list = [...(expansions.realProblem ?? [])]
+      list[bulletIndex] = newText
+      setExpansions({ ...expansions, realProblem: list })
+      return
+    }
+    if (slideKey === 'cost_of_inaction') {
+      const list = [...(expansions.costOfInaction ?? [])]
+      list[bulletIndex] = newText
+      setExpansions({ ...expansions, costOfInaction: list })
+      return
+    }
+    if (slideKey === 'how_it_works') {
+      // bullets render as "01  stepText" — strip the numeric prefix before saving
+      const stripped = newText.replace(/^\d{2}\s{2}/, '')
+      const steps = [...(expansions.approachSteps ?? [])]
+      steps[bulletIndex] = stripped
+      setExpansions({ ...expansions, approachSteps: steps })
+      return
+    }
+    // Slides with hard-coded or computed-from-object bullets — route via
+    // customBullets so the slideBuilder override layer takes effect.
+    if (
+      slideKey === 'core_insight' ||
+      slideKey === 'paramount_advantage' ||
+      slideKey === 'proof' ||
+      slideKey === 'custom_plan' ||
+      slideKey === 'roi_framing' ||
+      slideKey === 'closing'
+    ) {
+      saveAsCustomBullet()
+      return
+    }
+
+    // ── Legacy paramount-rfp slide keys (kept for backwards compatibility) ─
     // Challenge slide: edit the problem bullets (stored as editedProblems override)
     if (slideKey === 'challenge') {
       const base = expansions.editedProblems ?? parsedData?.content?.problems ?? ['', '', '', '']
@@ -356,14 +410,19 @@ export default function App() {
       return
     }
     // Deep-dive slides (paramount-rfp only)
-    const probs = [...expansions.problemExpansions] as [string, string, string, string]
-    const bens = [...expansions.benefitExpansions] as [string, string, string, string]
-    if (slideKey === 'prob1') probs[0] = newText
-    else if (slideKey === 'prob2') probs[1] = newText
-    else if (slideKey === 'ben1') bens[0] = newText
-    else if (slideKey === 'ben2') bens[1] = newText
-    else return
-    setExpansions({ ...expansions, problemExpansions: probs, benefitExpansions: bens })
+    if (slideKey === 'prob1' || slideKey === 'prob2' || slideKey === 'ben1' || slideKey === 'ben2') {
+      const probs = [...expansions.problemExpansions] as [string, string, string, string]
+      const bens = [...expansions.benefitExpansions] as [string, string, string, string]
+      if (slideKey === 'prob1') probs[0] = newText
+      else if (slideKey === 'prob2') probs[1] = newText
+      else if (slideKey === 'ben1') bens[0] = newText
+      else if (slideKey === 'ben2') bens[1] = newText
+      setExpansions({ ...expansions, problemExpansions: probs, benefitExpansions: bens })
+      return
+    }
+
+    // Final fallback — any unrecognised slideKey still persists via customBullets
+    saveAsCustomBullet()
   }
 
   const handleSlideTitleEdit = (slideKey: string, newTitle: string) => {

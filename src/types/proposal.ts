@@ -121,6 +121,10 @@ export interface ExpandedContent {
   editedBenefits?: [string, string, string, string];
   // Generic bullet overrides for any slide (slides 5, 6, 9, 10, etc.)
   editedBullets?: Record<number, string[]>;
+  // Per-slide bullet overrides keyed by slideKey + bullet index — used when
+  // a slide's bullets are hard-coded (no backing data field) so inline edits
+  // still persist (e.g. core_insight, paramount_advantage, closing).
+  customBullets?: Record<string, Record<number, string>>;
   // Paramount media sales content (Dunkin-style deck)
   paramountMedia?: ParamountMediaContent;
   // Flexible deck types (showcase and generic)

@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-05-11] — Fix Step 2 inline slide editing on paramount-rfp deck: click-off now persists edits
+
+### Fixed
+- **`src/components/SlidePreview.tsx`** — `SlideCard`'s inline edit was a controlled `<textarea>`/`<input>` driven by `editValue` / `titleValue` React state. In the in-Cursor browser (and any environment where focus moves between elements via a synthetic click that doesn't dispatch a real `blur`), the textarea's `onBlur` handler never fired, so `setEditingIndex(null)` was never called, the parent never received the new text, and on the next render the original text reappeared. Rewrote `SlideCard` to use **uncontrolled** inputs with `useRef` (`editTextareaRef`, `titleInputRef`) plus `defaultValue`, reading the actual DOM value on commit. Added `editStartValueRef`/`titleStartValueRef` so commits are no-ops when the value is unchanged.
+- **`src/components/SlidePreview.tsx`** — Added a global `mousedown` listener (inside a `useEffect` keyed on `editingIndex` / `isEditingTitle`) that explicitly commits the pending edit when the user clicks anywhere outside the active input/textarea. This bypasses the unreliable native `blur` event in MCP/synthetic-click environments and is the actual fix the user sees.
+- **`src/App.tsx`** — `handleSlideEdit` was paramount-rfp-aware but didn't recognise the new persuasion-engine slideKeys (`cultural_shift`, `real_problem`, `cost_of_inaction`, `core_insight`, `paramount_advantage`, `proof`, `how_it_works`, `custom_plan`, `roi_framing`, `closing`). Added explicit routing: `cultural_shift` → `expansions.culturalShift[]`, `real_problem` → `realProblem[]`, `cost_of_inaction` → `costOfInaction[]`, `how_it_works` → `approachSteps[]` (with `^\d{1,2}\s+` prefix-stripping so the rendered `"01  "` step number isn't double-saved). Hardcoded-content slides (`core_insight`, `paramount_advantage`, `proof`, `custom_plan`, `roi_framing`, `closing`) fall through to a new universal `saveAsCustomBullet` helper that writes per-slide / per-bullet overrides into `expansions.customBullets[slideKey][bulletIndex]`.
+- **`src/types/proposal.ts`** — Added `customBullets?: Record<string, Record<number, string>>` to `ExpandedContent` so the overrides above have a typed home.
+- **`src/utils/slideBuilder.ts`** — Added `applyCustomBullets`, `applyCustomBulletsToSlides`, `applyCustomTitlesToSlides`, and combined `applyEdits` helpers, and now run every generated `SlideData[]` (showcase, generic, and paramount-rfp paths) through `applyEdits(slides, expansions.customTitles, expansions.customBullets)` immediately before return. Hardcoded bullets on slides like `core_insight` now honour user edits, and `customTitles[slideKey]` overrides finally surface on every deck type.
+
+### Why
+On the paramount-rfp persuasion deck the user could click a bullet on `cultural_shift`, type, click off — and the edit would silently vanish. Two independent bugs were stacked: (1) the click-off path wasn't actually triggering a save because `onBlur` was being swallowed in synthetic-click environments, and (2) even when a save fired, the new persuasion-engine slideKeys had no routing in `handleSlideEdit`, and slides with hard-coded bullets (core_insight, proof, etc.) had no override mechanism at all. The mousedown listener fixes (1) deterministically; the routing + customBullets/customTitles override layer fixes (2).
+
+### Verified
+Tested in the in-Cursor MCP browser end-to-end on a paramount-rfp deck:
+- `cultural_shift` bullet edit (canonical field) — persists after click-off ✓
+- `core_insight` bullet edit (hardcoded → customBullets fallback) — persists after click-off ✓
+- `how_it_works` step 1 edit (canonical with `"01  "` prefix) — persists with prefix correctly stripped on save and re-added on render ✓
+
+---
+
 ## [2026-05-11] — Fix Step 2 inline slide editing: showcase / generic deck edits now persist
 
 ### Fixed

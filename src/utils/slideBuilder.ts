@@ -21,12 +21,57 @@ function capBullets(items: string[], maxItems: number, maxChars: number): string
   return items.slice(0, maxItems).map(b => truncate(b, maxChars))
 }
 
+// Applies per-slide bullet overrides from expanded.customBullets — used for
+// slides whose bullets are otherwise hard-coded or computed from non-array
+// sources, so inline edits in Step 2 still round-trip.
+function applyCustomBullets(
+  bullets: string[],
+  slideKey: string | undefined,
+  overrides: Record<string, Record<number, string>> | undefined,
+): string[] {
+  if (!slideKey || !overrides) return bullets
+  const slideOverrides = overrides[slideKey]
+  if (!slideOverrides) return bullets
+  return bullets.map((b, i) => (slideOverrides[i] !== undefined ? slideOverrides[i] : b))
+}
+
+function applyCustomBulletsToSlides(
+  slides: SlideData[],
+  overrides: Record<string, Record<number, string>> | undefined,
+): SlideData[] {
+  if (!overrides) return slides
+  return slides.map(s => ({ ...s, bullets: applyCustomBullets(s.bullets, s.slideKey, overrides) }))
+}
+
+// Applies customTitles overrides keyed by slideKey. Used so title edits in
+// Step 2 round-trip even for slides whose default title is hard-coded.
+function applyCustomTitlesToSlides(
+  slides: SlideData[],
+  overrides: Record<string, string> | undefined,
+): SlideData[] {
+  if (!overrides) return slides
+  return slides.map(s => {
+    if (!s.slideKey) return s
+    const override = overrides[s.slideKey]
+    return override ? { ...s, title: override } : s
+  })
+}
+
+function applyEdits(
+  slides: SlideData[],
+  titles: Record<string, string> | undefined,
+  bullets: Record<string, Record<number, string>> | undefined,
+): SlideData[] {
+  return applyCustomBulletsToSlides(applyCustomTitlesToSlides(slides, titles), bullets)
+}
+
 export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   const client = data.client
   const project = data.project
   const expanded = data.expanded
 
   const customTitlesAll = expanded?.customTitles ?? {}
+  const customBulletsAll = expanded?.customBullets
 
   // Route to flexible slide builders for non-RFP deck types
   if (expanded?.deckType === 'paramount-showcase' && expanded.showcaseContent) {
@@ -92,7 +137,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         bullets: capBullets(s.bullets, MAX_BULLETS, MAX_BULLET_CHARS),
       })
     })
-    return slides
+    return applyEdits(slides, customTitlesAll, customBulletsAll)
   }
 
   if (expanded?.deckType === 'generic' && expanded.flexibleSlides) {
@@ -134,7 +179,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         bullets: capBullets(s.bullets, MAX_BULLETS, MAX_BULLET_CHARS),
       })
     })
-    return slides
+    return applyEdits(slides, customTitlesAll, customBulletsAll)
   }
 
   const company = client?.company || '—'
@@ -364,5 +409,5 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     })
   })
 
-  return slides
+  return applyEdits(slides, customTitlesAll, customBulletsAll)
 }

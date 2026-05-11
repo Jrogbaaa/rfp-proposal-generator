@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { ProposalData, DesignConfig } from '../types/proposal'
 import type { SlideData } from '../data/slideContent'
@@ -77,28 +77,67 @@ function SlideCard({
   onTitleEdit?: (newTitle: string) => void
 }) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editValue, setEditValue] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
-  const [titleValue, setTitleValue] = useState('')
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const editStartValueRef = useRef<string>('')
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const titleStartValueRef = useRef<string>('')
   const isTitle = slide.type === 'title'
   const isClosing = slide.type === 'closing'
 
   const handleEditStart = (i: number, text: string) => {
+    editStartValueRef.current = text
     setEditingIndex(i)
-    setEditValue(text)
   }
 
-  const handleEditSave = (i: number) => {
-    if (editValue.trim() && onBulletEdit) {
-      onBulletEdit(i, editValue.trim())
+  const commitBulletEdit = (i: number, rawValue: string) => {
+    const trimmed = rawValue.trim()
+    if (trimmed && trimmed !== editStartValueRef.current.trim() && onBulletEdit) {
+      onBulletEdit(i, trimmed)
     }
     setEditingIndex(null)
   }
 
-  const handleTitleSave = () => {
-    if (onTitleEdit) onTitleEdit(titleValue.trim() || slide.title)
+  const handleTitleStart = () => {
+    titleStartValueRef.current = slide.title
+    setEditingTitle(true)
+  }
+
+  const commitTitleEdit = (rawValue: string) => {
+    const trimmed = rawValue.trim()
+    if (trimmed && trimmed !== titleStartValueRef.current.trim() && onTitleEdit) {
+      onTitleEdit(trimmed)
+    }
     setEditingTitle(false)
   }
+
+  // Defensive outside-click handler — React's onBlur should fire when the
+  // textarea/input loses focus, but some browsers and embedded contexts can
+  // swallow the event (e.g. in nested iframes or HMR remounts). This listener
+  // guarantees an edit-in-progress gets committed when the user clicks any
+  // element outside the active input.
+  useEffect(() => {
+    if (editingIndex === null && !editingTitle) return
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as Node | null
+      if (editingIndex !== null) {
+        const node = editTextareaRef.current
+        if (node && target && !node.contains(target)) {
+          commitBulletEdit(editingIndex, node.value)
+        }
+      }
+      if (editingTitle) {
+        const node = titleInputRef.current
+        if (node && target && !node.contains(target)) {
+          commitTitleEdit(node.value)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown, true)
+    return () => document.removeEventListener('mousedown', handlePointerDown, true)
+    // commit* helpers are stable enough — re-running on editingIndex/Title is the gate we want
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingIndex, editingTitle])
 
   return (
     <motion.div
@@ -126,17 +165,20 @@ function SlideCard({
           {onTitleEdit && !isClosing ? (
             editingTitle ? (
               <input
+                ref={titleInputRef}
                 autoFocus
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleTitleSave}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave() }}
+                defaultValue={slide.title}
+                onBlur={(e) => commitTitleEdit(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitTitleEdit(e.currentTarget.value) }
+                  else if (e.key === 'Escape') { e.preventDefault(); setEditingTitle(false) }
+                }}
                 className={`font-display text-lg w-full bg-transparent border-0 outline-none p-0 m-0 mb-1 ${theme.title}`}
               />
             ) : (
               <h3
                 className={`font-display mb-1 text-lg ${theme.title} cursor-pointer hover:bg-gold-50 rounded px-1 -mx-1 transition-colors inline-flex items-center gap-1`}
-                onClick={() => { setEditingTitle(true); setTitleValue(slide.title) }}
+                onClick={handleTitleStart}
               >
                 {slide.title}
                 <span className="opacity-0 group-hover:opacity-100 text-navy-300 text-[11px] transition-opacity">✏</span>
@@ -166,12 +208,15 @@ function SlideCard({
               if (editingIndex === i) {
                 return (
                   <textarea
-                    key={i}
+                    key={`edit-${i}`}
+                    ref={editTextareaRef}
                     autoFocus
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={() => handleEditSave(i)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditSave(i) } }}
+                    defaultValue={editStartValueRef.current}
+                    onBlur={(e) => commitBulletEdit(i, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitBulletEdit(i, e.currentTarget.value) }
+                      else if (e.key === 'Escape') { e.preventDefault(); setEditingIndex(null) }
+                    }}
                     className="w-full text-sm leading-relaxed text-navy-600 pl-3 resize-none bg-transparent border-0 outline-none focus:outline-none p-0 shadow-none"
                     rows={3}
                   />

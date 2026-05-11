@@ -15,6 +15,25 @@ When you encounter an error:
 
 ## LLM / Chat Iteration Errors
 
+### Inline edit (click-to-edit) on a paramount-rfp slide disappears when you click off (and the new persuasion-engine slideKeys)
+
+**Symptom:** On a `paramount-rfp` deck the user clicks a bullet (or title) on `cultural_shift`, `real_problem`, `cost_of_inaction`, `how_it_works`, `core_insight`, `paramount_advantage`, `proof`, `custom_plan`, `roi_framing`, or `closing`, types a change, then clicks anywhere outside the input. The new text shows while focused, then on the next render the original text reappears. Pressing **Enter** correctly saves the edit; only the click-off (blur) path fails.
+
+**Cause (1) — blur swallowed in synthetic-click environments:** `SlideCard` used controlled inputs (`value={editValue}` + `onChange={setEditValue}`) and relied on the `<textarea>`'s native `onBlur` to commit. In environments where focus moves between elements via a synthetic click that doesn't dispatch a real `blur` (the in-Cursor MCP browser is one), `onBlur` simply doesn't fire — `setEditingIndex(null)` is never called, `onBulletEdit` is never invoked, the next render rebuilds slides from unchanged `expansions`, and the original text reappears.
+
+**Cause (2) — missing routing for new slideKeys:** Even when a save *did* fire (via Enter), `App.tsx`'s `handleSlideEdit` only matched legacy paramount-rfp slideKeys (`challenge`, `solution`, `prob1`, `nextSteps`, …). The new persuasion-engine slideKeys (`cultural_shift`, `real_problem`, `cost_of_inaction`, `core_insight`, etc.) hit the fallthrough `return` and the edit was silently dropped.
+
+**Cause (3) — hardcoded bullets on certain slides:** `core_insight`, `paramount_advantage`, `proof`, `custom_plan`, `roi_framing`, and `closing` render bullets straight from string literals in `slideBuilder.ts`, not from an `ExpandedContent` field. There's no canonical field for an edit to mutate, so even with correct routing those slides would no-op.
+
+**Solution:**
+- **Use uncontrolled inputs + a global `mousedown` listener** in `SlidePreview.tsx`. `SlideCard` now uses `useRef` + `defaultValue` (`editTextareaRef`, `titleInputRef`) and reads the DOM value at commit time. A `useEffect` registers a `mousedown` listener while editing that commits the edit when the user clicks outside the active input. This makes click-off persistence independent of whether the synthetic `blur` event fires.
+- **Add explicit slideKey routing** in `App.tsx`'s `handleSlideEdit` for `cultural_shift`, `real_problem`, `cost_of_inaction`, and `how_it_works` (which writes back to `expansions.approachSteps[]` after stripping the `^\d{1,2}\s+` step-number prefix that the renderer prepends).
+- **Add a customBullets override layer.** New `ExpandedContent.customBullets: Record<string, Record<number, string>>` plus `saveAsCustomBullet` in `App.tsx` provides a universal fallback for hardcoded slides. `slideBuilder.ts` now runs every generated `SlideData[]` through `applyEdits(slides, customTitles, customBullets)` so per-slide / per-bullet overrides are applied on top of whatever the builder produced. Same applies for title overrides via `applyCustomTitlesToSlides`.
+
+**Diagnostic tip:** If only Enter works but click-off doesn't, the bug is the blur path — add `console.log('blur', editingIndex)` inside `commitBulletEdit` and try the in-Cursor browser. If neither fires, the bug is missing routing — log `slideKey, deckType, bulletIndex, newText` at the top of `handleSlideEdit`. If routing fires but the preview doesn't change, the slide's bullets are hardcoded in `slideBuilder` and you need `applyEdits` to apply `customBullets[slideKey][bulletIndex]` after build.
+
+---
+
 ### Inline edit (click-to-edit) on a showcase or generic slide disappears when you click off
 
 **Symptom:** On a `paramount-showcase` or `generic` deck the user clicks a bullet or title in the Step 2 preview, types a change, presses Enter or clicks outside the slide. The edit appears briefly while the input is focused, then reverts back to the original text the next render.
