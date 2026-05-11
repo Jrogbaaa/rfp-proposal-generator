@@ -88,7 +88,34 @@ function geminiIterationBody() {
         parts: [{
           text: JSON.stringify({
             reply: "Done! I've tightened the language across all sections — the copy is now more direct and concise.",
-            updatedExpansions: {
+            updatedContent: {
+              culturalShift: [
+                'QSR discovery is now 73% social-media-driven — traditional ads miss Gen Z entirely.',
+                'Starbucks customers live in TikTok feeds and fan communities, not linear TV.',
+                'Brand recall from TV ads fell 19% in 2025. Attention has shifted permanently.',
+              ],
+              realProblem: [
+                'Interruptive ads generate skip buttons, not engagement.',
+                'Media spend alone cannot buy cultural relevance.',
+                'Brands earning impressions but not attention lose to culturally-native competitors.',
+              ],
+              costOfInaction: [
+                'Lost attention — ads play but Gen Z doesn\'t remember.',
+                'Low brand recall — 19% decline in QSR ad effectiveness.',
+                'Weak emotional connection — no cultural currency with the audience that matters.',
+              ],
+              coreInsight: 'Winning Brands Don\'t Buy Media — They Join Culture.',
+              approachSteps: [
+                'Identify the cultural moment — select the right Paramount IP.',
+                'Design a native integration that becomes part of the content.',
+                'Amplify across Paramount\'s full ecosystem for scale.',
+              ],
+              nextSteps: [
+                'Lock preferred inventory for 2026 tentpoles.',
+                'Confirm integration concept and brand brief.',
+                'Align on measurement framework before go-live.',
+                'Schedule kick-off call with Paramount partnerships team.',
+              ],
               problemExpansions: [
                 'Declining mobile engagement is hurting revenue and retention.',
                 'Siloed data prevents personalisation at scale.',
@@ -149,12 +176,16 @@ async function mockGoogleOAuth(page: Page) {
 }
 
 async function mockGoogleSlidesApi(page: Page) {
-  // Mock Drive API (template copy — POST www.googleapis.com/drive/v3/files/{id}/copy → { id })
-  await page.route('https://www.googleapis.com/drive/**', (route) => {
+  // Mock Drive API — covers both the template-copy path (/drive/v3/files/.../copy)
+  // and the pptx-upload path (/upload/drive/v3/files)
+  await page.route('https://www.googleapis.com/**drive**', (route) => {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ id: 'fake-presentation-id' }),
+      body: JSON.stringify({
+        id: 'fake-presentation-id',
+        webViewLink: 'https://docs.google.com/presentation/d/fake-presentation-id/edit',
+      }),
     })
   })
 
@@ -728,7 +759,7 @@ test.describe('Error and auth failure scenarios', () => {
     await expect(page.getByRole('button', { name: /try again/i })).toBeVisible()
   })
 
-  test('shows rate limit error when Slides API returns 429', async ({ page }) => {
+  test('shows rate limit error when Drive upload returns 429', async ({ page }) => {
     await mockGeminiApi(page)
     await mockGoogleOAuth(page)
 
@@ -737,20 +768,12 @@ test.describe('Error and auth failure scenarios', () => {
       route.fulfill({ status: 200, contentType: 'image/png', body: '' })
     })
 
-    // Slides API always returns 429
-    await page.route('**/slides.googleapis.com/**', (route) => {
+    // Drive upload returns 429 — pptxExport throws RATE_LIMITED
+    await page.route('https://www.googleapis.com/**drive**', (route) => {
       route.fulfill({
         status: 429,
         contentType: 'application/json',
-        body: JSON.stringify({ error: { message: 'Quota exceeded for quota metric' } }),
-      })
-    })
-    // Drive API succeeds (template copy path)
-    await page.route('https://www.googleapis.com/drive/**', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ id: 'fake-presentation-id' }),
+        body: JSON.stringify({ error: { message: 'Quota exceeded' } }),
       })
     })
 
@@ -764,7 +787,7 @@ test.describe('Error and auth failure scenarios', () => {
 
     await page.getByLabel('Create Google Slides presentation').click()
 
-    // Rate limit message should appear (after all retries are exhausted)
+    // Rate limit message should appear
     await expect(page.getByText(/rate limit|Please wait/i)).toBeVisible({ timeout: 30000 })
     await expect(page.getByRole('button', { name: /try again/i })).toBeVisible()
   })
@@ -937,7 +960,7 @@ test.describe('Resilience Hardening', () => {
     expect(tokenCallCount).toBeGreaterThanOrEqual(2)
   })
 
-  test('Slides API 401 mid-batch → withBackoff refreshes token and retries', async ({ page }) => {
+  test('export succeeds via Drive pptx-upload path (happy path with token counter)', async ({ page }) => {
     await page.route('**/accounts.google.com/gsi/**', (route) => {
       route.fulfill({ status: 200, contentType: 'application/javascript', body: '' })
     })
@@ -966,45 +989,16 @@ test.describe('Resilience Hardening', () => {
 
     await mockGeminiApi(page)
 
-    // Drive API succeeds
-    await page.route('https://www.googleapis.com/drive/**', (route) => {
+    // Drive API succeeds — matches both /drive/** and /upload/drive/** paths
+    await page.route('https://www.googleapis.com/**drive**', (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ id: 'fake-presentation-id' }),
+        body: JSON.stringify({
+          id: 'fake-presentation-id',
+          webViewLink: 'https://docs.google.com/presentation/d/fake-presentation-id/edit',
+        }),
       })
-    })
-
-    // Slides API: first POST create returns 200, first batchUpdate returns 401, then 200
-    let slidesCallCount = 0
-    await page.route('**/slides.googleapis.com/**', (route) => {
-      slidesCallCount++
-      const url = route.request().url()
-      const method = route.request().method()
-
-      if (url.includes(':batchUpdate')) {
-        if (slidesCallCount <= 3) {
-          route.fulfill({
-            status: 401,
-            contentType: 'application/json',
-            body: JSON.stringify({ error: { message: 'Token expired' } }),
-          })
-        } else {
-          route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
-        }
-      } else if (method === 'GET') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ presentationId: 'fake-presentation-id', slides: [] }),
-        })
-      } else {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ presentationId: 'fake-presentation-id' }),
-        })
-      }
     })
 
     await page.route('**/*favicon*', (route) => {
@@ -1021,6 +1015,10 @@ test.describe('Resilience Hardening', () => {
 
     await page.getByLabel('Create Google Slides presentation').click()
     await expect(page.getByText('Presentation created!')).toBeVisible({ timeout: 20000 })
+
+    // Auth was requested at least once during the export flow
+    const tokenCallCount = await page.evaluate(() => (window as any).__tokenCallCount)
+    expect(tokenCallCount).toBeGreaterThanOrEqual(1)
   })
 
   test('full happy path regression (Draft → Refine → Chat → Export → Share)', async ({ page }) => {

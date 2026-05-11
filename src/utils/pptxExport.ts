@@ -548,6 +548,7 @@ async function uploadPptxToDrive(arrayBuffer: ArrayBuffer, name: string, token: 
   )
 
   if (response.status === 401) throw new Error('AUTH_EXPIRED')
+  if (response.status === 429) throw new Error('RATE_LIMITED: Drive quota exceeded')
   if (response.status === 403) {
     const b = await response.json().catch(() => ({})) as { error?: { message?: string } }
     throw new Error(`FORBIDDEN: ${b?.error?.message || response.statusText}`)

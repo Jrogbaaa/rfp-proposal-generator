@@ -1097,10 +1097,16 @@ User request: ${userInstruction}`;
     } | null;
     // Legacy field name — accepted for backward compat with old mocks/tests
     updatedExpansions?: {
+      culturalShift?: string[] | null;
+      realProblem?: string[] | null;
+      costOfInaction?: string[] | null;
+      coreInsight?: string | null;
+      proofPoints?: ProofPoint[] | null;
+      approachSteps?: string[] | null;
+      customPlan?: CustomClientPlan | null;
+      nextSteps?: string[] | null;
       problemExpansions?: string[] | null;
       benefitExpansions?: string[] | null;
-      approachSteps?: string[] | null;
-      nextSteps?: string[] | null;
     } | null;
     additionalSlides: AdditionalSlide[] | null;
   };
