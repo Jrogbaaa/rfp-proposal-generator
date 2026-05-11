@@ -920,30 +920,68 @@ Return ONLY valid JSON with this structure:
     "problemExpansions": ["p1", "p2", "p3", "p4"] | null,
     "benefitExpansions": ["b1", "b2", "b3", "b4"] | null
   } | null,
+  "updatedShowcaseContent": {
+    "showcaseTitle": "string" | null,
+    "executiveSummary": "string" | null,
+    "slides": [{"slideKey": "string", "title": "string", "subtitle": "string" | null, "bullets": ["..."]}] | null,
+    "audienceInsights": ["..."] | null,
+    "measurementFramework": ["..."] | null
+  } | null,
+  "updatedFlexibleSlides": [{"slideKey": "string", "title": "string", "subtitle": "string" | null, "bullets": ["..."]}] | null,
   "additionalSlides": [{"title": "Slide Title", "bullets": ["point 1", "point 2", "point 3"]}] | null
 }
+
+DECK-SPECIFIC RULES — choose ONE update field based on the active deck type stated in the context:
+- paramount-rfp  → put edits in "updatedContent". Leave "updatedShowcaseContent" and "updatedFlexibleSlides" as null.
+- paramount-showcase → put edits in "updatedShowcaseContent". Leave "updatedContent" and "updatedFlexibleSlides" as null.
+  • slides field: return the COMPLETE new slides array (every slide in order). Preserve the existing "slideKey" for each unchanged slide; only change title/subtitle/bullets the user asked about.
+  • If the user did not change a showcase header field (showcaseTitle, executiveSummary, audienceInsights, measurementFramework), set it to null.
+- generic → put edits in "updatedFlexibleSlides". Leave "updatedContent" and "updatedShowcaseContent" as null.
+  • Return the COMPLETE new slides array; preserve existing "slideKey" values.
 
 RULES:
 - For each field in updatedContent: provide the updated value if you changed it, or null to leave it unchanged
 - GENERAL requests ("more concise", "stronger tone", "add urgency", "more persuasive", "tighten the copy"):
-  → Update ALL text-bearing fields: culturalShift, realProblem, costOfInaction, coreInsight, approachSteps, nextSteps, and proofPoints context descriptions
-  → Apply the tonal change consistently across every field — not just one or two slides
+  → For paramount-rfp: update ALL text-bearing fields (culturalShift, realProblem, costOfInaction, coreInsight, approachSteps, nextSteps, proofPoints context). Apply the tonal change consistently across every field — not just one or two slides.
+  → For paramount-showcase / generic: rewrite the bullets (and subtitles where applicable) on every slide in the slides array.
 - SLIDE-SPECIFIC requests ("change slide 3", "rewrite the reframe slide", "make the cost slide stronger"):
-  → Update only the field(s) for that slide; set all others to null
+  → paramount-rfp: update only the field(s) for that slide; set all others to null.
+  → paramount-showcase / generic: return the FULL slides array, but only modify the one slide the user referenced. The slide numbers in the context match what the user sees in the preview.
 - ADDING SLIDES ("add a slide about X", "make it longer", "add a Big Brother slide"):
   → Generate 1-3 new slides in additionalSlides with a title and 2-4 bullets each
   → ALWAYS generate requested slides — never refuse; use Paramount training context for specific properties
-  → Set updatedContent to null unless the user also asked to change existing content
+  → Set updatedContent / updatedShowcaseContent / updatedFlexibleSlides to null unless the user also asked to change existing content
 - DESIGN CHANGE requests (colors, layout, visuals):
-  → Set updatedContent and additionalSlides to null; explain in reply that visual changes are in the Design tab
+  → Set updatedContent, updatedShowcaseContent, updatedFlexibleSlides and additionalSlides to null; explain in reply that visual changes are in the Design tab
 
 Item count rules (preserve these exactly):
 - culturalShift, realProblem, costOfInaction, approachSteps → exactly 3 items each
 - nextSteps → exactly 4 items
 - proofPoints → 3-5 items (keep stats accurate, only refine context descriptions)
 - problemExpansions, benefitExpansions → exactly 4 items each (only update if user references "the brief content" or "the proposal body")
+- showcase / flexible slide bullets → keep within 2-6 items unless the user explicitly asks for a specific count
 
 IMPORTANT: Return ONLY the JSON object, no markdown or code blocks.`;
+
+// Merge an LLM-returned slides array into the existing slides, matched by slideKey.
+// If the LLM returns the full array (same length, all keys match), it replaces in order.
+// Otherwise we update slides whose slideKey matches and append any new slideKeys at the end.
+function mergeFlexibleSlidesByKey(current: FlexibleSlide[], updates: FlexibleSlide[]): FlexibleSlide[] {
+  const validUpdates = updates.filter(
+    s => s && typeof s.slideKey === 'string' && typeof s.title === 'string' && Array.isArray(s.bullets)
+  );
+  if (validUpdates.length === 0) return current;
+
+  const updateMap = new Map<string, FlexibleSlide>();
+  validUpdates.forEach(s => updateMap.set(s.slideKey, s));
+
+  const out: FlexibleSlide[] = current.map(cur => updateMap.get(cur.slideKey) ?? cur);
+  const currentKeys = new Set(current.map(s => s.slideKey));
+  validUpdates.forEach(u => {
+    if (!currentKeys.has(u.slideKey)) out.push(u);
+  });
+  return out;
+}
 
 export async function iterateProposalContent(
   briefText: string,
@@ -1000,18 +1038,26 @@ Benefits:
 ${ce.benefitExpansions.map((b, i) => `${i + 1}. ${b}`).join('\n')}`;
   } else if (activeDeckType === 'paramount-showcase' && currentExpansions?.showcaseContent) {
     const sc = currentExpansions.showcaseContent;
-    deckContext = `This is a paramount-showcase deck. Modify the slide bullets in showcaseContent.slides — not problemExpansions/benefitExpansions (those are unused).
+    // Preview slide 1 is always the cover (showcaseTitle / executiveSummary),
+    // content slides start at preview slide 2. Surface slideKey so the model can
+    // return it unchanged for every slide it preserves.
+    deckContext = `This is a paramount-showcase deck. Put your edits in "updatedShowcaseContent" — do NOT use "updatedContent" or problemExpansions/benefitExpansions for this deck type.
 
-Current showcase: ${sc.showcaseTitle}
+Slide 1 (cover) — showcaseTitle: ${sc.showcaseTitle}
 Executive summary: ${sc.executiveSummary}
 
-Current slides:
-${sc.slides.map((s, i) => `${i + 1}. ${s.title}\n${s.bullets.map(b => `   - ${b}`).join('\n')}`).join('\n\n')}`;
-  } else if (activeDeckType === 'generic' && currentExpansions?.flexibleSlides) {
-    deckContext = `This is a generic flexible deck. Modify the slide bullets in flexibleSlides — not problemExpansions/benefitExpansions (those are unused).
+Content slides (numbered as they appear in the preview; slide 1 is the cover above):
+${sc.slides.map((s, i) => `Slide ${i + 2} [slideKey: "${s.slideKey}"] — ${s.title}${s.subtitle ? `\n   subtitle: ${s.subtitle}` : ''}\n${s.bullets.map(b => `   - ${b}`).join('\n')}`).join('\n\n')}
 
-Current slides:
-${currentExpansions.flexibleSlides.map((s, i) => `${i + 1}. ${s.title}\n${s.bullets.map(b => `   - ${b}`).join('\n')}`).join('\n\n')}`;
+When returning "updatedShowcaseContent.slides", include every slide above in order with its existing slideKey. Modify only the slide(s) the user asked about; copy the rest through unchanged.`;
+  } else if (activeDeckType === 'generic' && currentExpansions?.flexibleSlides) {
+    const flex = currentExpansions.flexibleSlides;
+    deckContext = `This is a generic flexible deck. Put your edits in "updatedFlexibleSlides" — do NOT use "updatedContent" or problemExpansions/benefitExpansions for this deck type.
+
+Content slides (numbered as they appear in the preview; slide 1 is the cover):
+${flex.map((s, i) => `Slide ${i + 2} [slideKey: "${s.slideKey}"] — ${s.title}${s.subtitle ? `\n   subtitle: ${s.subtitle}` : ''}\n${s.bullets.map(b => `   - ${b}`).join('\n')}`).join('\n\n')}
+
+When returning "updatedFlexibleSlides", include every slide above in order with its existing slideKey. Modify only the slide(s) the user asked about; copy the rest through unchanged.`;
   }
 
   const contextPrompt = `Current proposal context:
@@ -1119,6 +1165,14 @@ User request: ${userInstruction}`;
       problemExpansions?: string[] | null;
       benefitExpansions?: string[] | null;
     } | null;
+    updatedShowcaseContent?: {
+      showcaseTitle?: string | null;
+      executiveSummary?: string | null;
+      slides?: FlexibleSlide[] | null;
+      audienceInsights?: string[] | null;
+      measurementFramework?: string[] | null;
+    } | null;
+    updatedFlexibleSlides?: FlexibleSlide[] | null;
     additionalSlides: AdditionalSlide[] | null;
   };
   try {
@@ -1132,7 +1186,7 @@ User request: ${userInstruction}`;
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',hypothesisId:'C,D',location:'llmService.ts:iterate-parsed-shape',message:'parsed JSON shape',data:{activeDeckType,parsedKeys:Object.keys(parsed||{}),hasUpdatedContent:!!parsed.updatedContent,hasUpdatedExpansions:!!parsed.updatedExpansions,updatedContentKeys:parsed.updatedContent?Object.keys(parsed.updatedContent):null,additionalSlidesCount:Array.isArray(parsed.additionalSlides)?parsed.additionalSlides.length:0,reply:typeof parsed.reply==='string'?parsed.reply.slice(0,200):null,offSchemaTopKeys:Object.keys(parsed||{}).filter(k=>!['reply','updatedContent','updatedExpansions','additionalSlides'].includes(k))},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',runId:'post-fix',hypothesisId:'C,D',location:'llmService.ts:iterate-parsed-shape',message:'parsed JSON shape',data:{activeDeckType,parsedKeys:Object.keys(parsed||{}),hasUpdatedContent:!!parsed.updatedContent,hasUpdatedShowcase:!!parsed.updatedShowcaseContent,hasUpdatedFlexible:Array.isArray(parsed.updatedFlexibleSlides)&&parsed.updatedFlexibleSlides.length>0,showcaseSlidesReturned:Array.isArray(parsed.updatedShowcaseContent?.slides)?parsed.updatedShowcaseContent!.slides!.length:0,showcaseSlideKeys:Array.isArray(parsed.updatedShowcaseContent?.slides)?parsed.updatedShowcaseContent!.slides!.map(s=>s?.slideKey):null,flexibleSlideKeys:Array.isArray(parsed.updatedFlexibleSlides)?parsed.updatedFlexibleSlides.map(s=>s?.slideKey):null,additionalSlidesCount:Array.isArray(parsed.additionalSlides)?parsed.additionalSlides.length:0,reply:typeof parsed.reply==='string'?parsed.reply.slice(0,200):null,offSchemaTopKeys:Object.keys(parsed||{}).filter(k=>!['reply','updatedContent','updatedExpansions','updatedShowcaseContent','updatedFlexibleSlides','additionalSlides'].includes(k))},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
 
   const output: { reply: string; updatedExpansions?: ExpandedContent } = { reply: parsed.reply };
@@ -1176,6 +1230,38 @@ User request: ${userInstruction}`;
     };
   }
 
+  // Merge showcase content updates (paramount-showcase deck)
+  const usc = parsed.updatedShowcaseContent;
+  if (usc && currentExpansions?.showcaseContent) {
+    const curSc = currentExpansions.showcaseContent;
+    const mergedShowcase: ShowcaseContent = {
+      showcaseTitle: typeof usc.showcaseTitle === 'string' && usc.showcaseTitle
+        ? usc.showcaseTitle : curSc.showcaseTitle,
+      executiveSummary: typeof usc.executiveSummary === 'string' && usc.executiveSummary
+        ? usc.executiveSummary : curSc.executiveSummary,
+      slides: Array.isArray(usc.slides) && usc.slides.length > 0
+        ? mergeFlexibleSlidesByKey(curSc.slides, usc.slides)
+        : curSc.slides,
+      audienceInsights: Array.isArray(usc.audienceInsights) && usc.audienceInsights.length > 0
+        ? usc.audienceInsights : curSc.audienceInsights,
+      measurementFramework: Array.isArray(usc.measurementFramework) && usc.measurementFramework.length > 0
+        ? usc.measurementFramework : curSc.measurementFramework,
+    };
+    output.updatedExpansions = {
+      ...(output.updatedExpansions ?? currentExpansions),
+      showcaseContent: mergedShowcase,
+    };
+  }
+
+  // Merge flexible slide updates (generic deck)
+  if (Array.isArray(parsed.updatedFlexibleSlides) && parsed.updatedFlexibleSlides.length > 0 && currentExpansions?.flexibleSlides) {
+    const mergedFlex = mergeFlexibleSlidesByKey(currentExpansions.flexibleSlides, parsed.updatedFlexibleSlides);
+    output.updatedExpansions = {
+      ...(output.updatedExpansions ?? currentExpansions),
+      flexibleSlides: mergedFlex,
+    };
+  }
+
   // Merge additional slides into updatedExpansions (or create a shell if only additional slides were returned)
   if (Array.isArray(parsed.additionalSlides) && parsed.additionalSlides.length > 0) {
     if (!output.updatedExpansions && currentExpansions) {
@@ -1199,7 +1285,7 @@ User request: ${userInstruction}`;
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',hypothesisId:'C,D',location:'llmService.ts:iterate-output',message:'iterate output ready',data:{activeDeckType,hasUpdatedExpansions:!!output.updatedExpansions,updatedKeys:output.updatedExpansions?Object.keys(output.updatedExpansions):null,replyPreview:output.reply?.slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7761/ingest/8466d330-33fd-4f02-a267-9c0089730a8a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8a6c35'},body:JSON.stringify({sessionId:'8a6c35',runId:'post-fix',hypothesisId:'C,D',location:'llmService.ts:iterate-output',message:'iterate output ready',data:{activeDeckType,hasUpdatedExpansions:!!output.updatedExpansions,showcaseSlideBulletCounts:output.updatedExpansions?.showcaseContent?.slides?.map(s=>({key:s.slideKey,title:s.title,bullets:s.bullets.length})),flexibleSlideBulletCounts:output.updatedExpansions?.flexibleSlides?.map(s=>({key:s.slideKey,title:s.title,bullets:s.bullets.length})),replyPreview:output.reply?.slice(0,160)},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
 
   return output;
