@@ -187,7 +187,9 @@ export async function analyzeBriefPdf(file: File): Promise<string> {
           ...(withResponseMimeType ? { responseMimeType: 'application/json' } : {}),
         },
       }),
-    }, { timeoutMs: 90_000 });
+      // Each PDF attempt occupies the Vercel function for up to ~58s. Cap retries at 1
+      // (2 attempts total) so users wait at most ~2 min before falling back to paste.
+    }, { timeoutMs: 90_000, maxRetries: 1 });
 
   try {
     let response = await makeRequest(true);

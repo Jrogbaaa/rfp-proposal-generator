@@ -2,7 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { setCors } from '../_lib/cors.js'
 
 const ALLOWED_MIME_TYPES = new Set(['application/pdf'])
-const UPSTREAM_TIMEOUT_MS = 55_000
+// Vercel serverless function `maxDuration` is 60s (see vercel.json).
+// Leave ~2s of headroom for response serialization + cold-start overhead.
+const UPSTREAM_TIMEOUT_MS = 58_000
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (setCors(req, res)) return

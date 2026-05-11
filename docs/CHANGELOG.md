@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-05-11] — Fix PDF brief upload 504 / `Gemini API request timed out`
+
+### Fixed
+- **`src/utils/fetchWithRetry.ts`** — Added `408` and `504` to `RETRYABLE_STATUS_CODES`. Gateway/request timeouts are transient by definition and the existing retry pipeline (3 attempts, exponential backoff, capped at 32s) was skipping them — a single slow Gemini call on `gemini-3-flash-preview` failed the user immediately with no second chance. The user-reported symptom (`/api/gemini/generate-content:1 504`, `{"error":"Gemini API request timed out"}`) was the server's own 55s `AbortController` firing before Gemini answered the PDF analysis call; the client then surfaced the failure verbatim instead of retrying.
+- **`src/utils/llmService.ts`** — `analyzeBriefPdf()` now passes `maxRetries: 1` to `fetchWithRetry` (2 total attempts) so that adding 504 to the retry set doesn't blow PDF-upload UX out to ~4 × 58 s = 230 s on a genuinely stuck upstream. Worst case is now ~2 min before the user sees a typed error and can fall back to paste.
+- **`api/gemini/generate-content.ts`** + **`api/gemini/upload-file.ts`** — Bumped `UPSTREAM_TIMEOUT_MS` from `55_000` → `58_000`. The Vercel function `maxDuration` is 60s; we were leaving ~5s of headroom on the table. Two extra seconds at the upstream limit handles Gemini tail-latency cases that were timing out at 55s and succeeding at ~56–58s.
+- **`src/components/PdfUploader.tsx`** — Catch block now detects `FetchTimeoutError` and `FetchRetryExhaustedError` with status `504`/`408` (plus a string fallback for the legacy `Gemini PDF analysis failed: 504` message) and shows a timeout-specific error: "Gemini took too long to analyze this PDF. Try again, use a smaller PDF, or paste the brief text instead." Generic non-timeout failures still get the original message.
+
+### Why
+A user uploaded a PDF in an incognito tab (cold caches) and the request hit `gemini-3-flash-preview` on a slow path. The Vercel proxy aborted at 55s and returned a real HTTP 504. The client's `fetchWithRetry` set was `[429, 500, 502, 503]` — explicitly missing 504 — so the very-recoverable transient gateway timeout propagated straight to the UI as a hard failure. The fixes (a) make 504/408 first-class retryable, (b) cap PDF retries so a stuck upstream doesn't strand the user, (c) reclaim the 5s of unused Vercel function headroom, and (d) give the user actionable guidance when timeouts do exhaust retries.
+
+---
+
 ## [2026-05-11] — Password-protect the site (`PARA123`)
 
 ### Added

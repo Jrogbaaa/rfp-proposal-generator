@@ -1,4 +1,7 @@
-const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503])
+// 408 = client request timeout, 504 = upstream/gateway timeout.
+// Both are transient and frequently recover on a second attempt
+// (e.g. Gemini cold path on `gemini-3-flash-preview` for large PDFs).
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504])
 
 export interface FetchRetryOptions {
   maxRetries?: number

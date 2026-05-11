@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { analyzeBriefPdf, MAX_PDF_SIZE } from '../utils/llmService'
+import { FetchTimeoutError, FetchRetryExhaustedError } from '../utils/fetchWithRetry'
 
 interface PdfUploaderProps {
   uploadedFile: File | null
@@ -60,7 +61,19 @@ export default function PdfUploader({ uploadedFile, onFileUpload, onTextExtracte
       clearTimeout(t2)
       console.error('[PdfUploader] Extraction failed:', err)
       setIsProcessing(false)
-      setError('Failed to analyze PDF. Please try pasting the text instead.')
+
+      const isTimeout =
+        err instanceof FetchTimeoutError ||
+        (err instanceof FetchRetryExhaustedError && (err.status === 504 || err.status === 408)) ||
+        (err instanceof Error && /timed out|timeout|504/i.test(err.message))
+
+      if (isTimeout) {
+        setError(
+          'Gemini took too long to analyze this PDF. Try again, use a smaller PDF, or paste the brief text instead.'
+        )
+      } else {
+        setError('Failed to analyze PDF. Please try pasting the text instead.')
+      }
     }
   }, [onFileUpload, onTextExtracted])
 

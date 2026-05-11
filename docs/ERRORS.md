@@ -487,6 +487,21 @@ generationConfig: {
 
 ---
 
+#### PDF brief upload 504 — `Gemini API request timed out`
+**Error:** Browser console shows `POST /api/gemini/generate-content 504` followed by `[LLM Service] PDF analysis error: {"error":"Gemini API request timed out"}` and `[PdfUploader] Extraction failed: Error: Gemini PDF analysis failed: 504`. Reproducible in incognito (cold caches) on `gemini-3-flash-preview` with a non-trivial PDF brief.
+
+**Cause:** Two-part bug. (1) The Vercel proxy in `api/gemini/generate-content.ts` aborts its own upstream fetch at `UPSTREAM_TIMEOUT_MS` and returns a real HTTP 504 with `{ error: 'Gemini API request timed out' }`. (2) The client wrapper `fetchWithRetry.ts` only retried `[429, 500, 502, 503]` — **504 was deliberately missing from the retryable set**, so a single slow Gemini PDF call propagated to the UI immediately. There was no second attempt, even though the next attempt almost always succeeds. The 5s gap between `UPSTREAM_TIMEOUT_MS = 55_000` and Vercel's `maxDuration: 60` also meant we were timing out tail-latency requests that would have completed at ~56–58s.
+
+**Solution:**
+1. Added `408` and `504` to `RETRYABLE_STATUS_CODES` in `src/utils/fetchWithRetry.ts`. Gateway and request timeouts are transient by definition.
+2. Bumped `UPSTREAM_TIMEOUT_MS` from `55_000` → `58_000` in both `api/gemini/generate-content.ts` and `api/gemini/upload-file.ts`. Reclaims the wasted Vercel function headroom while keeping ~2s for response serialization.
+3. `analyzeBriefPdf()` in `src/utils/llmService.ts` passes `maxRetries: 1` to `fetchWithRetry` so PDF analysis caps at 2 attempts (~2 min worst case) — without this, 4 × 58s retries on a stuck upstream would strand the user for ~230s.
+4. `src/components/PdfUploader.tsx` now detects `FetchTimeoutError` / `FetchRetryExhaustedError{status:504}` and renders a timeout-specific error: "Gemini took too long to analyze this PDF. Try again, use a smaller PDF, or paste the brief text instead."
+
+**Prevention:** When introducing new retryable HTTP error classes anywhere in the stack, always add the matching status code to `RETRYABLE_STATUS_CODES` and verify the longest-tail caller (e.g. PDF analysis here) sets a sane `maxRetries` so retries don't multiply the user's wait.
+
+---
+
 #### 429 - Resource Exhausted
 **Error:** `Gemini API error: 429` or `RESOURCE_EXHAUSTED`
 
