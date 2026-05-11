@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-05-11] — Fix Step 2 chat: showcase / generic deck edits now actually update the slide preview
+
+### Fixed
+- **`src/utils/llmService.ts`** — The iterate response schema only had paramount-rfp fields (`updatedContent` → `culturalShift`, `realProblem`, etc.). For `paramount-showcase` and `generic` decks (whose slide content lives in `showcaseContent.slides` and `flexibleSlides`), the LLM had nowhere on-schema to put its edits, so it either improvised into an unknown top-level field (silently ignored) or into malformed JSON (`Failed to parse iterate response as JSON`). Added two new optional response slots — `updatedShowcaseContent` and `updatedFlexibleSlides` — both expressed as full slide arrays with `slideKey` for per-slide identity.
+- **`src/utils/llmService.ts`** — `ITERATE_SYSTEM_PROMPT` now contains "DECK-SPECIFIC RULES" that tell the model which exact response slot to use for each `activeDeckType` and to set the other two slots to null.
+- **`src/utils/llmService.ts`** — Deck context for showcase/generic decks now exposes each slide's `slideKey` and numbers slides starting at 2 (slide 1 = cover) so the model's "slide N" interpretation matches what the user sees in the preview.
+- **`src/utils/llmService.ts`** — Added `mergeFlexibleSlidesByKey` helper and merge blocks in `iterateProposalContent` that write `updatedShowcaseContent` into `output.updatedExpansions.showcaseContent` and `updatedFlexibleSlides` into `output.updatedExpansions.flexibleSlides`. `buildSlidesFromData` reads those exact fields, so the preview now rerenders on showcase / generic chat edits.
+
+### Why
+For `paramount-showcase` decks (the most common one used in the app), every chat edit either silently no-op'd the preview ("AI says it changed slide 4 to 3 bullets — but the preview still shows 5") or threw a JSON parse error. Runtime evidence captured during the debug session showed the model returning a `showcaseContent` field that the merge code didn't know about, so `onExpansionsUpdated` was either never called or called with an unchanged `ExpandedContent`.
+
+---
+
 ## [2026-05-11] — Feature: AI Design Studio (Step 3)
 
 ### Added

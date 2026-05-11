@@ -15,6 +15,20 @@ When you encounter an error:
 
 ## LLM / Chat Iteration Errors
 
+### `Failed to parse iterate response as JSON` (or chat says "done" but showcase/generic deck preview doesn't change)
+
+**Symptom:** On a `paramount-showcase` or `generic` deck, the Step 2 chat either:
+- throws `Error: Failed to parse iterate response as JSON` at `llmService.ts` (the `JSON.parse(content)` line in `iterateProposalContent`), or
+- silently succeeds (AI says "Updated slide 4 to N bullets") but the slide preview never changes.
+
+**Cause:** The iterate response schema only had `updatedContent` (which carries paramount-rfp fields like `culturalShift`, `realProblem`, …). For `paramount-showcase` decks the slides live in `currentExpansions.showcaseContent.slides`, and for `generic` decks they live in `currentExpansions.flexibleSlides`. There was no on-schema slot for either, so the LLM improvised — sometimes into a valid but unknown top-level field (silently ignored by the merge code), sometimes into structurally invalid JSON (parse failure).
+
+**Solution:** The response schema now includes `updatedShowcaseContent` and `updatedFlexibleSlides` (both with `slideKey` per slide). `ITERATE_SYSTEM_PROMPT` has "DECK-SPECIFIC RULES" telling the model which slot to use per `activeDeckType`. The merge logic in `iterateProposalContent` writes those values into `output.updatedExpansions.showcaseContent` / `output.updatedExpansions.flexibleSlides` via the `mergeFlexibleSlidesByKey` helper — these are the exact fields `slideBuilder.ts` reads when building the preview.
+
+**Diagnostic tip:** If chat edits don't show, log `parsed` after `JSON.parse(content)` and inspect the top-level keys. If you see `showcaseContent`, `flexibleSlides`, or any other off-schema key, the prompt and merge logic for that deck type are out of sync. Also check `activeDeckType` and whether `currentExpansions.showcaseContent` / `.flexibleSlides` exist on the deck you're iterating.
+
+---
+
 ### Chat prompts appear to work but slide preview never changes
 
 **Symptom:** User types in the Step 2 chat (e.g. "make slide 3 more concise", "tighten everything"). The AI replies with a confirmation message, the "Writing" indicator appears, but the slide cards in the preview do not visibly update.
