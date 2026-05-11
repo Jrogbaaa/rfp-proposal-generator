@@ -203,6 +203,17 @@ function SlideCard({
 
         <div className={`h-1 bg-gradient-to-r ${theme.accentBar}`} />
       </div>
+
+      {slide.mainIdea && (
+        <div className="flex items-start gap-1.5 px-1 pt-2 pb-0.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-navy-400 whitespace-nowrap mt-0.5">
+            Main idea
+          </span>
+          <span className="text-[11px] text-navy-500 leading-snug">
+            {slide.mainIdea}
+          </span>
+        </div>
+      )}
     </motion.div>
   )
 }

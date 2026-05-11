@@ -6,6 +6,7 @@ export interface SlideData {
   subtitle?: string
   bullets: string[]
   type: 'title' | 'section' | 'content' | 'impact' | 'closing'
+  mainIdea?: string    // one-sentence purpose shown in the UI below the card, not on the slide
 }
 
 export const TMOBILE_PARAMOUNT_SLIDES: SlideData[] = [

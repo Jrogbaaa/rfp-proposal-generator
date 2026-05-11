@@ -155,6 +155,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       company !== '—' ? `${company}${project?.duration ? ` · ${project.duration}` : ''}` : '',
       project?.totalValue ? `Investment: ${project.totalValue}` : '',
     ].filter(Boolean),
+    mainIdea: 'Sets the stage — who this proposal is for and what\'s at stake.',
   })
 
   // Slide 2: The New Reality of Attention (Cultural Shift)
@@ -170,6 +171,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       : ['Media is fragmenting across TikTok, streaming, and fan communities',
          'Gen Z lives in culture, not channels — if your brand isn\'t part of it, you\'re invisible',
          'Traditional reach metrics mask a deeper problem: attention ≠ engagement'],
+    mainIdea: 'Frames the market reality your prospect is operating in.',
   })
 
   // Slide 3: Why Most Brand Campaigns Fail Today (Real Problem)
@@ -185,6 +187,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       : ['Interruptive ads don\'t create impact — they create skip buttons',
          'Media spend ≠ cultural relevance. Presence ≠ remembrance.',
          'Brands are buying impressions but not earning attention'],
+    mainIdea: 'Diagnoses why current approaches are failing.',
   })
 
   // Slide 4: What This Is Costing You (Cost of Inaction)
@@ -200,6 +203,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       : ['Lost attention — your ads play but nobody remembers',
          'Low brand recall — declining ROI on traditional media',
          'Weak emotional connection — no cultural currency with Gen Z'],
+    mainIdea: 'Makes the cost of doing nothing concrete and urgent.',
   })
 
   // Slide 5: The Core Insight (Money Slide)
@@ -215,6 +219,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       'VMAs moments — shoppable, social-first, in the cultural conversation',
       'Talent + fandom + live moments = emotional brand equity at scale',
     ],
+    mainIdea: 'The pivot — your single most important strategic idea.',
   })
 
   // Slide 6: How Paramount Turns Brands Into Cultural Moments
@@ -225,6 +230,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     type: 'content',
     title: 'How Paramount Turns Brands Into Cultural Moments',
     subtitle: company !== '—' ? `${company} × Paramount` : undefined,
+    mainIdea: 'Shows how the offering uniquely solves the problem.',
     bullets: [
       'IP: Big Brother, VMAs, NFL, GRAMMYs — culture\'s biggest stages',
       'Talent: Named partnerships that drive authentic brand connections',
@@ -247,6 +253,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
          '+99% purchase intent lift — Dunkin\' × VMAs 2025',
          '2.5B votes cast — Big Brother S27',
          '1B+ social impressions — VMAs 2025'],
+    mainIdea: 'Proves the approach works with real data from past campaigns.',
   })
 
   // Slide 8: From Idea to Cultural Moment (How It Works)
@@ -262,6 +269,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       : ['01  Identify the cultural moment — match your brand to the right IP',
          '02  Design native integration — content that belongs, not interrupts',
          '03  Amplify across platforms — CBS, Paramount+, social, in-store'],
+    mainIdea: 'Walks through the activation playbook step by step.',
   })
 
   // Slide 9: Your Opportunity with Paramount (Custom Plan)
@@ -285,6 +293,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
          'Custom integration formats for your brand',
          'Specific audience alignment with Paramount properties',
          'Activation timeline synced to your calendar'],
+    mainIdea: 'Tailors the opportunity specifically to this prospect.',
   })
 
   // Slide 10: Investment vs Impact (ROI Framing)
@@ -302,6 +311,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       'Engagement: Native integrations drive 3.2× higher recall than standard ads',
       'Conversion: QR, app, retail pathways from cultural moment to measurable outcome',
     ].filter(Boolean),
+    mainIdea: 'Frames the investment as a return, not a cost.',
   })
 
   // Slide 11: Next Steps — conditional
@@ -317,6 +327,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         nextSteps.map((step, i) => `${pad(i + 1)}  ${step}`),
         MAX_STEPS, MAX_STEP_CHARS,
       ),
+      mainIdea: 'Closes with a clear call to action and path forward.',
     })
   }
 
@@ -332,6 +343,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
       `We look forward to building this together.`,
       client?.email ? `Reach us at ${client.email}` : '',
     ].filter(Boolean),
+    mainIdea: 'Ends on a human note and keeps the door open.',
   })
 
   // Additional user-added slides

@@ -893,45 +893,55 @@ Build the best possible presentation for this request. Use the full Paramount IP
   };
 }
 
-const ITERATE_SYSTEM_PROMPT = `You are refining a sales proposal. The user will request changes to the content (tone, length, focus, etc.).
+const ITERATE_SYSTEM_PROMPT = `You are a Paramount Advertising Solutions proposal editor. The user will request changes to slide content — either specific slides or general improvements across the whole deck.
 
-You will be given the CURRENT expanded content (4 problem paragraphs, 4 benefit paragraphs, approach steps, and next steps). Refine the relevant sections based on the user's request.
+SLIDE MAP — paramount-rfp deck (use this to understand which field a slide number refers to):
+Slide 2  — "The New Reality of Attention"              → field: culturalShift      (exactly 3 bullet strings)
+Slide 3  — "Why Most Brand Campaigns Fail Today"       → field: realProblem        (exactly 3 bullet strings)
+Slide 4  — "What This Is Costing You"                  → field: costOfInaction     (exactly 3 bullet strings)
+Slide 5  — "The Reframe / Money Slide"                 → field: coreInsight        (1 powerful sentence string)
+Slide 7  — "Proven Impact at Scale"                    → field: proofPoints        (3-5 items: {stat, source, context})
+Slide 8  — "From Idea to Cultural Moment"              → field: approachSteps      (exactly 3 strings)
+Slide 9  — "Your Opportunity with Paramount"           → field: customPlan         ({recommendedProperties[], formats[], audienceMatch, timeline})
+Slide 11 — "Next Steps"                                → field: nextSteps          (exactly 4 strings)
 
 Return ONLY valid JSON with this structure:
 {
-  "reply": "A brief conversational response acknowledging the change (1-2 sentences)",
-  "updatedExpansions": {
-    "problemExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
-    "benefitExpansions": ["paragraph1", "paragraph2", "paragraph3", "paragraph4"],
+  "reply": "Brief 1-2 sentence confirmation of what changed",
+  "updatedContent": {
+    "culturalShift": ["item1", "item2", "item3"] | null,
+    "realProblem": ["item1", "item2", "item3"] | null,
+    "costOfInaction": ["item1", "item2", "item3"] | null,
+    "coreInsight": "One powerful sentence" | null,
+    "proofPoints": [{"stat": "...", "source": "...", "context": "..."}] | null,
     "approachSteps": ["step1", "step2", "step3"] | null,
-    "nextSteps": ["action1", "action2", "action3", "action4"] | null
+    "customPlan": {"recommendedProperties": [], "formats": [], "audienceMatch": "", "timeline": ""} | null,
+    "nextSteps": ["action1", "action2", "action3", "action4"] | null,
+    "problemExpansions": ["p1", "p2", "p3", "p4"] | null,
+    "benefitExpansions": ["b1", "b2", "b3", "b4"] | null
   } | null,
   "additionalSlides": [{"title": "Slide Title", "bullets": ["point 1", "point 2", "point 3"]}] | null
 }
 
-CRITICAL: You MUST always return exactly 4 items in each array when returning updatedExpansions.
+RULES:
+- For each field in updatedContent: provide the updated value if you changed it, or null to leave it unchanged
+- GENERAL requests ("more concise", "stronger tone", "add urgency", "more persuasive", "tighten the copy"):
+  → Update ALL text-bearing fields: culturalShift, realProblem, costOfInaction, coreInsight, approachSteps, nextSteps, and proofPoints context descriptions
+  → Apply the tonal change consistently across every field — not just one or two slides
+- SLIDE-SPECIFIC requests ("change slide 3", "rewrite the reframe slide", "make the cost slide stronger"):
+  → Update only the field(s) for that slide; set all others to null
+- ADDING SLIDES ("add a slide about X", "make it longer", "add a Big Brother slide"):
+  → Generate 1-3 new slides in additionalSlides with a title and 2-4 bullets each
+  → ALWAYS generate requested slides — never refuse; use Paramount training context for specific properties
+  → Set updatedContent to null unless the user also asked to change existing content
+- DESIGN CHANGE requests (colors, layout, visuals):
+  → Set updatedContent and additionalSlides to null; explain in reply that visual changes are in the Design tab
 
-For approachSteps and nextSteps inside updatedExpansions:
-- If the user's request relates to methodology, approach, process, or next steps — update those arrays
-- Otherwise set them to null (the existing values will be preserved automatically)
-- approachSteps: 3-4 items, each 1-2 sentences describing a delivery phase
-- nextSteps: 4-5 items, short action-oriented lines (15-25 words max each)
-
-If the user asks to add more slides, expand the deck, make it longer, OR asks to add a slide about a specific IP/property/show/event/talent:
-- ALWAYS generate the requested slides — never refuse or say a property is unavailable
-- Generate 1-3 new slides in "additionalSlides" with a clear title and 2-4 bullet points each
-- If the user names a specific Paramount/CBS property (e.g. "The Masters," a new show, a specific talent), build the slide around that property with confidence
-- These will be appended to the end of the deck
-- Set "updatedExpansions" to null unless the user also asked to change the existing content
-- In "reply" confirm the new slides that were added
-
-If the user asks for a design change (colors, layout, visuals), set both "updatedExpansions" and "additionalSlides" to null and explain in "reply" that visual design isn't supported in the editor.
-
-Guidelines for content changes:
-- Preserve all specific facts, numbers, and company details from the original
-- Apply only the requested stylistic or tonal changes
-- Keep each expansion to 2-3 sentences unless asked otherwise
-- Use direct "you" language
+Item count rules (preserve these exactly):
+- culturalShift, realProblem, costOfInaction, approachSteps → exactly 3 items each
+- nextSteps → exactly 4 items
+- proofPoints → 3-5 items (keep stats accurate, only refine context descriptions)
+- problemExpansions, benefitExpansions → exactly 4 items each (only update if user references "the brief content" or "the proposal body")
 
 IMPORTANT: Return ONLY the JSON object, no markdown or code blocks.`;
 
@@ -952,18 +962,42 @@ export async function iterateProposalContent(
   // Build context section based on deck type
   let deckContext = '';
   if (activeDeckType === 'paramount-rfp' && currentExpansions) {
-    deckContext = `Current expanded content:
+    const ce = currentExpansions;
+    deckContext = `CURRENT SLIDE CONTENT (what is shown in the deck right now):
+
+Slide 2 — culturalShift:
+${ce.culturalShift?.map((s, i) => `${i + 1}. ${s}`).join('\n') || '(none)'}
+
+Slide 3 — realProblem:
+${ce.realProblem?.map((s, i) => `${i + 1}. ${s}`).join('\n') || '(none)'}
+
+Slide 4 — costOfInaction:
+${ce.costOfInaction?.map((s, i) => `${i + 1}. ${s}`).join('\n') || '(none)'}
+
+Slide 5 — coreInsight:
+${ce.coreInsight || '(none)'}
+
+Slide 7 — proofPoints:
+${ce.proofPoints?.map((p, i) => `${i + 1}. ${p.stat} — ${p.source}${p.context ? ` (${p.context})` : ''}`).join('\n') || '(none)'}
+
+Slide 8 — approachSteps:
+${ce.approachSteps?.map((s, i) => `${i + 1}. ${s}`).join('\n') || '(none)'}
+
+Slide 9 — customPlan:
+${ce.customPlan ? `Properties: ${ce.customPlan.recommendedProperties?.join(', ') || '—'}
+Formats: ${ce.customPlan.formats?.join(', ') || '—'}
+Audience: ${ce.customPlan.audienceMatch || '—'}
+Timeline: ${ce.customPlan.timeline || '—'}` : '(none)'}
+
+Slide 11 — nextSteps:
+${ce.nextSteps?.map((s, i) => `${i + 1}. ${s}`).join('\n') || '(none)'}
+
+Proposal body (problemExpansions / benefitExpansions — used in content review, not shown as slides in this deck):
 Problems:
-${currentExpansions.problemExpansions.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+${ce.problemExpansions.map((p, i) => `${i + 1}. ${p}`).join('\n')}
 
 Benefits:
-${currentExpansions.benefitExpansions.map((b, i) => `${i + 1}. ${b}`).join('\n')}${currentExpansions.approachSteps?.length ? `
-
-Approach steps:
-${currentExpansions.approachSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}${currentExpansions.nextSteps?.length ? `
-
-Next steps:
-${currentExpansions.nextSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')}` : ''}`;
+${ce.benefitExpansions.map((b, i) => `${i + 1}. ${b}`).join('\n')}`;
   } else if (activeDeckType === 'paramount-showcase' && currentExpansions?.showcaseContent) {
     const sc = currentExpansions.showcaseContent;
     deckContext = `This is a paramount-showcase deck. Modify the slide bullets in showcaseContent.slides — not problemExpansions/benefitExpansions (those are unused).
@@ -1049,11 +1083,24 @@ User request: ${userInstruction}`;
 
   let parsed: {
     reply: string;
-    updatedExpansions: {
-      problemExpansions: string[];
-      benefitExpansions: string[];
-      approachSteps: string[] | null;
-      nextSteps: string[] | null;
+    updatedContent?: {
+      culturalShift?: string[] | null;
+      realProblem?: string[] | null;
+      costOfInaction?: string[] | null;
+      coreInsight?: string | null;
+      proofPoints?: ProofPoint[] | null;
+      approachSteps?: string[] | null;
+      customPlan?: CustomClientPlan | null;
+      nextSteps?: string[] | null;
+      problemExpansions?: string[] | null;
+      benefitExpansions?: string[] | null;
+    } | null;
+    // Legacy field name — accepted for backward compat with old mocks/tests
+    updatedExpansions?: {
+      problemExpansions?: string[] | null;
+      benefitExpansions?: string[] | null;
+      approachSteps?: string[] | null;
+      nextSteps?: string[] | null;
     } | null;
     additionalSlides: AdditionalSlide[] | null;
   };
@@ -1065,38 +1112,42 @@ User request: ${userInstruction}`;
 
   const output: { reply: string; updatedExpansions?: ExpandedContent } = { reply: parsed.reply };
 
-  if (parsed.updatedExpansions) {
-    const e = parsed.updatedExpansions;
-    // Fall back to current expansions if LLM omitted a section rather than throwing
-    const problems = Array.isArray(e.problemExpansions) && e.problemExpansions.length > 0
-      ? e.problemExpansions
-      : currentExpansions?.problemExpansions ?? [];
-    const benefits = Array.isArray(e.benefitExpansions) && e.benefitExpansions.length > 0
-      ? e.benefitExpansions
-      : currentExpansions?.benefitExpansions ?? [];
-    // Pad to 4 if needed
+  // Support both new `updatedContent` and legacy `updatedExpansions` field names
+  const uc = parsed.updatedContent ?? parsed.updatedExpansions ?? null;
+
+  if (uc) {
+    const cur = currentExpansions;
+    // Merge problem/benefit expansions (fall back to current if null/empty)
+    const problems = Array.isArray(uc.problemExpansions) && uc.problemExpansions.length > 0
+      ? uc.problemExpansions
+      : cur?.problemExpansions ?? [];
+    const benefits = Array.isArray(uc.benefitExpansions) && uc.benefitExpansions.length > 0
+      ? uc.benefitExpansions
+      : cur?.benefitExpansions ?? [];
     while (problems.length < 4) problems.push('Additional challenge to be identified.');
     while (benefits.length < 4) benefits.push('Additional benefit to be identified.');
+
     output.updatedExpansions = {
+      ...cur,
       problemExpansions: problems as [string, string, string, string],
       benefitExpansions: benefits as [string, string, string, string],
-      approachSteps: e.approachSteps ?? currentExpansions?.approachSteps,
-      nextSteps: e.nextSteps ?? currentExpansions?.nextSteps,
-      customTitles: currentExpansions?.customTitles,
-      additionalSlides: currentExpansions?.additionalSlides,
-      // Preserve flexible deck fields
-      deckType: currentExpansions?.deckType,
-      showcaseContent: currentExpansions?.showcaseContent,
-      flexibleSlides: currentExpansions?.flexibleSlides,
-      paramountMedia: currentExpansions?.paramountMedia,
-      // Preserve persuasion-engine fields
-      culturalShift: currentExpansions?.culturalShift,
-      realProblem: currentExpansions?.realProblem,
-      costOfInaction: currentExpansions?.costOfInaction,
-      coreInsight: currentExpansions?.coreInsight,
-      proofPoints: currentExpansions?.proofPoints,
-      customPlan: currentExpansions?.customPlan,
-      industryInsights: currentExpansions?.industryInsights,
+      // Persuasion-engine fields — use LLM value if provided, otherwise keep current
+      culturalShift: Array.isArray(uc.culturalShift) && uc.culturalShift.length > 0
+        ? uc.culturalShift : cur?.culturalShift,
+      realProblem: Array.isArray(uc.realProblem) && uc.realProblem.length > 0
+        ? uc.realProblem : cur?.realProblem,
+      costOfInaction: Array.isArray(uc.costOfInaction) && uc.costOfInaction.length > 0
+        ? uc.costOfInaction : cur?.costOfInaction,
+      coreInsight: typeof uc.coreInsight === 'string' && uc.coreInsight
+        ? uc.coreInsight : cur?.coreInsight,
+      proofPoints: Array.isArray(uc.proofPoints) && uc.proofPoints.length > 0
+        ? uc.proofPoints : cur?.proofPoints,
+      approachSteps: Array.isArray(uc.approachSteps) && uc.approachSteps.length > 0
+        ? uc.approachSteps : cur?.approachSteps,
+      customPlan: uc.customPlan && typeof uc.customPlan === 'object'
+        ? uc.customPlan : cur?.customPlan,
+      nextSteps: Array.isArray(uc.nextSteps) && uc.nextSteps.length > 0
+        ? uc.nextSteps : cur?.nextSteps,
     };
   }
 
