@@ -1,0 +1,32 @@
+---
+description: Project workflow — always work in an isolated git worktree, never commit to main directly, and run subagents on Opus 4.8
+alwaysApply: true
+---
+
+# Agent Workflow
+
+## Always work in a git worktree
+
+This repo runs an auto-Documenter that commits and pushes the **entire working tree** to `main` in waves, and multiple agent sessions (Cursor, Claude Code) may run in parallel. Editing the shared primary checkout directly causes cross-session contamination — one session's auto-commit sweeps in another session's half-finished work.
+
+**Before starting any feature, fix, or refactor:**
+
+1. Create an isolated worktree on a new branch off `origin/main`:
+
+```bash
+git fetch origin
+git worktree add -b <type>/<short-name> .worktrees/<short-name> origin/main
+cd .worktrees/<short-name>
+```
+
+`.worktrees/` is gitignored. A sibling directory outside the repo (e.g. `../rfp-worktrees/<name>`) also works and is safest while the auto-Documenter is active.
+
+2. Do ALL edits, builds, and tests inside that worktree.
+3. Commit only your own files, push the branch, and open a PR. **Never commit straight to `main`.**
+4. After the PR merges, remove the worktree: `git worktree remove <path>`.
+
+Never edit the primary checkout (`/Users/JackEllis/RFP BUILD!`) directly when other sessions may be active.
+
+## Subagents run on Opus 4.8
+
+When launching subagents (the Task tool), set the model to **Opus 4.8** (`claude-opus-4-8-thinking-high`) — not Sonnet — unless the user explicitly asks for a different model.

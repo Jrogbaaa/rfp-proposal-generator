@@ -2,6 +2,22 @@ API → find a batch endpoint that would fix → rewrite script to accommodate �
 
 ---
 
+## Workflow Rules (read first)
+
+**Always work in an isolated git worktree.** The auto-Documenter below commits and pushes the entire working tree to `main` in waves, and multiple agent sessions may run at once. Editing the shared primary checkout directly causes cross-session contamination. Before any feature/fix/refactor:
+
+1. `git fetch origin`
+2. `git worktree add -b <type>/<short-name> .worktrees/<short-name> origin/main` (`.worktrees/` is gitignored; a sibling dir outside the repo is safest)
+3. Do all edits, builds, and tests in the worktree.
+4. Commit only your own files, push the branch, open a PR — **never commit straight to `main`**.
+5. After merge: `git worktree remove <path>`.
+
+**Subagents run on Opus 4.8** (`claude-opus-4-8-thinking-high`), not Sonnet, unless the user asks otherwise.
+
+See `.cursor/rules/agent-workflow.mdc` for the full version.
+
+---
+
 ## Documenter Sub-Agent
 
 The Documenter sub-agent automatically reviews and documents all changes after they are made. This ensures consistent documentation and creates a traceable history of modifications.
