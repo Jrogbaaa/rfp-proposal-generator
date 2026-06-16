@@ -11,6 +11,9 @@
 ### Changed
 - **`src/utils/slideBuilder.ts`** — Added `finalizeSlides()` which filters out slides whose `slideKey` is in `deletedSlideKeys` and renumbers the survivors `1..N`. Applied as the final step in all three return paths of `buildSlidesFromData()` (paramount-rfp, paramount-showcase, generic). Because this single builder feeds the Step 2 preview, the Step 3 Design Studio, and the Google Slides / PPTX export, deletion propagates everywhere automatically.
 
+### Fixed
+- **`e2e/app.spec.ts`** — The Playwright `beforeEach` now also sets `sessionStorage["rfp_site_unlocked"] = "1"`. The `PasswordGate` added on 2026-05-11 wraps the entire app, but the e2e harness only set `rfp_app_entered`, so every app-loading test was stranded on the password screen (55 of 56 failing). Unlocking the gate in the harness restores the suite (56/56 passing).
+
 ### Why
 The AI Copywriter (Step 2 chat) was wired correctly but lacked any test proving slide *text* actually changes after a chat turn, so its behavior was unverified. The new regression test closes that gap. Slide deletion was a missing capability — users could edit copy but not remove whole slides; doing it at the builder level keeps the preview, design review, and export in lock-step.
 

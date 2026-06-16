@@ -13,6 +13,29 @@ When you encounter an error:
 
 ---
 
+## Testing / E2E Errors
+
+### Every Playwright test fails on the password screen (`PasswordGate` blocks the app)
+
+**Symptom:** After the site password gate was added, almost the entire e2e suite fails — even trivial tests like "App Shell loads with header and New button." Screenshots show the "Enter password to continue" lock screen instead of the app. Counts look like "55 failed, 1 passed."
+
+**Cause:** `src/main.tsx` wraps `<App />` in `<PasswordGate>`, which renders the lock screen until `sessionStorage["rfp_site_unlocked"] === "1"`. The Playwright `beforeEach` in `e2e/app.spec.ts` only seeded `sessionStorage["rfp_app_entered"] = "1"` (which skips the landing page) but never unlocked the gate, so every `page.goto('/')` lands on the password screen and all selectors time out.
+
+**Solution:** Seed the unlock flag in the same `addInitScript` the harness already uses:
+
+```ts
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('rfp_app_entered', '1')
+    sessionStorage.setItem('rfp_site_unlocked', '1')
+  })
+})
+```
+
+**Diagnostic tip:** If a huge number of tests fail at once (especially the most basic shell tests), suspect a global gate/blocker rendered before the app — not the individual features. Check what wraps `<App />` in `src/main.tsx` and whether the harness satisfies each gate's storage key (`rfp_app_entered` for the landing page, `rfp_site_unlocked` for the password gate).
+
+---
+
 ## LLM / Chat Iteration Errors
 
 ### Inline edit (click-to-edit) on a paramount-rfp slide disappears when you click off (and the new persuasion-engine slideKeys)
