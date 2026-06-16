@@ -36,6 +36,25 @@ test.beforeEach(async ({ page }) => {
 
 ---
 
+## Slide Rendering Errors
+
+### Stat-grid layout garbles prose by extracting embedded numbers as hero stats
+
+**Symptom:** On the Design & Export step, a content slide rendered as a "stat-grid" turns ordinary sentences into broken big-number tiles. E.g. "South Park is the #1 title..." becomes a giant "1" with caption "South Park is the # title..." (the 1 deleted mid-word); "Q1 2026 marathons" becomes "1" + "Q 2026 marathons"; "launching March 2026" becomes "2026." + "launching March".
+
+**Cause:** Two cooperating bugs.
+1. `extractStat()` in `src/components/slides/types.ts` used `STAT_RE = /([+-]?\$?\d[\d,.]*\s*(?:%|x|B|M|K)?)/i`. The unit group is optional, so it matched the first bare digit run anywhere in the string — including "1" inside "#1"/"Q1" and a bare year like "2026".
+2. `ContentStatGrid.tsx` then did `b.replace(stat, '')` (deleting the matched digit from the middle of the word, leaving "#"/"Q") and `b.slice(0, 6)` to fabricate a "stat" when none existed. The slide was routed into stat-grid because `HAS_DIGIT_OR_CURRENCY` in `vocabulary.ts` counted any 2+ digit number as a stat.
+
+**Solution:** Require a real unit everywhere a "stat" is detected.
+- `STAT_RE` now matches only: leading currency (`$175,000`, `$2.4B`), trailing `%` (`47%`), multiplier (`12x`), or magnitude suffix (`6.8M`), with a `(?<![\w#])` boundary guard so digits embedded after a letter/`#` and bare years return `null`.
+- `HAS_DIGIT_OR_CURRENCY` mirrors that (percent/currency/magnitude/multiplier, no bare-number branch).
+- `ContentStatGrid` computes captions boundary-safely and falls back to `ContentList` when fewer than 2 bullets carry a real stat (handles the case where the AI design reviewer over-eagerly picks `content-stat-grid`).
+
+**Diagnostic tip:** A fast way to verify stat logic without the full UI/API: import `extractStat`/`defaultLayoutFor` in a one-off `tsx` script and assert against the failing strings — they should return `null`/`content-list`, while `47%`/`$2.4B`/`6.8M`/`12x` return the stat.
+
+---
+
 ## LLM / Chat Iteration Errors
 
 ### Inline edit (click-to-edit) on a paramount-rfp slide disappears when you click off (and the new persuasion-engine slideKeys)

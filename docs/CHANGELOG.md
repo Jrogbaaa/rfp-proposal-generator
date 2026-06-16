@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-06-16] — Fix stat-grid copy garble + greeting company substitution
+
+### Fixed
+- **Stat-grid no longer mangles prose** — `src/components/slides/types.ts`; `extractStat()`'s `STAT_RE` was `/([+-]?\$?\d[\d,.]*\s*(?:%|x|B|M|K)?)/i`, whose optional unit group matched ANY embedded digit, so "South Park is the #1 title" yielded a hero stat "1", "Q1 2026 marathons" yielded "1", and "launching March 2026" yielded "2026.". Rewrote it to require a real unit (leading currency `$175,000`/`$2.4B`, trailing `%`, multiplier `12x`, or magnitude `6.8M`) with a boundary guard so digits after a letter/`#` (`#1`, `Q1`, `S28`) and bare years return `null`.
+- **Stat-grid layout routing tightened** — `src/utils/design/vocabulary.ts`; `HAS_DIGIT_OR_CURRENCY` previously treated any 2+ digit number (`[+-]?\d{2,}`, e.g. a year) as a stat, routing prose slides into `content-stat-grid`/`title-stat`. Now requires percent/currency/magnitude/multiplier, matching `STAT_RE`.
+- **ContentStatGrid renderer hardened** — `src/components/slides/ContentStatGrid.tsx`; removed the `b.replace(stat, '')` mid-string deletion (which left orphaned "#"/"Q") and the `b.slice(0, 6)` fake-stat fallback. Captions are now computed boundary-safely, and when fewer than 2 bullets carry a real stat (i.e. the layout was mis-selected for prose) the slide falls back to `ContentList` instead of garbling copy.
+- **AI Copywriter greeting now names the company** — `src/components/ChatInterface.tsx` greeting fell back to "your client" because `useBriefParser` (`src/hooks/useBriefParser.ts`) only set `client.company` from an explicit `Company:` key or a 3-part `Client:` line. `buildBriefText` (`src/utils/llmService.ts`) now emits an explicit `Company:` line so the PDF path's company survives even with no contact name; `useBriefParser` now takes the last non-name, non-email part of a `Client:` line as the company and adds a conservative free-form "for <Brand>" fallback (stop-word/date guarded).
+
+### Verified
+- Deterministic check of `extractStat`/`defaultLayoutFor` against the originally-garbled strings and real stats (all pass); full Playwright e2e suite 56/56 (incl. greeting-company + export flow); live frontend confirmed the greeting now reads "I've reviewed the brief for Dunkin'". (Live stat-grid render not visually re-shot this session because the upstream Gemini API returned transient 500s for the heavy generation call — backend itself verified healthy via direct calls.)
+
+---
+
 ## [2026-06-16] — "Design with Claude" export path (pptx Agent Skill)
 
 ### Added
