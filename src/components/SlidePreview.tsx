@@ -12,6 +12,7 @@ interface SlidePreviewProps {
   chatUpdateVersion?: number
   onSlideEdit?: (slideKey: string, bulletIndex: number, newText: string) => void
   onSlideTitleEdit?: (slideKey: string, newTitle: string) => void
+  onSlideDelete?: (slideKey: string) => void
 }
 
 // Theme token shapes for dynamic coloring
@@ -68,6 +69,7 @@ function SlideCard({
   chatUpdateVersion = 0,
   onBulletEdit,
   onTitleEdit,
+  onDelete,
 }: {
   slide: SlideData
   index: number
@@ -75,6 +77,7 @@ function SlideCard({
   chatUpdateVersion?: number
   onBulletEdit?: (bulletIndex: number, newText: string) => void
   onTitleEdit?: (newTitle: string) => void
+  onDelete?: () => void
 }) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -155,9 +158,26 @@ function SlideCard({
           <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-navy-400">
             Slide {slide.slideNumber}
           </span>
-          {(onBulletEdit || onTitleEdit) && (
-            <span className="ml-auto text-[10px] text-navy-300 font-medium">click to edit</span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {(onBulletEdit || onTitleEdit) && (
+              <span className="text-[10px] text-navy-300 font-medium">click to edit</span>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDelete() }}
+                aria-label={`Delete slide ${slide.slideNumber}`}
+                className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-6 h-6 rounded-md text-navy-300 hover:text-red-600 hover:bg-red-50 transition-all"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className={`px-6 pb-5 ${isTitle || isClosing ? 'text-center pt-4 pb-8' : ''}`}>
@@ -265,7 +285,7 @@ function SlideCard({
 
 const isEditableSlide = (slide: SlideData) => slide.editable === true
 
-export default function SlidePreview({ fileName, data, designConfig, isUpdating, chatUpdateVersion, onSlideEdit, onSlideTitleEdit }: SlidePreviewProps) {
+export default function SlidePreview({ fileName, data, designConfig, isUpdating, chatUpdateVersion, onSlideEdit, onSlideTitleEdit, onSlideDelete }: SlidePreviewProps) {
   const hasRealData = !!(data && (data.client?.company || data.project?.title || data.content?.problems?.[0] || data.expanded))
   const slides = hasRealData ? buildSlidesFromData(data!) : null
   const theme = THEME_MAP[designConfig?.colorTheme ?? 'navy-gold'] ?? DEFAULT_THEME
@@ -316,6 +336,10 @@ export default function SlidePreview({ fileName, data, designConfig, isUpdating,
                 }
                 onTitleEdit={onSlideTitleEdit && isEditableSlide(slide) && slide.slideKey
                   ? (newTitle) => onSlideTitleEdit(slide.slideKey!, newTitle)
+                  : undefined
+                }
+                onDelete={onSlideDelete && slide.slideKey
+                  ? () => onSlideDelete(slide.slideKey!)
                   : undefined
                 }
               />

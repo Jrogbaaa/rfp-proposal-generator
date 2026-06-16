@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-06-16] — Step 2 slide deletion + AI Copywriter round-trip regression test
+
+### Added
+- **`src/components/SlidePreview.tsx`** — Per-slide delete control. `SlideCard` now accepts an `onDelete` callback and renders a hover-revealed trash button in the slide header (next to the "click to edit" hint, `opacity-0 group-hover:opacity-100`). The button calls `e.stopPropagation()` so it never triggers inline editing. `SlidePreview` exposes a new `onSlideDelete?: (slideKey: string) => void` prop and passes `onDelete` to every slide that has a `slideKey` — including the Cover (`title`), Closing (`closing`), and non-editable `roi_framing` slides — so any slide can be removed.
+- **`src/App.tsx`** — `handleSlideDelete(slideKey)` shows a `window.confirm` dialog, then appends the key to `expanded.deletedSlideKeys` via `setExpansions`. Wired into the Step 2 `SlidePreview` as `onSlideDelete`. Deletions persist through the existing `expansions` → `sessionStorage` effect and survive chat iterations / inline edits (both spread the prior expansions object).
+- **`src/types/proposal.ts`** — Added `deletedSlideKeys?: string[]` to `ExpandedContent`.
+- **`e2e/app.spec.ts`** — Two new tests: (1) "chat iteration rewrites slide text in the preview" proves the AI Copywriter round-trips end-to-end (a `realProblem` bullet is replaced after a "More concise" turn); (2) "deleting a slide removes it and decrements the slide count" accepts the confirm dialog, deletes slide 3, and asserts the deck drops from 11 → 10 slides and the slide title disappears.
+
+### Changed
+- **`src/utils/slideBuilder.ts`** — Added `finalizeSlides()` which filters out slides whose `slideKey` is in `deletedSlideKeys` and renumbers the survivors `1..N`. Applied as the final step in all three return paths of `buildSlidesFromData()` (paramount-rfp, paramount-showcase, generic). Because this single builder feeds the Step 2 preview, the Step 3 Design Studio, and the Google Slides / PPTX export, deletion propagates everywhere automatically.
+
+### Why
+The AI Copywriter (Step 2 chat) was wired correctly but lacked any test proving slide *text* actually changes after a chat turn, so its behavior was unverified. The new regression test closes that gap. Slide deletion was a missing capability — users could edit copy but not remove whole slides; doing it at the builder level keeps the preview, design review, and export in lock-step.
+
+---
+
 ## [2026-05-11] — Fix lingering "Google hasn't verified this app" warning post-verification
 
 ### Fixed

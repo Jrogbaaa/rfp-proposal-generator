@@ -1,6 +1,12 @@
 import type { ProposalData, ExpandedContent, DesignConfig, AdditionalSlide, BrandVoiceProfile, ParamountMediaContent, IPAlignment, IntegrationConcept, CalendarItem, InvestmentTier, DeckType, FlexibleSlide, ShowcaseContent, ProofPoint, CustomClientPlan, IndustryInsight } from '../types/proposal';
-import { PARAMOUNT_TRAINING_CONTEXT, PROOF_POINTS_DATABASE, INDUSTRY_INSIGHTS_MAP } from './trainingContext';
+import { PARAMOUNT_TRAINING_CONTEXT, PROOF_POINTS_DATABASE, INDUSTRY_INSIGHTS_MAP, renderKnowledgeBase } from './trainingContext';
+import { PARAMOUNT_AGENT_IDENTITY, NON_NEGOTIABLES, ANTI_PATTERNS } from './paramountAgent/persona';
+import { FEW_SHOT_EXEMPLARS } from './paramountAgent/exemplars';
+import { ENABLE_SELF_CRITIQUE, critiqueAndRevise } from './paramountAgent/critique';
 import { fetchWithRetry } from './fetchWithRetry';
+
+// Layer 1 — assembled persona block (identity + hard rules), prepended to the RFP system prompt.
+const PARAMOUNT_PERSONA = [PARAMOUNT_AGENT_IDENTITY, NON_NEGOTIABLES, ANTI_PATTERNS].join('\n\n');
 
 const GEMINI_PROXY   = '/api/gemini/generate-content';
 const FILES_PROXY_UPLOAD = '/api/gemini/upload-file';
@@ -379,7 +385,7 @@ interface LLMResponse {
   industryInsights?: IndustryInsight[];
 }
 
-const SYSTEM_PROMPT = `You are a senior Paramount Advertising Solutions sales executive writing a custom media partnership proposal. You build PERSUASION DECKS, not informational slides. Every deck must create urgency, reframe thinking, prove impact, and show tailored execution.
+const SYSTEM_PROMPT = `Generate the proposal content as schema-strict JSON. (Your identity, non-negotiables, and the Paramount knowledge base are provided above.)
 
 You MUST output valid JSON with this exact structure:
 {
@@ -720,13 +726,19 @@ ${briefText}
 
 Build the best possible presentation for this request. Use the full Paramount IP inventory, talent roster, and programming calendar from your training context where relevant.`;
 
-  // Select system prompt and training context based on deck type
+  // Select system prompt and training context based on deck type.
+  // RFP path is assembled from the four layers: persona → knowledge base → deck-type prompt.
   const promptsByType: Record<DeckType, (string | null)[]> = {
-    'paramount-rfp':      [brandVoice ? formatBrandVoiceConstraints(brandVoice) : null, PARAMOUNT_TRAINING_CONTEXT, PROOF_POINTS_DATABASE, INDUSTRY_INSIGHTS_MAP, SYSTEM_PROMPT],
+    'paramount-rfp':      [brandVoice ? formatBrandVoiceConstraints(brandVoice) : null, PARAMOUNT_PERSONA, renderKnowledgeBase(), PROOF_POINTS_DATABASE, INDUSTRY_INSIGHTS_MAP, SYSTEM_PROMPT],
     'paramount-showcase': [brandVoice ? formatBrandVoiceConstraints(brandVoice) : null, PARAMOUNT_TRAINING_CONTEXT, SHOWCASE_SYSTEM_PROMPT],
     'generic':            [GENERIC_SYSTEM_PROMPT],
   };
   const systemPrompt = promptsByType[deckType].filter(Boolean).join('\n\n');
+
+  // Few-shot: inject the worked brief→JSON exemplar before the live brief (RFP only).
+  const contents = deckType === 'paramount-rfp'
+    ? [...FEW_SHOT_EXEMPLARS, { role: 'user', parts: [{ text: userPrompt }] }]
+    : [{ role: 'user', parts: [{ text: userPrompt }] }];
 
   let parsed: LLMResponse | undefined;
   let lastError: Error | undefined;
@@ -739,9 +751,7 @@ Build the best possible presentation for this request. Use the full Paramount IP
         systemInstruction: {
           parts: [{ text: systemPrompt }],
         },
-        contents: [
-          { role: 'user', parts: [{ text: userPrompt }] },
-        ],
+        contents,
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 32768,
@@ -872,7 +882,7 @@ Build the best possible presentation for this request. Use the full Paramount IP
     : undefined;
   const industryInsights: IndustryInsight[] | undefined = Array.isArray(parsed.industryInsights) ? (parsed.industryInsights as IndustryInsight[]) : undefined;
 
-  return {
+  const draft: ExpandedContent = {
     problemExpansions: Array.isArray(parsed.problemExpansions) && parsed.problemExpansions.length === 4
       ? parsed.problemExpansions as [string, string, string, string]
       : EMPTY_FOUR,
@@ -893,6 +903,13 @@ Build the best possible presentation for this request. Use the full Paramount IP
     customPlan,
     industryInsights,
   };
+
+  // Layer 4 — self-critique-and-revise pass (RFP only). Fail-open: returns draft on any error.
+  if (ENABLE_SELF_CRITIQUE && deckType === 'paramount-rfp') {
+    return critiqueAndRevise(draft, { briefText, clientCompany });
+  }
+
+  return draft;
 }
 
 const ITERATE_SYSTEM_PROMPT = `You are a Paramount Advertising Solutions proposal editor. The user will request changes to slide content — either specific slides or general improvements across the whole deck.

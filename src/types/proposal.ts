@@ -115,6 +115,8 @@ export interface ExpandedContent {
   nextSteps?: string[];       // 3-5 post-agreement action items (LLM-generated)
   additionalSlides?: AdditionalSlide[];
   customTitles?: Record<string, string>;
+  // slideKeys the user removed in Step 2 — filtered out of the built deck everywhere
+  deletedSlideKeys?: string[];
   // User edits from the Refine tab (slides 1 & 2)
   editedProjectTitle?: string;
   editedProblems?: [string, string, string, string];

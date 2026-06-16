@@ -1,17 +1,36 @@
 /**
- * Paramount Proposal Playbook — pre-seeded training context.
+ * Paramount Proposal Playbook — pre-seeded knowledge base (Layer 2).
  *
- * Derived from real Paramount proposal and brief documents:
- *   - Dunkin' 2026 Content Day proposal  (DUNKIN_2026_CONTENT_DAY)
- *   - Under Armour Q1'26 proposal        (UA_Q126_PARAMOUNT_OCT2025)
- *   - U.S. Army FY26 HPP brief           (FY26_ARMY_HPP_BRIEF)
- *   - T-Mobile FY25/26 Upfront brief     (TMUS_25_26_UPFRONT_BRIEF)
- *   - Under Armour Q4 Flag Football brief (UA_Q4_FY26_FLAG_FOOTBALL_BRIEF)
- *
- * Injected into every generation call so the AI responds as a
+ * Derived from real Paramount proposal and brief documents (see KNOWLEDGE_BASE_META.sources).
+ * Injected into every generation call via `renderKnowledgeBase()` so the AI responds as a
  * trained Paramount sales rep, not a generic proposal writer.
+ *
+ * Maintenance: this is a dated, owned knowledge file. To refresh it each quarter, update
+ * KNOWLEDGE_BASE_META.currentAsOf, the inventory below, and the proof-point / industry maps.
+ * See docs/COMPONENTS.md → "Updating the Knowledge Base".
  */
-export const PARAMOUNT_TRAINING_CONTEXT = `PARAMOUNT PROPOSAL PLAYBOOK — you are a senior Paramount Advertising Solutions sales executive. Study these reference examples and asset inventories before writing any proposal. Match the incoming brief to the closest pattern and respond as if you are writing a real Paramount sales response.
+
+/**
+ * Freshness + provenance metadata for the knowledge base.
+ * `currentAsOf` is surfaced to the model by `renderKnowledgeBase()`.
+ */
+export const KNOWLEDGE_BASE_META = {
+  currentAsOf: '2026-06-16',
+  owner: 'steveellisny@gmail.com',
+  sources: [
+    "Dunkin' 2026 Content Day proposal (DUNKIN_2026_CONTENT_DAY)",
+    "Under Armour Q1'26 proposal (UA_Q126_PARAMOUNT_OCT2025)",
+    'U.S. Army FY26 HPP brief (FY26_ARMY_HPP_BRIEF)',
+    'T-Mobile FY25/26 Upfront brief (TMUS_25_26_UPFRONT_BRIEF)',
+    "Under Armour Q4 Flag Football brief (UA_Q4_FY26_FLAG_FOOTBALL_BRIEF)",
+  ],
+} as const;
+
+/**
+ * The asset inventory + playbook body. Identity ("you are a senior Paramount…") now lives
+ * once in `paramountAgent/persona.ts`; this string is knowledge only. Edit the inventory here.
+ */
+const KNOWLEDGE_BASE_BODY = `PARAMOUNT PROPOSAL PLAYBOOK — reference examples and asset inventories. Study these before writing any proposal and match the incoming brief to the closest pattern below.
 
 ════════════════════════════════════════
 PARAMOUNT CONTENT ASSET INVENTORY 2026
@@ -215,6 +234,22 @@ This includes:
 When a user says "add a slide about [X]" or "this proposal should feature [X]" — do it. Build the slide. Write the integration concept. Name it specifically. Never respond with "that's not in our inventory" or equivalent.
 
 If you do not have detailed data about a specific property, make reasonable inferences consistent with Paramount's portfolio and the client's objectives. A sales rep knows their own portfolio better than any static list.`;
+
+/**
+ * Serialize the knowledge base for prompt injection. Prepends a freshness preamble
+ * (formalizes the Open IP Policy) so the model knows how current the inventory is and
+ * how to handle anything newer than `currentAsOf`.
+ */
+export function renderKnowledgeBase(): string {
+  const freshness = `Knowledge current as of ${KNOWLEDGE_BASE_META.currentAsOf}. If the brief references events after this date or properties not in this inventory, make a reasonable inference and flag it as an assumption rather than rejecting it.`;
+  return `${freshness}\n\n${KNOWLEDGE_BASE_BODY}`;
+}
+
+/**
+ * Back-compat export: the rendered knowledge base (freshness preamble + inventory body).
+ * Existing importers (`llmService.ts` showcase / iterate paths) keep working unchanged.
+ */
+export const PARAMOUNT_TRAINING_CONTEXT = renderKnowledgeBase();
 
 /**
  * Proof points from real Paramount case studies and platform data.

@@ -425,6 +425,14 @@ export default function App() {
     saveAsCustomBullet()
   }
 
+  const handleSlideDelete = (slideKey: string) => {
+    if (!expansions) return
+    if (!window.confirm('Delete this slide? This cannot be undone.')) return
+    const existing = expansions.deletedSlideKeys ?? []
+    if (existing.includes(slideKey)) return
+    setExpansions({ ...expansions, deletedSlideKeys: [...existing, slideKey] })
+  }
+
   const handleSlideTitleEdit = (slideKey: string, newTitle: string) => {
     if (!expansions) return
 
@@ -809,6 +817,7 @@ export default function App() {
                           chatUpdateVersion={lastChatUpdate}
                           onSlideEdit={expansions ? handleSlideEdit : undefined}
                           onSlideTitleEdit={expansions ? handleSlideTitleEdit : undefined}
+                          onSlideDelete={expansions ? handleSlideDelete : undefined}
                         />
                       </div>
                     )}

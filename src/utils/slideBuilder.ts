@@ -65,6 +65,16 @@ function applyEdits(
   return applyCustomBulletsToSlides(applyCustomTitlesToSlides(slides, titles), bullets)
 }
 
+// Removes user-deleted slides (matched by slideKey) and renumbers the remainder
+// so slideNumber stays contiguous (1..N). Applied as the final build step so
+// deletion propagates to the preview, Design Studio, and export uniformly.
+function finalizeSlides(slides: SlideData[], deletedKeys: string[] | undefined): SlideData[] {
+  const filtered = deletedKeys?.length
+    ? slides.filter(s => !s.slideKey || !deletedKeys.includes(s.slideKey))
+    : slides
+  return filtered.map((s, i) => ({ ...s, slideNumber: i + 1 }))
+}
+
 export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
   const client = data.client
   const project = data.project
@@ -137,7 +147,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         bullets: capBullets(s.bullets, MAX_BULLETS, MAX_BULLET_CHARS),
       })
     })
-    return applyEdits(slides, customTitlesAll, customBulletsAll)
+    return finalizeSlides(applyEdits(slides, customTitlesAll, customBulletsAll), expanded?.deletedSlideKeys)
   }
 
   if (expanded?.deckType === 'generic' && expanded.flexibleSlides) {
@@ -179,7 +189,7 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
         bullets: capBullets(s.bullets, MAX_BULLETS, MAX_BULLET_CHARS),
       })
     })
-    return applyEdits(slides, customTitlesAll, customBulletsAll)
+    return finalizeSlides(applyEdits(slides, customTitlesAll, customBulletsAll), expanded?.deletedSlideKeys)
   }
 
   const company = client?.company || '—'
@@ -409,5 +419,5 @@ export function buildSlidesFromData(data: Partial<ProposalData>): SlideData[] {
     })
   })
 
-  return applyEdits(slides, customTitlesAll, customBulletsAll)
+  return finalizeSlides(applyEdits(slides, customTitlesAll, customBulletsAll), expanded?.deletedSlideKeys)
 }
