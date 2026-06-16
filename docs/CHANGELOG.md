@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-06-16] — "Design with Claude" export path (pptx Agent Skill)
+
+### Added
+- **`api/_lib/anthropicDeck.ts`** (new) — Server-side helper `generateDeckPptx(prompt)` that calls the Claude Messages API with the pre-built `pptx` Agent Skill (`container.skills` + `code_execution` tool + betas `code-execution-2025-08-25,files-api-2025-04-14,skills-2025-10-02`). Extracts the generated file's `file_id` from the code/bash execution tool-result blocks, downloads the bytes via the Files API, and returns the deck as base64. Model overridable via `ANTHROPIC_MODEL` (default `claude-sonnet-4-5-20250929`). Throws `AnthropicConfigError` when `ANTHROPIC_API_KEY` is missing.
+- **`api/anthropic/generate-deck.ts`** (new) — Vercel serverless wrapper (POST `{ prompt }` → `{ pptxBase64, model }`). `maxDuration` raised to 300s in `vercel.json`.
+- **`server/routes/anthropic.ts`** (new) — Express dev-server equivalent, mounted at `/api/anthropic` in `server/index.ts`; shares the same helper.
+- **`src/utils/claudeSlides.ts`** (new) — `createSlidesViaClaude(data, designConfig, getToken)`. Builds a content + brand brief from `buildSlidesFromData()` and the Step-3 theme tokens (`resolveTheme`), posts to the route, decodes the base64 `.pptx`, and reuses `uploadPptxToDrive()` to convert it to a native Google Slides file.
+- **`src/utils/buildProposalData.ts`** (new) — Extracted the `buildProposalData()` helper out of `GoogleSlidesButton` so both export paths share one assembler.
+- **`src/components/ClaudeDesignButton.tsx`** (new) — "Design with Claude" export button (indigo accent) with staged progress UI; wired into the DesignStudio export section beneath the standard Google Slides button (separated by an "or" divider).
+
+### Changed
+- **`src/components/GoogleSlidesButton.tsx`** — Now imports the shared `buildProposalData` (local copy removed); behavior unchanged.
+- **`src/utils/pptxExport.ts`** — `uploadPptxToDrive()` is now exported for reuse by the Claude path.
+- **`.env.example`** — Added `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`.
+
+### Why
+The Google Slides export was a separate, lower-fidelity renderer than the Step-3 canvas, and the team wants Claude's design quality. This adds a second, opt-in export that hands the deck content + brand palette to Claude's `pptx` skill and converts the result to Google Slides. Trade-offs: the skill designs its own layout (not a pixel match of Step 3), the agent loop can take a few minutes (Vercel Hobby's 60s cap will time out — use local dev or a Pro plan), and it incurs Anthropic API cost per deck. Verified: `tsc --noEmit` (src) + targeted `tsc` over the new api/server files + `npm run build` all pass; lint clean.
+
+---
+
 ## [2026-06-16] — Paramount agent: four-layer refactor + self-critique pass
 
 ### Added
