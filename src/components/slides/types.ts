@@ -30,9 +30,15 @@ export function effectiveBullets(slide: SlideData, overrides?: SlideOverrides): 
   return typeof cap === 'number' && cap > 0 ? source.slice(0, cap) : source
 }
 
-/** First numeric/statistical token in a string, e.g. "+47%", "$2.4B", "12x". */
-const STAT_RE = /([+-]?\$?\d[\d,.]*\s*(?:%|x|B|M|K)?)/i
+/**
+ * First *real* statistical token in a string — a number that carries a unit:
+ * a leading currency ($175,000, $2.4B), a trailing percent (47%), a trailing
+ * multiplier (12x), or a magnitude suffix (6.8M, 2.4B). A bare digit embedded
+ * in prose ("#1", "Q1", "March 2026") is NOT a stat and returns null, so the
+ * stat-grid never mangles ordinary copy.
+ */
+const STAT_RE = /(?<![\w#])[+-]?(?:[$£€]\s?\d[\d,.]*(?:\s*(?:bn|[KMB])\b)?|\d[\d,.]*\s*%|\d[\d,.]*\s*(?:bn|[KMB]|[xX×])\b)/i
 export function extractStat(text: string): string | null {
   const m = text.match(STAT_RE)
-  return m ? m[1].trim() : null
+  return m ? m[0].trim() : null
 }

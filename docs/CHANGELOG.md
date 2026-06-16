@@ -1,5 +1,54 @@
 # Changelog
 
+## [2026-06-16] — Fix stat-grid copy garble + greeting company substitution
+
+### Fixed
+- **Stat-grid no longer mangles prose** — `src/components/slides/types.ts`; `extractStat()`'s `STAT_RE` was `/([+-]?\$?\d[\d,.]*\s*(?:%|x|B|M|K)?)/i`, whose optional unit group matched ANY embedded digit, so "South Park is the #1 title" yielded a hero stat "1", "Q1 2026 marathons" yielded "1", and "launching March 2026" yielded "2026.". Rewrote it to require a real unit (leading currency `$175,000`/`$2.4B`, trailing `%`, multiplier `12x`, or magnitude `6.8M`) with a boundary guard so digits after a letter/`#` (`#1`, `Q1`, `S28`) and bare years return `null`.
+- **Stat-grid layout routing tightened** — `src/utils/design/vocabulary.ts`; `HAS_DIGIT_OR_CURRENCY` previously treated any 2+ digit number (`[+-]?\d{2,}`, e.g. a year) as a stat, routing prose slides into `content-stat-grid`/`title-stat`. Now requires percent/currency/magnitude/multiplier, matching `STAT_RE`.
+- **ContentStatGrid renderer hardened** — `src/components/slides/ContentStatGrid.tsx`; removed the `b.replace(stat, '')` mid-string deletion (which left orphaned "#"/"Q") and the `b.slice(0, 6)` fake-stat fallback. Captions are now computed boundary-safely, and when fewer than 2 bullets carry a real stat (i.e. the layout was mis-selected for prose) the slide falls back to `ContentList` instead of garbling copy.
+- **AI Copywriter greeting now names the company** — `src/components/ChatInterface.tsx` greeting fell back to "your client" because `useBriefParser` (`src/hooks/useBriefParser.ts`) only set `client.company` from an explicit `Company:` key or a 3-part `Client:` line. `buildBriefText` (`src/utils/llmService.ts`) now emits an explicit `Company:` line so the PDF path's company survives even with no contact name; `useBriefParser` now takes the last non-name, non-email part of a `Client:` line as the company and adds a conservative free-form "for <Brand>" fallback (stop-word/date guarded).
+
+### Verified
+- Deterministic check of `extractStat`/`defaultLayoutFor` against the originally-garbled strings and real stats (all pass); full Playwright e2e suite 56/56 (incl. greeting-company + export flow); live frontend confirmed the greeting now reads "I've reviewed the brief for Dunkin'". (Live stat-grid render not visually re-shot this session because the upstream Gemini API returned transient 500s for the heavy generation call — backend itself verified healthy via direct calls.)
+
+---
+
+## [2026-06-16] — "Design with Claude" export path (pptx Agent Skill)
+
+### Added
+- **`api/_lib/anthropicDeck.ts`** (new) — Server-side helper `generateDeckPptx(prompt)` that calls the Claude Messages API with the pre-built `pptx` Agent Skill (`container.skills` + `code_execution` tool + betas `code-execution-2025-08-25,files-api-2025-04-14,skills-2025-10-02`). Extracts the generated file's `file_id` from the code/bash execution tool-result blocks, downloads the bytes via the Files API, and returns the deck as base64. Model overridable via `ANTHROPIC_MODEL` (default `claude-sonnet-4-5-20250929`). Throws `AnthropicConfigError` when `ANTHROPIC_API_KEY` is missing.
+- **`api/anthropic/generate-deck.ts`** (new) — Vercel serverless wrapper (POST `{ prompt }` → `{ pptxBase64, model }`). `maxDuration` raised to 300s in `vercel.json`.
+- **`server/routes/anthropic.ts`** (new) — Express dev-server equivalent, mounted at `/api/anthropic` in `server/index.ts`; shares the same helper.
+- **`src/utils/claudeSlides.ts`** (new) — `createSlidesViaClaude(data, designConfig, getToken)`. Builds a content + brand brief from `buildSlidesFromData()` and the Step-3 theme tokens (`resolveTheme`), posts to the route, decodes the base64 `.pptx`, and reuses `uploadPptxToDrive()` to convert it to a native Google Slides file.
+- **`src/utils/buildProposalData.ts`** (new) — Extracted the `buildProposalData()` helper out of `GoogleSlidesButton` so both export paths share one assembler.
+- **`src/components/ClaudeDesignButton.tsx`** (new) — "Design with Claude" export button (indigo accent) with staged progress UI; wired into the DesignStudio export section beneath the standard Google Slides button (separated by an "or" divider).
+
+### Changed
+- **`src/components/GoogleSlidesButton.tsx`** — Now imports the shared `buildProposalData` (local copy removed); behavior unchanged.
+- **`src/utils/pptxExport.ts`** — `uploadPptxToDrive()` is now exported for reuse by the Claude path.
+- **`.env.example`** — Added `ANTHROPIC_API_KEY` and optional `ANTHROPIC_MODEL`.
+
+### Why
+The Google Slides export was a separate, lower-fidelity renderer than the Step-3 canvas, and the team wants Claude's design quality. This adds a second, opt-in export that hands the deck content + brand palette to Claude's `pptx` skill and converts the result to Google Slides. Trade-offs: the skill designs its own layout (not a pixel match of Step 3), the agent loop can take a few minutes (Vercel Hobby's 60s cap will time out — use local dev or a Pro plan), and it incurs Anthropic API cost per deck. Verified: `tsc --noEmit` (src) + targeted `tsc` over the new api/server files + `npm run build` all pass; lint clean.
+
+---
+
+## [2026-06-16] — Paramount agent: four-layer refactor + self-critique pass
+
+### Added
+- **`src/utils/paramountAgent/persona.ts`** (new) — Layer 1 single source of truth for the agent's identity. Exports `PARAMOUNT_AGENT_IDENTITY`, `NON_NEGOTIABLES` (always name the property, never invent a stat, every integration = property + mechanic + outcome, active ownership language, always close with measurement), and `ANTI_PATTERNS`. Deduplicates the identity text that was previously restated in both `llmService.ts` `SYSTEM_PROMPT` and the `trainingContext.ts` header.
+- **`src/utils/paramountAgent/exemplars.ts`** (new) — Layer 3 few-shot. Exports `FEW_SHOT_EXEMPLARS`, one compact, full brief→ideal `ExpandedContent` JSON pair distilled from the real Dunkin' reference (correct item counts, named properties, sourced stats, property→mechanic→outcome integrations). Injected as a prior user/model turn before the live brief, gated to `paramount-rfp` only.
+- **`src/utils/paramountAgent/critique.ts`** (new) — Layer 4 self-critique. Exports `ENABLE_SELF_CRITIQUE` (default `true`), `RUBRIC`, and `critiqueAndRevise(draft, ctx)` — one extra low-temp Gemini call that scores the draft against the rubric and returns a revised object in the same `ExpandedContent` schema. **Fail-open**: any error, timeout, empty/invalid JSON, or failed sanity check returns the original draft unchanged.
+
+### Changed
+- **`src/utils/trainingContext.ts`** — Layer 2. Added `KNOWLEDGE_BASE_META` (`currentAsOf`, `owner`, `sources[]`) and `renderKnowledgeBase()`, which prepends a freshness preamble (formalizing the Open IP Policy) to the inventory body. Identity sentence removed from the knowledge body (now owned by `persona.ts`). `PARAMOUNT_TRAINING_CONTEXT`, `PROOF_POINTS_DATABASE`, and `INDUSTRY_INSIGHTS_MAP` exports preserved (the first is now `renderKnowledgeBase()`), so showcase/iterate importers are unaffected. Knowledge prose kept intact (no typed-data shatter) to guarantee prompt parity.
+- **`src/utils/llmService.ts`** — `generateProposalContent` now assembles the `paramount-rfp` system prompt from the four layers (persona → `renderKnowledgeBase()` → proof points → industry insights → schema/slide-arc prompt), injects `FEW_SHOT_EXEMPLARS` before the live brief (RFP only), and runs `critiqueAndRevise` after the draft when `ENABLE_SELF_CRITIQUE` is on (RFP only). `SYSTEM_PROMPT` identity paragraph replaced with a pointer to the now-shared persona block. Output contract (`ExpandedContent`, deck-type routing) unchanged — `googleSlides.ts`, chat components, and the E2E suite untouched.
+
+### Why
+The agent was a prompt-based persona with three weaknesses: the identity was entangled/duplicated, the knowledge was an undated prose blob, and the five real reference proposals were never used as few-shot examples. This restructures the agent into clean Identity / Knowledge / Craft / Harness layers and adds a grounding-focused revise pass — a behavior-preserving refactor plus one quality addition, with no tool-calling and no schema changes. Verified: `npm run build` passes; targeted E2E across mount, RFP generation (few-shot + critique fail-open), and the iterate path all green.
+
+---
+
 ## [2026-06-16] — Step 2 slide deletion + AI Copywriter round-trip regression test
 
 ### Added

@@ -102,7 +102,10 @@ export interface SlideOverrides {
 // Pure function — also reused by the reviewer prompt to ground its suggestions.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HAS_DIGIT_OR_CURRENCY = /(\d[\d,.]*\s*%|\$\s*\d|[+-]?\d{2,}|\d+\s*x)/i
+// A bullet "has a stat" only when a number carries a unit — percent, currency,
+// magnitude (K/M/B), or multiplier (x). Bare years/counts like "2026" are NOT
+// stats, so prose slides no longer get routed into stat-grid / title-stat.
+const HAS_DIGIT_OR_CURRENCY = /(\d[\d,.]*\s*%|[$£€]\s*\d|\d[\d,.]*\s*(?:bn|[KMB])\b|\d[\d,.]*\s*[xX×]\b)/i
 const STARTS_WITH_QUOTE     = /^[“"'']/
 const ENDS_WITH_QUOTE       = /[”"'']$/
 

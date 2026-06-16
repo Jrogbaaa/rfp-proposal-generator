@@ -14,7 +14,9 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
-.cursor/
+# Ignore .cursor/ but keep committed project rules
+.cursor/*
+!.cursor/rules/
 
 # Logs
 *.log
@@ -37,3 +39,6 @@ Thumbs.db
 .tmp/
 .vercel
 .gstack/
+
+# Git worktrees (per .cursor/rules/agent-workflow.mdc)
+.worktrees/
