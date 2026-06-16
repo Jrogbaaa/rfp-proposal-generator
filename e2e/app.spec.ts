@@ -3,6 +3,8 @@ import { test, expect, type Page } from '@playwright/test'
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     sessionStorage.setItem('rfp_app_entered', '1')
+    // PasswordGate wraps the whole app — unlock it so tests can reach the workflow
+    sessionStorage.setItem('rfp_site_unlocked', '1')
   })
 })
 
@@ -508,6 +510,25 @@ test.describe('Step 2 – Chat Interface', () => {
       page.getByRole('button', { name: 'Suggest: Stronger ROI' })
     ).not.toBeVisible()
   })
+
+  test('chat iteration rewrites slide text in the preview', async ({ page }) => {
+    await goToIterateStep(page)
+    // Original "Why Most Brand Campaigns Fail Today" (realProblem) bullet from the initial generation
+    await expect(
+      page.getByText("Interruptive ads don't drive app engagement", { exact: false })
+    ).toBeVisible({ timeout: 10000 })
+
+    await page.getByRole('button', { name: 'Suggest: More concise' }).click()
+
+    // After the iteration, the realProblem bullet is rewritten — proves the chat
+    // round-trips updatedContent → setExpansions → buildSlidesFromData → preview
+    await expect(
+      page.getByText('Interruptive ads generate skip buttons, not engagement.')
+    ).toBeVisible({ timeout: 10000 })
+    await expect(
+      page.getByText("Interruptive ads don't drive app engagement", { exact: false })
+    ).not.toBeVisible()
+  })
 })
 
 // ─── Step 2: Export Button ────────────────────────────────────────────────────
@@ -714,6 +735,25 @@ test.describe('Step 2 – Slide Preview Structure', () => {
     const count = parseInt(slidesText)
     // 11 base + 1 next steps = 12
     expect(count).toBe(12)
+  })
+})
+
+// ─── Step 2: Slide Deletion ───────────────────────────────────────────────────
+
+test.describe('Step 2 – Slide Deletion', () => {
+  test('deleting a slide removes it and decrements the slide count', async ({ page }) => {
+    await goToIterateStep(page)
+    // Accept the confirm dialog that fires before deletion
+    page.on('dialog', (d) => d.accept())
+
+    await expect(page.getByText('Why Most Brand Campaigns Fail Today')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('11 slides')).toBeVisible({ timeout: 10000 })
+
+    // Slide 3 is "Why Most Brand Campaigns Fail Today" (real_problem)
+    await page.getByRole('button', { name: 'Delete slide 3' }).click()
+
+    await expect(page.getByText('Why Most Brand Campaigns Fail Today')).not.toBeVisible()
+    await expect(page.getByText('10 slides')).toBeVisible({ timeout: 10000 })
   })
 })
 
