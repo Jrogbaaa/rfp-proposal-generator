@@ -5,6 +5,7 @@ import type { SlideData } from '../data/slideContent'
 import type { SlideOverrides } from './SlideCanvasRenderer'
 import SlideCanvasRenderer from './SlideCanvasRenderer'
 import GoogleSlidesButton from './GoogleSlidesButton'
+import ClaudeDesignButton from './ClaudeDesignButton'
 import { buildSlidesFromData } from '../utils/slideBuilder'
 import { runDesignLoop } from '../utils/designReview'
 
@@ -261,6 +262,25 @@ export default function DesignStudio({
                     </span>
                   </div>
                   <GoogleSlidesButton
+                    data={parsedData}
+                    briefText={briefText}
+                    isEmpty={!briefText.trim()}
+                    preGeneratedContent={expansions}
+                    onSuccess={(url) => {
+                      setSlidesUrl(url)
+                      setPhase('exported')
+                    }}
+                    designConfig={designConfig}
+                    brandVoice={brandVoice}
+                  />
+
+                  <div className="flex items-center gap-3 py-1">
+                    <div className="flex-1 h-px bg-cream-300" />
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-navy-300">or</span>
+                    <div className="flex-1 h-px bg-cream-300" />
+                  </div>
+
+                  <ClaudeDesignButton
                     data={parsedData}
                     briefText={briefText}
                     isEmpty={!briefText.trim()}

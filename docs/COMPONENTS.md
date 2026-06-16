@@ -255,12 +255,31 @@ All slide-builder functions accept `palette: SlidePalette` and `opts: SlideOpts`
 | contentExpander | `src/utils/contentExpander.ts` | Template-based content expansion for problems and benefits |
 | validators | `src/utils/validators.ts` | Input validation functions |
 | errorHandler | `src/utils/errorHandler.ts` | Centralized error logging and debugging utilities |
-| llmService | `src/utils/llmService.ts` | Gemini 3 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()` (deck-type aware — `updatedContent` for paramount-rfp, `updatedShowcaseContent` for paramount-showcase, `updatedFlexibleSlides` for generic), `iterateDesign()`, `extractBrandVoice()`. SYSTEM_PROMPT generates the 11-slide persuasion arc with dynamic client personalization, automated proof insertion (PROOF_POINTS_DATABASE), and industry-specific insights (INDUSTRY_INSIGHTS_MAP). All calls use `fetchWithRetry` + `validateGeminiBody()`. Exports `GeminiBlockedError` for typed error handling. |
+| llmService | `src/utils/llmService.ts` | Gemini 3 Flash: `analyzeBriefPdf()`, `generateProposalContent()`, `iterateProposalContent()` (deck-type aware — `updatedContent` for paramount-rfp, `updatedShowcaseContent` for paramount-showcase, `updatedFlexibleSlides` for generic), `iterateDesign()`, `extractBrandVoice()`. The `paramount-rfp` system prompt is assembled from four layers — persona (`paramountAgent/persona.ts`) → `renderKnowledgeBase()` → `PROOF_POINTS_DATABASE` → `INDUSTRY_INSIGHTS_MAP` → `SYSTEM_PROMPT` (schema + 11-slide persuasion arc) — with `FEW_SHOT_EXEMPLARS` injected before the live brief and a fail-open `critiqueAndRevise` pass after the draft (`ENABLE_SELF_CRITIQUE`, rfp only). All calls use `fetchWithRetry` + `validateGeminiBody()`. Exports `GeminiBlockedError` for typed error handling. |
 | googleAuth | `src/utils/googleAuth.ts` | Google OAuth 2.0 token management via GIS; `ensureFreshToken(bufferMs)` for long-running flows |
 | googleSlides | `src/utils/googleSlides.ts` | Google Slides REST API — 3-phase presentation creation with theme-aware palette system; `withBackoff` retries on 429 + 401 |
 | googleSlidesTemplate | `src/utils/googleSlidesTemplate.ts` | Template-based slide builder — copies template via Drive API, auto-discovers roles, clear-and-fill from SlideData[]; `withBackoff` retries on 429 + 401 |
-| trainingContext | `src/utils/trainingContext.ts` | Pre-seeded training context for LLM: `PARAMOUNT_TRAINING_CONTEXT`, `PROOF_POINTS_DATABASE` (case study stats for automated proof insertion), `INDUSTRY_INSIGHTS_MAP` (category-specific trend insights for QSR, telecom, etc.) |
+| trainingContext | `src/utils/trainingContext.ts` | Layer 2 knowledge base: `KNOWLEDGE_BASE_META` (`currentAsOf`/`owner`/`sources`), `renderKnowledgeBase()` (freshness preamble + inventory body), `PARAMOUNT_TRAINING_CONTEXT` (= `renderKnowledgeBase()`, back-compat), `PROOF_POINTS_DATABASE`, `INDUSTRY_INSIGHTS_MAP`. Identity lives in `paramountAgent/persona.ts`, not here. See "Updating the Knowledge Base" below |
+| paramountAgent | `src/utils/paramountAgent/{persona,exemplars,critique}.ts` | Layered Paramount agent: `persona.ts` (identity + non-negotiables + anti-patterns), `exemplars.ts` (`FEW_SHOT_EXEMPLARS`, rfp-gated brief→JSON), `critique.ts` (`ENABLE_SELF_CRITIQUE`, `RUBRIC`, fail-open `critiqueAndRevise`) |
 | brandColors | `src/utils/brandColors.ts` | Brand palette derivation: `getBrandPalette(company)` for ~50 known brands; `derivePaletteFromHex(hex)` derives a full 4-stop `SlidePalette` from any hex color |
+
+---
+
+### Updating the Knowledge Base
+
+The Paramount knowledge base (`src/utils/trainingContext.ts`) is a **dated, owned file**, not an auto-fed feed.
+
+- **Owner:** `KNOWLEDGE_BASE_META.owner` (currently `steveellisny@gmail.com`).
+- **Freshness field:** `KNOWLEDGE_BASE_META.currentAsOf`. `renderKnowledgeBase()` surfaces this date to the model, telling it to treat anything newer as an assumption rather than rejecting it.
+- **Sources:** `KNOWLEDGE_BASE_META.sources` lists the real reference proposals/briefs the inventory is distilled from.
+
+**Quarterly refresh (manual):**
+1. Update the inventory body in `trainingContext.ts` — properties, talent, calendar dates, audience stats, proof points (`PROOF_POINTS_DATABASE`), and industry insights (`INDUSTRY_INSIGHTS_MAP`).
+2. Bump `KNOWLEDGE_BASE_META.currentAsOf` to today and add any new reference docs to `sources`.
+3. If a new reference proposal is strong enough to teach voice/grounding, add a `{ user } / { model }` pair to `FEW_SHOT_EXEMPLARS` (`paramountAgent/exemplars.ts`) — keep item counts aligned with `SYSTEM_PROMPT`.
+4. Run `npm run build` and the E2E suite; the rendered knowledge text feeds the prompt, so review a sample generation after large edits.
+
+Identity and hard rules live in `paramountAgent/persona.ts` (not the knowledge base) — edit them there, once.
 
 ---
 
