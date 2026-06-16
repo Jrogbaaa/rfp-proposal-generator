@@ -110,6 +110,9 @@ function buildBriefText(extracted: Record<string, unknown>): string {
   if (extracted.clientEmail) clientParts.push(extracted.clientEmail as string);
   if (extracted.clientCompany) clientParts.push(extracted.clientCompany as string);
   if (clientParts.length) lines.push(`Client: ${clientParts.join(', ')}`);
+  // Explicit Company line so the parser keeps the company even when no contact
+  // name was extracted (otherwise "Client: Dunkin'" collapses to a single part).
+  if (extracted.clientCompany) lines.push(`Company: ${extracted.clientCompany}`);
 
   if (extracted.timeline) lines.push(`Timeline: ${extracted.timeline}`);
   if (extracted.budget) lines.push(`Budget: ${extracted.budget}`);

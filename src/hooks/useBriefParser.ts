@@ -77,8 +77,11 @@ export function useBriefParser(text: string): Partial<ProposalData> | null {
           if (parts.length >= 2 && parts[1].includes('@')) {
             client.email = parts[1]
           }
-          if (parts.length >= 3) {
-            client.company = parts[2]
+          // Company = the last non-name, non-email part. Handles both
+          // "Name, email, Company" and "Name, Company" (no email) shapes.
+          const companyPart = parts.slice(1).find(p => p && !p.includes('@'))
+          if (parts.length >= 2 && companyPart) {
+            client.company = companyPart
           }
         }
         else if (key === 'company' || key === 'organization') {
@@ -112,6 +115,22 @@ export function useBriefParser(text: string): Partial<ProposalData> | null {
         }
         else if (key === 'month 3' || key === 'month 3 investment' || key === 'month three' || key === 'month three investment' || key === 'third month' || key === 'month 3+' || key === 'ongoing') {
           project.monthThreeInvestment = value
+        }
+      }
+    }
+
+    // Free-form fallback: no structured Company/Client line was found, so try
+    // to lift a brand from a "for <Proper Noun>" phrase (e.g. "...deck for
+    // Dunkin'..."). Best-effort only — skips stop-words/dates and leaves the
+    // company empty (greeting falls back to "your client") when unsure.
+    if (!client.company) {
+      const m = text.match(/\bfor\s+([A-Z][\w&.'’-]*(?:\s+[A-Z][\w&.'’-]*){0,2})/)
+      if (m) {
+        const candidate = m[1].trim().replace(/[.,;:]+$/, '')
+        const firstWord = candidate.split(/\s+/)[0]
+        const STOP = /^(the|a|an|q[1-4]|jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|jun(e)?|jul(y)?|aug(ust)?|sep(tember)?|oct(ober)?|nov(ember)?|dec(ember)?|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?)$/i
+        if (!STOP.test(firstWord) && !/^\d/.test(candidate)) {
+          client.company = candidate
         }
       }
     }

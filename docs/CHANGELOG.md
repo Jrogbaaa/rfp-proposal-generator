@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-06-16] — Paramount agent: four-layer refactor + self-critique pass
+
+### Added
+- **`src/utils/paramountAgent/persona.ts`** (new) — Layer 1 single source of truth for the agent's identity. Exports `PARAMOUNT_AGENT_IDENTITY`, `NON_NEGOTIABLES` (always name the property, never invent a stat, every integration = property + mechanic + outcome, active ownership language, always close with measurement), and `ANTI_PATTERNS`. Deduplicates the identity text that was previously restated in both `llmService.ts` `SYSTEM_PROMPT` and the `trainingContext.ts` header.
+- **`src/utils/paramountAgent/exemplars.ts`** (new) — Layer 3 few-shot. Exports `FEW_SHOT_EXEMPLARS`, one compact, full brief→ideal `ExpandedContent` JSON pair distilled from the real Dunkin' reference (correct item counts, named properties, sourced stats, property→mechanic→outcome integrations). Injected as a prior user/model turn before the live brief, gated to `paramount-rfp` only.
+- **`src/utils/paramountAgent/critique.ts`** (new) — Layer 4 self-critique. Exports `ENABLE_SELF_CRITIQUE` (default `true`), `RUBRIC`, and `critiqueAndRevise(draft, ctx)` — one extra low-temp Gemini call that scores the draft against the rubric and returns a revised object in the same `ExpandedContent` schema. **Fail-open**: any error, timeout, empty/invalid JSON, or failed sanity check returns the original draft unchanged.
+
+### Changed
+- **`src/utils/trainingContext.ts`** — Layer 2. Added `KNOWLEDGE_BASE_META` (`currentAsOf`, `owner`, `sources[]`) and `renderKnowledgeBase()`, which prepends a freshness preamble (formalizing the Open IP Policy) to the inventory body. Identity sentence removed from the knowledge body (now owned by `persona.ts`). `PARAMOUNT_TRAINING_CONTEXT`, `PROOF_POINTS_DATABASE`, and `INDUSTRY_INSIGHTS_MAP` exports preserved (the first is now `renderKnowledgeBase()`), so showcase/iterate importers are unaffected. Knowledge prose kept intact (no typed-data shatter) to guarantee prompt parity.
+- **`src/utils/llmService.ts`** — `generateProposalContent` now assembles the `paramount-rfp` system prompt from the four layers (persona → `renderKnowledgeBase()` → proof points → industry insights → schema/slide-arc prompt), injects `FEW_SHOT_EXEMPLARS` before the live brief (RFP only), and runs `critiqueAndRevise` after the draft when `ENABLE_SELF_CRITIQUE` is on (RFP only). `SYSTEM_PROMPT` identity paragraph replaced with a pointer to the now-shared persona block. Output contract (`ExpandedContent`, deck-type routing) unchanged — `googleSlides.ts`, chat components, and the E2E suite untouched.
+
+### Why
+The agent was a prompt-based persona with three weaknesses: the identity was entangled/duplicated, the knowledge was an undated prose blob, and the five real reference proposals were never used as few-shot examples. This restructures the agent into clean Identity / Knowledge / Craft / Harness layers and adds a grounding-focused revise pass — a behavior-preserving refactor plus one quality addition, with no tool-calling and no schema changes. Verified: `npm run build` passes; targeted E2E across mount, RFP generation (few-shot + critique fail-open), and the iterate path all green.
+
+---
+
 ## [2026-06-16] — Step 2 slide deletion + AI Copywriter round-trip regression test
 
 ### Added
@@ -10,6 +26,9 @@
 
 ### Changed
 - **`src/utils/slideBuilder.ts`** — Added `finalizeSlides()` which filters out slides whose `slideKey` is in `deletedSlideKeys` and renumbers the survivors `1..N`. Applied as the final step in all three return paths of `buildSlidesFromData()` (paramount-rfp, paramount-showcase, generic). Because this single builder feeds the Step 2 preview, the Step 3 Design Studio, and the Google Slides / PPTX export, deletion propagates everywhere automatically.
+
+### Fixed
+- **`e2e/app.spec.ts`** — The Playwright `beforeEach` now also sets `sessionStorage["rfp_site_unlocked"] = "1"`. The `PasswordGate` added on 2026-05-11 wraps the entire app, but the e2e harness only set `rfp_app_entered`, so every app-loading test was stranded on the password screen (55 of 56 failing). Unlocking the gate in the harness restores the suite (56/56 passing).
 
 ### Why
 The AI Copywriter (Step 2 chat) was wired correctly but lacked any test proving slide *text* actually changes after a chat turn, so its behavior was unverified. The new regression test closes that gap. Slide deletion was a missing capability — users could edit copy but not remove whole slides; doing it at the builder level keeps the preview, design review, and export in lock-step.

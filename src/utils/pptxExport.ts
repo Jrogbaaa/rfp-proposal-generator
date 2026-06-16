@@ -519,7 +519,7 @@ function buildGenericDeck(pptx: pptxgen, proposalData: ProposalData, expanded: E
 
 // ─── Drive upload ─────────────────────────────────────────────────────────────
 
-async function uploadPptxToDrive(arrayBuffer: ArrayBuffer, name: string, token: string): Promise<{ id: string; webViewLink: string }> {
+export async function uploadPptxToDrive(arrayBuffer: ArrayBuffer, name: string, token: string): Promise<{ id: string; webViewLink: string }> {
   const boundary = 'rfp_pptx_boundary_x7k2'
   const meta = JSON.stringify({ name, mimeType: 'application/vnd.google-apps.presentation' })
   const enc = new TextEncoder()
