@@ -9,12 +9,16 @@ import proposalsRouter from './routes/proposals.js'
 const app = express()
 
 const ALLOWED_ORIGINS = new Set(
-  [process.env.FRONTEND_ORIGIN, 'http://localhost:5173'].filter(Boolean)
+  [process.env.FRONTEND_ORIGIN, 'http://localhost:5173', 'http://localhost:5174'].filter(Boolean)
 )
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.has(origin)) callback(null, true)
-    else callback(new Error('CORS rejected'))
+    // Allow any localhost port in development
+    if (!origin || ALLOWED_ORIGINS.has(origin) || /^http:\/\/localhost:\d+$/.test(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('CORS rejected'))
+    }
   },
 }))
 app.use(compression())

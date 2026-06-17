@@ -26,8 +26,11 @@ import type {
   CustomClientPlan,
   FlexibleSlide,
 } from '../types/proposal'
+import type { SlideData } from '../data/slideContent'
+import type { SlideOverrides } from './design/vocabulary'
 import type { SlidePalette } from './brandColors'
 import { getBrandPalette, derivePaletteFromHex } from './brandColors'
+import { buildDeckFromSlides } from './design/pptxVariants'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -562,6 +565,36 @@ export async function uploadPptxToDrive(arrayBuffer: ArrayBuffer, name: string, 
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Export a pre-built SlideData[] (from buildSlidesFromData) with their
+ * AI-reviewed SlideOverrides[] through the unified pptxVariants renderers.
+ * This keeps the exported deck in sync with what the user sees in the canvas.
+ */
+export async function exportSlidesViaDrive(
+  slides: SlideData[],
+  overrides: SlideOverrides[],
+  designConfig: DesignConfig,
+  getToken: () => Promise<string>,
+  title?: string,
+): Promise<ExportResult> {
+  const prs = new pptxgen()
+  prs.layout = 'LAYOUT_WIDE'
+  prs.title  = title ?? 'Presentation'
+  prs.author = 'Paramount Advertising Solutions'
+
+  buildDeckFromSlides(prs, slides, overrides, designConfig)
+
+  const arrayBuffer = await prs.write({ outputType: 'arraybuffer' }) as ArrayBuffer
+  const token  = await getToken()
+  const result = await uploadPptxToDrive(arrayBuffer, prs.title, token)
+
+  return {
+    presentationId:  result.id,
+    presentationUrl: result.webViewLink,
+    title:           prs.title,
+  }
+}
 
 export async function exportPresentationViaDrive(
   proposalData: ProposalData,
