@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import express from 'express'
 import type { Request, Response } from 'express'
+import { normalizeThinkingConfig } from '../../api/_lib/geminiThinking.js'
 
 const router = Router()
 
@@ -25,7 +26,7 @@ function checkRate(req: Request, res: Response): boolean {
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
-const GEMINI_MODEL   = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const GEMINI_MODEL   = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
 const GEMINI_ENDPOINT  = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 const FILES_API_UPLOAD = `https://generativelanguage.googleapis.com/upload/v1beta/files`
 const FILES_API_BASE   = `https://generativelanguage.googleapis.com/v1beta`
@@ -45,20 +46,7 @@ router.post('/generate-content', express.json({ limit: '25mb' }), async (req: Re
   const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS)
 
   try {
-    const body = { ...req.body }
-    if (body.generationConfig?.thinkingConfig) {
-      const tc = body.generationConfig.thinkingConfig
-      // Normalise to thinkingBudget (integer) which gemini-2.5-flash expects.
-      // If the client sent thinkingLevel (string), convert it.
-      if ('thinkingLevel' in tc && !('thinkingBudget' in tc)) {
-        const budget = tc.thinkingLevel === 'none' || tc.thinkingLevel === 'low' ? 0
-          : tc.thinkingLevel === 'high' ? 24576 : 8192
-        body.generationConfig = {
-          ...body.generationConfig,
-          thinkingConfig: { thinkingBudget: budget },
-        }
-      }
-    }
+    const body = normalizeThinkingConfig({ ...req.body }, GEMINI_MODEL)
 
     const geminiRes = await fetch(`${GEMINI_ENDPOINT}?key=${GEMINI_API_KEY}`, {
       method: 'POST',

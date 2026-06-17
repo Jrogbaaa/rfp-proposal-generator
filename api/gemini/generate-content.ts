@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { setCors } from '../_lib/cors.js'
+import { normalizeThinkingConfig } from '../_lib/geminiThinking.js'
 
 // Vercel serverless function `maxDuration` is 60s (see vercel.json).
 // Leave ~2s of headroom for response serialization + cold-start overhead.
@@ -20,16 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const model = process.env.GEMINI_MODEL || 'gemini-3-flash-preview'
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
-  const body = { ...req.body }
-  if (body.generationConfig?.thinkingConfig) {
-    const tc = body.generationConfig.thinkingConfig
-    if ('thinkingBudget' in tc && !('thinkingLevel' in tc)) {
-      body.generationConfig = {
-        ...body.generationConfig,
-        thinkingConfig: { thinkingLevel: tc.thinkingBudget === 0 ? 'low' : 'medium' },
-      }
-    }
-  }
+  const body = normalizeThinkingConfig({ ...req.body }, model)
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS)
