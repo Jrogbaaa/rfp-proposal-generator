@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-06-17] — Fix API server: CORS, Gemini model, thinkingConfig; replace ClaudeDesignButton with copy-prompt
+
+### Fixed
+- **CORS now allows any localhost port** — `server/index.ts`; hardcoded allow-list only included `localhost:5173` but Vite dev runs on `5174` when port 5173 is occupied. Added regex `/^http:\/\/localhost:\d+$/` so any local dev port is permitted.
+- **Gemini model corrected to `gemini-2.5-flash`** — `server/routes/gemini.ts`; default was `'gemini-3-flash-preview'` which is not a valid model name, causing all `/api/gemini/generate-content` proxy calls to return 404/500. Changed default to `gemini-2.5-flash`.
+- **`thinkingConfig` normalised for gemini-2.5-flash** — `server/routes/gemini.ts`; client sends `{ thinkingLevel: 'low' }` but `gemini-2.5-flash` requires `{ thinkingBudget: 0 }`. Server now converts `thinkingLevel → thinkingBudget` (low/none → 0, high → 24576, else → 8192). Eliminates `"Thinking level is not supported for this model"` 400 errors on generation + design-review.
+
+### Changed
+- **"Design with Claude" button replaced with "Copy Claude design prompt"** — `src/components/DesignStudio.tsx`; removed `ClaudeDesignButton` (which required a live API route that was not reliably available). Replaced with a clipboard copy button that builds the same `buildDeckPrompt()` text and copies it so users can paste into claude.ai manually. Added `promptCopied` state with 2.5s "Prompt copied!" confirmation feedback.
+- **`buildDeckPrompt` exported** — `src/utils/claudeSlides.ts`; was a private function, now exported so `DesignStudio` can call it directly without duplicating logic.
+
+### Verified
+- `npm run build` clean (tsc + vite). Full 56 E2E tests passing. Tested live: Brief → Refine (12 slides generated) → Export (Design Studio loads, 6→9/10, 12 improvements applied). All 12 slide layouts render correctly. Copy-prompt button present in right panel with clipboard feedback.
+
+---
+
 ## [2026-06-16] — Fix stat-grid copy garble + greeting company substitution
 
 ### Fixed

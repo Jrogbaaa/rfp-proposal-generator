@@ -5,9 +5,10 @@ import type { SlideData } from '../data/slideContent'
 import type { SlideOverrides } from './SlideCanvasRenderer'
 import SlideCanvasRenderer from './SlideCanvasRenderer'
 import GoogleSlidesButton from './GoogleSlidesButton'
-import ClaudeDesignButton from './ClaudeDesignButton'
 import { buildSlidesFromData } from '../utils/slideBuilder'
 import { runDesignLoop } from '../utils/designReview'
+import { buildDeckPrompt } from '../utils/claudeSlides'
+import { buildProposalData } from '../utils/buildProposalData'
 
 interface DesignStudioProps {
   parsedData: Partial<ProposalData> | null
@@ -47,6 +48,7 @@ export default function DesignStudio({
   const [scoreStart, setScoreStart] = useState<number | null>(null)
   const [scoreFinal, setScoreFinal] = useState<number | null>(null)
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
+  const [promptCopied, setPromptCopied] = useState(false)
 
   // Refs to hidden full-res slide elements for html2canvas
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -282,18 +284,40 @@ export default function DesignStudio({
                     <div className="flex-1 h-px bg-cream-300" />
                   </div>
 
-                  <ClaudeDesignButton
-                    data={parsedData}
-                    briefText={briefText}
-                    isEmpty={!briefText.trim()}
-                    preGeneratedContent={expansions}
-                    onSuccess={(url) => {
-                      setSlidesUrl(url)
-                      setPhase('exported')
+                  {/* Copy-to-clipboard prompt for manual use in claude.ai */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!parsedData || !expansions) return
+                      const proposalData = buildProposalData(parsedData, expansions)
+                      const prompt = buildDeckPrompt(proposalData, designConfig)
+                      navigator.clipboard.writeText(prompt).then(() => {
+                        setPromptCopied(true)
+                        setTimeout(() => setPromptCopied(false), 2500)
+                      })
                     }}
-                    designConfig={designConfig}
-                    brandVoice={brandVoice}
-                  />
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-navy-200 text-navy-700 text-sm font-medium hover:bg-cream-50 transition-colors"
+                  >
+                    {promptCopied ? (
+                      <>
+                        <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span className="text-emerald-600">Prompt copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                        </svg>
+                        Copy Claude design prompt
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[10px] text-navy-400 text-center leading-snug">
+                    Paste into <span className="font-medium">claude.ai</span> to get an AI-designed deck
+                  </p>
                 </motion.div>
               ) : phase === 'exported' && slidesUrl ? (
                 <motion.div

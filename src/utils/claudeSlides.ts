@@ -36,7 +36,7 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
 }
 
 /** Build a content + style brief for the pptx skill from the proposal data. */
-function buildDeckPrompt(data: ProposalData, designConfig: DesignConfig): string {
+export function buildDeckPrompt(data: ProposalData, designConfig: DesignConfig): string {
   const theme = resolveTheme(designConfig.colorTheme)
   const slides = buildSlidesFromData(data)
   const company = data.client.company || 'the client'

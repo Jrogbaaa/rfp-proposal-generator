@@ -701,9 +701,22 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 
 **Cause:** The Express dev server (`server/routes/gemini.ts`) was forwarding the Gemini request body as-is, while the Vercel serverless function (`api/gemini/generate-content.ts`) normalized `thinkingConfig.thinkingBudget` (Gemini 2.5 format) to `thinkingConfig.thinkingLevel` (Gemini 3 format). When the client sent `{ thinkingBudget: 0 }`, production converted it to `{ thinkingLevel: 'low' }` but dev passed it through unchanged.
 
-**Solution:** Added the same normalization logic to the Express route: if `thinkingBudget` is present without `thinkingLevel`, convert `thinkingBudget: 0` to `thinkingLevel: 'low'` and any other value to `thinkingLevel: 'medium'`.
+**Solution (2026-03-23):** Added normalization: `thinkingBudget: 0` → `thinkingLevel: 'low'` for Gemini 3 models.
 
-**Fix applied:** `server/routes/gemini.ts` — `generate-content` handler now shallow-clones `req.body` and normalizes `thinkingConfig` before forwarding to Gemini.
+**Updated solution (2026-06-17):** Model changed to `gemini-2.5-flash` which requires `thinkingBudget` (integer), not `thinkingLevel` (string). Client sends `{ thinkingLevel: 'low' }` from the `NO_THINKING` constant. Server now converts in the opposite direction: `thinkingLevel: 'low'/'none'` → `thinkingBudget: 0`, `'high'` → `24576`, else `8192`.
+
+**Fix applied:** `server/routes/gemini.ts` — normalizes `thinkingLevel` → `thinkingBudget` before forwarding. Also updated default model from `gemini-3-flash-preview` (invalid) to `gemini-2.5-flash`.
+
+---
+
+### Content generation fails with CORS error in worktree dev setup
+**Error:** `[server] Unhandled error: CORS rejected` in API server logs; content generation returns 500/network error when Vite runs on a non-default port.
+
+**Cause:** `server/index.ts` hardcoded `http://localhost:5173` in the CORS allow-list. When port 5173 is occupied by another project, Vite picks `5174` (or higher). Requests from `localhost:5174` are rejected by the Express CORS middleware.
+
+**Solution:** Added regex `/^http:\/\/localhost:\d+$/` to allow any localhost port. The env var `FRONTEND_ORIGIN` still overrides for production.
+
+**Fix applied:** `server/index.ts` CORS origin callback.
 
 ---
 
