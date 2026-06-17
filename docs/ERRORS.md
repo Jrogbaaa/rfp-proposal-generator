@@ -692,6 +692,7 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 | 2026-03-17 | Google Slides 401 mid-batch not retried | src/utils/googleSlides.ts | Extended withBackoff to handle AUTH_EXPIRED with token refresh | Fixed |
 | 2026-03-17 | Initial presentation creation has no retry | src/utils/googleSlides.ts | Wrapped POST create + Drive copy in withBackoff | Fixed |
 | 2026-03-23 | Express/Vercel thinkingConfig format mismatch | server/routes/gemini.ts | Added thinkingBudget→thinkingLevel normalization to Express route | Fixed |
+| 2026-06-17 | Dev/prod Gemini model + thinkingConfig mismatch (gemini-3-flash-preview wrongly thought invalid) | server/routes/gemini.ts, api/gemini/generate-content.ts | Standardized both on gemini-3-flash-preview + shared model-aware normalizeThinkingConfig (api/_lib/geminiThinking.ts) | Fixed |
 | 2026-03-23 | CI E2E "operation was canceled" (stale selectors + 15m timeout) | e2e/app.spec.ts | Updated 12 selectors (greeting, prompts, placeholder, heading); bumped CI timeout to 25m | Fixed |
 
 ---
@@ -703,9 +704,11 @@ Actual values don't matter since all API calls are mocked by Playwright route ha
 
 **Solution (2026-03-23):** Added normalization: `thinkingBudget: 0` → `thinkingLevel: 'low'` for Gemini 3 models.
 
-**Updated solution (2026-06-17):** Model changed to `gemini-2.5-flash` which requires `thinkingBudget` (integer), not `thinkingLevel` (string). Client sends `{ thinkingLevel: 'low' }` from the `NO_THINKING` constant. Server now converts in the opposite direction: `thinkingLevel: 'low'/'none'` → `thinkingBudget: 0`, `'high'` → `24576`, else `8192`.
+**Superseded attempt (2026-06-17):** Dev was switched to `gemini-2.5-flash` on the mistaken belief that `gemini-3-flash-preview` was invalid, and a `thinkingLevel → thinkingBudget` conversion was added to the Express route only — leaving dev (`gemini-2.5-flash`) and prod (`gemini-3-flash-preview`) on different models with opposite conversions.
 
-**Fix applied:** `server/routes/gemini.ts` — normalizes `thinkingLevel` → `thinkingBudget` before forwarding. Also updated default model from `gemini-3-flash-preview` (invalid) to `gemini-2.5-flash`.
+**Final solution (2026-06-17):** Verified directly against the live Gemini API: `gemini-3-flash-preview` is valid and accepts the client's native `thinkingLevel: 'low'`; `gemini-2.5-flash` is the model that rejects it (`"Thinking level is not supported for this model"` — it needs `thinkingBudget`). Standardized BOTH `server/routes/gemini.ts` (dev) and `api/gemini/generate-content.ts` (prod) on `gemini-3-flash-preview`, and replaced the divergent inline blocks with one shared, model-aware helper `api/_lib/geminiThinking.ts` (`normalizeThinkingConfig`): Gemini 3+ keeps `thinkingLevel` (converting a numeric budget if present); Gemini 2.x converts `thinkingLevel → thinkingBudget` (`low`/`none` → 0, `high` → 24576, else 8192).
+
+**Fix applied:** `api/_lib/geminiThinking.ts` (new), imported by both `api/gemini/generate-content.ts` and `server/routes/gemini.ts`; both default to `gemini-3-flash-preview`.
 
 ---
 

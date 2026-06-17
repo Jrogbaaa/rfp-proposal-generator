@@ -623,6 +623,40 @@ test.describe('Step 3 – Share Screen', () => {
   })
 })
 
+// ─── Step 3: Copy Claude Design Prompt ───────────────────────────────────────
+
+test.describe('Step 3 – Copy Claude design prompt', () => {
+  test('copies the deck brief to the clipboard and shows confirmation', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await mockGeminiApi(page)
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Prompt' }).click()
+    await page.locator('textarea').fill(SAMPLE_BRIEF)
+    await page.getByRole('button', { name: 'Continue to Refine' }).click()
+    await expect(
+      page.locator('[class*="rounded-2xl"]').filter({ hasText: "I've reviewed the brief for" }).first()
+    ).toBeVisible({ timeout: 10000 })
+
+    // Enter the AI Design Studio and wait for the design review to finish
+    await page.getByRole('button', { name: /Design & Export/i }).click()
+    await expect(page.getByText(/Design optimized/i)).toBeVisible({ timeout: 30000 })
+
+    // The "or" divider then the copy-to-clipboard button live in the export panel
+    const copyBtn = page.getByRole('button', { name: /Copy Claude design prompt/i })
+    await expect(copyBtn).toBeVisible()
+    await copyBtn.click()
+
+    // Button flips to its confirmation state
+    await expect(page.getByText('Prompt copied!')).toBeVisible({ timeout: 5000 })
+
+    // Clipboard holds the generated deck brief (company + stable boilerplate)
+    const clip = await page.evaluate(() => navigator.clipboard.readText())
+    expect(clip).toContain('Starbucks')
+    expect(clip).toContain('Produce a single editable .pptx file')
+  })
+})
+
 // ─── Step 2: Slide Preview Structure ─────────────────────────────────────────
 
 test.describe('Step 2 – Slide Preview Structure', () => {

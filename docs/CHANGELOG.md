@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-06-17] — Standardize Gemini model on gemini-3-flash-preview (dev + prod consistent)
+
+### Fixed
+- **Dev/prod Gemini model + thinkingConfig mismatch resolved** — the prior session left `server/routes/gemini.ts` (dev) on `gemini-2.5-flash` with `thinkingLevel → thinkingBudget` conversion, while `api/gemini/generate-content.ts` (prod) stayed on `gemini-3-flash-preview` with the opposite `thinkingBudget → thinkingLevel` conversion. Live API testing confirmed `gemini-3-flash-preview` is a valid, current model that accepts the client's native `thinkingLevel: 'low'`, and that `gemini-2.5-flash` is the model which rejects `thinkingLevel` (`"Thinking level is not supported for this model"`). Standardized BOTH proxies on `gemini-3-flash-preview`.
+- **Single source of truth for thinking normalization** — new `api/_lib/geminiThinking.ts` (`normalizeThinkingConfig(body, model)`), imported by both the Vercel function and the Express dev route. Gemini 3+ passes `thinkingLevel` through (converts a numeric budget if present); Gemini 2.x converts `thinkingLevel → thinkingBudget`. Replaces the two divergent inline blocks.
+
+### Added
+- **Copy-prompt button E2E test** — `e2e/app.spec.ts`; new "Step 3 – Copy Claude design prompt" test grants clipboard permission, reaches the Design Studio, clicks "Copy Claude design prompt", and asserts the "Prompt copied!" confirmation plus clipboard content (company name + deck-brief boilerplate).
+
+### Verified
+- Live API smoke matrix (real key): `gemini-3-flash-preview` PASS for no-thinking / `thinkingLevel:low` / `thinkingBudget:0`; `gemini-2.5-flash` FAILS `thinkingLevel:low` (as expected), PASS `thinkingBudget:0`; `gemini-3.5-flash` also available and passes all.
+- Live frontend walk (real model): Brief → Refine generated 12 contextual slides through the actual vite → Express → Gemini path with zero proxy errors.
+- `npm run build` clean (tsc + vite). Playwright suite 57/57 passing (incl. the new copy-prompt test).
+
+### Note
+- Supersedes the Gemini-model claim in the prior 2026-06-17 entry below: `gemini-3-flash-preview` is valid; the temporary switch to `gemini-2.5-flash` was a misdiagnosis. (The CORS fix and the ClaudeDesignButton → copy-prompt change from that entry remain in effect.)
+
+---
+
 ## [2026-06-17] — Fix API server: CORS, Gemini model, thinkingConfig; replace ClaudeDesignButton with copy-prompt
 
 ### Fixed
