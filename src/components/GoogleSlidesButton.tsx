@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ProposalData, ExpandedContent, DesignConfig, BrandVoiceProfile } from '../types/proposal'
+import type { SlideData } from '../data/slideContent'
+import type { SlideOverrides } from '../utils/design/vocabulary'
 import { ensureFreshToken } from '../utils/googleAuth'
-import { exportPresentationViaDrive } from '../utils/pptxExport'
+import { exportPresentationViaDrive, exportSlidesViaDrive } from '../utils/pptxExport'
 import { generateProposalContent } from '../utils/llmService'
 import { GeminiBlockedError } from '../utils/llmService'
 import { FetchTimeoutError, FetchRetryExhaustedError } from '../utils/fetchWithRetry'
@@ -17,6 +19,10 @@ interface GoogleSlidesButtonProps {
   onSuccess?: (url: string) => void
   designConfig?: DesignConfig
   brandVoice?: BrandVoiceProfile | null
+  // When provided, export renders these pre-built slides + AI overrides instead of
+  // re-deriving content from proposalData. This is the unified pipeline path.
+  slides?: SlideData[]
+  overrides?: SlideOverrides[]
 }
 
 type Stage = 'idle' | 'authenticating' | 'generating' | 'creating' | 'done' | 'error'
@@ -29,7 +35,7 @@ const PROGRESS_STEPS = [
   'Finalising...',
 ]
 
-export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, onSuccess, designConfig, brandVoice }: GoogleSlidesButtonProps) {
+export default function GoogleSlidesButton({ data, briefText, isEmpty, preGeneratedContent, onSuccess, designConfig, brandVoice, slides, overrides }: GoogleSlidesButtonProps) {
   const [stage, setStage] = useState<Stage>('idle')
   const [progressStep, setProgressStep] = useState(0)
   const [slidesUrl, setSlidesUrl] = useState<string | null>(null)
@@ -62,7 +68,20 @@ export default function GoogleSlidesButton({ data, briefText, isEmpty, preGenera
 
       // Step 4: Re-validate token right before export (generation may have consumed time)
       const tokenGetter = () => ensureFreshToken()
-      const result = await exportPresentationViaDrive(proposalData, designConfig ?? { colorTheme: 'navy-gold' }, tokenGetter)
+      const config = designConfig ?? { colorTheme: 'navy-gold' as const }
+
+      // Unified path: if slides + overrides were provided by DesignStudio,
+      // render them directly — this ensures what you approved on screen is what
+      // you get in the exported file.
+      const result = slides && slides.length > 0
+        ? await exportSlidesViaDrive(
+            slides,
+            overrides ?? slides.map(() => ({})),
+            config,
+            tokenGetter,
+            proposalData.project.title || 'Presentation',
+          )
+        : await exportPresentationViaDrive(proposalData, config, tokenGetter)
       setProgressStep(4)
 
       setSlidesUrl(result.presentationUrl)

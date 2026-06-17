@@ -272,6 +272,8 @@ export default function DesignStudio({
                     }}
                     designConfig={designConfig}
                     brandVoice={brandVoice}
+                    slides={slides}
+                    overrides={overrides}
                   />
 
                   <div className="flex items-center gap-3 py-1">
